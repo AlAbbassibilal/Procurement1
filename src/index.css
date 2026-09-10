@@ -1,0 +1,57 @@
+@import './theme/brand.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  body { @apply bg-surface-sunken text-ink-800 font-sans text-[14px] leading-[1.5]; }
+  h1, h2, h3, h4 { @apply font-display text-ink-900 tracking-[-0.01em]; }
+  ::selection { @apply bg-brand-200 text-ink-900; }
+  [dir="rtl"] body { font-family: var(--font-arabic); }
+}
+
+@layer components {
+  .card { @apply bg-surface rounded-card border border-line shadow-card; }
+  .label { @apply block text-[12px] font-medium text-ink-600 mb-1.5 uppercase tracking-[0.04em]; }
+  .input {
+    @apply w-full bg-surface border border-ink-300 rounded-control px-3 py-2 text-[14px] text-ink-900
+           placeholder:text-ink-400 transition-colors
+           focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/15
+           disabled:bg-surface-sunken disabled:text-ink-500;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-control px-3.5 py-2 text-[13.5px] font-medium
+           transition-all select-none whitespace-nowrap
+           focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/30
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-primary { @apply btn bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800 shadow-sm; }
+  .btn-secondary { @apply btn bg-surface text-ink-800 border border-ink-300 hover:bg-surface-muted hover:border-ink-400; }
+  .btn-ghost { @apply btn text-ink-700 hover:bg-ink-100; }
+  .btn-danger { @apply btn bg-accent-600 text-white hover:bg-accent-700; }
+  .btn-danger-soft { @apply btn bg-danger-50 text-danger-700 hover:bg-accent-100; }
+  .btn-sm { @apply px-2.5 py-1.5 text-[12.5px]; }
+  .btn-lg { @apply px-5 py-2.5 text-[15px]; }
+  .table-th { @apply text-left text-[11.5px] font-semibold uppercase tracking-[0.05em] text-ink-500 px-4 py-2.5 bg-surface-muted border-b border-line; }
+  .table-td { @apply px-4 py-3 border-b border-line text-ink-800 align-middle; }
+  .kbd { @apply font-mono text-[11px] bg-ink-100 border border-ink-300 rounded px-1.5 py-0.5 text-ink-700; }
+}
+
+/* RHS secondary pattern (sun symbol) — subtle background per guideline §9 (5–10% opacity) */
+.pattern-sun {
+  background-image: radial-gradient(circle at 1px 1px, rgb(var(--sun-500) / 0.10) 1.2px, transparent 0);
+  background-size: 28px 28px;
+}
+.scrollbar-thin::-webkit-scrollbar { width: 8px; height: 8px; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: rgb(var(--ink-300)); border-radius: 8px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+
+/* Print: PO / contract / requisition print-outs keep the document body only */
+@media print {
+  aside, header, footer, .btn, .btn-primary, .btn-secondary, .btn-ghost, .btn-danger-soft, nav { display: none !important; }
+  main { overflow: visible !important; }
+  body { background: white; }
+  .card { box-shadow: none; border-color: #ccc; break-inside: avoid; }
+}

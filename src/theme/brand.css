@@ -1,0 +1,95 @@
+/* ============================================================================
+   RHS BRAND TOKENS — SINGLE SOURCE OF TRUTH
+   Source: "RHS - Brand Guideline 2025" (Restoring Hope Society)
+   ----------------------------------------------------------------------------
+   Primary palette (guideline §6):
+     Green   #00853f  rgb(0 133 63)    — primary brand / actions
+     Crimson #d21e47  rgb(211 18 69)   — "RESTORING" wordmark / emphasis
+     Amber   #ffb32c  rgb(255 179 44)  — sun symbol / highlight
+     Navy    #152b38  rgb(21 43 56)    — dark surfaces, headings
+     Black   #000000
+   Tints follow the guideline's 100% → 10% opacity steps on white.
+
+   Typography (§7): Helvetica Neue (primary), Myriad Pro (secondary),
+   Helvetica Neue W23 (Arabic). These are licensed fonts — they are declared
+   here and will render wherever installed; system Helvetica/Arial fallback
+   otherwise. Add @font-face rules here once web-font files are licensed.
+
+   Every component consumes these via Tailwind classes (bg-brand-600,
+   text-ink-500, rounded-card ...). No literal colours elsewhere.
+   ============================================================================ */
+
+:root {
+  /* --- Brand primary: RHS Green ------------------------------------------- */
+  --brand-50:  242 249 245;
+  --brand-100: 230 243 236;
+  --brand-200: 204 231 217;
+  --brand-300: 153 206 178;
+  --brand-400: 102 182 140;
+  --brand-500:  51 157 101;
+  --brand-600:   0 133  63;   /* #00853f */
+  --brand-700:   0 110  52;
+  --brand-800:   0  88  42;
+  --brand-900:   0  66  31;
+  --brand-950:   0  44  21;
+
+  /* --- Brand secondary: RHS Crimson --------------------------------------- */
+  --accent-50:  253 244 246;
+  --accent-100: 251 233 237;
+  --accent-200: 246 210 218;
+  --accent-300: 237 165 181;
+  --accent-400: 229 120 145;
+  --accent-500: 220  75 108;
+  --accent-600: 211  30  71;  /* #d21e47 */
+  --accent-700: 176  25  59;
+
+  /* --- Brand highlight: RHS Amber (sun) ----------------------------------- */
+  --sun-50:  255 248 234;
+  --sun-100: 255 240 213;
+  --sun-300: 255 209 128;
+  --sun-500: 255 179  44;     /* #ffb32c */
+  --sun-700: 204 143  35;
+
+  /* --- Neutral / ink: tints of RHS Navy ----------------------------------- */
+  --ink-50:  248 249 250;
+  --ink-100: 241 243 245;
+  --ink-200: 226 230 233;
+  --ink-300: 199 206 211;
+  --ink-400: 149 161 170;
+  --ink-500: 104 120 133;
+  --ink-600:  74  92 107;
+  --ink-700:  52  70  85;
+  --ink-800:  33  53  68;
+  --ink-900:  21  43  56;     /* #152b38 */
+
+  /* --- Semantic status (mapped onto brand palette) ------------------------ */
+  --success-50: 230 243 236;  --success-500:   0 133  63;  --success-700:   0  88  42;
+  --warning-50: 255 248 234;  --warning-500: 204 143  35;  --warning-700: 153 107  26;
+  --danger-50:  251 233 237;  --danger-500:  211  30  71;  --danger-700:  176  25  59;
+  --info-50:    237 242 246;  --info-500:     52 100 140;  --info-700:     33  70 100;
+
+  /* --- Surfaces ----------------------------------------------------------- */
+  --surface:        255 255 255;
+  --surface-muted:  248 249 250;
+  --surface-sunken: 241 243 245;
+  --border:         226 230 233;
+
+  /* --- Typography --------------------------------------------------------- */
+  --font-sans: 'Helvetica Neue', 'HelveticaNeue', Helvetica, 'Myriad Pro', Arial,
+               -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: var(--font-sans);
+  --font-arabic: 'Helvetica Neue W23 for SKY', 'Helvetica Neue', Tahoma, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* --- Shape & elevation (minimal, modern — guideline §1) ----------------- */
+  --radius-card: 8px;
+  --radius-control: 6px;
+  --radius-pill: 999px;
+  --shadow-card: 0 1px 2px rgb(21 43 56 / 0.05), 0 1px 3px rgb(21 43 56 / 0.05);
+  --shadow-raised: 0 4px 14px rgb(21 43 56 / 0.08), 0 2px 4px rgb(21 43 56 / 0.04);
+  --shadow-overlay: 0 24px 48px rgb(21 43 56 / 0.22);
+
+  /* --- Layout ------------------------------------------------------------- */
+  --sidebar-width: 252px;
+  --topbar-height: 60px;
+}

@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { NavLink, Outlet, useNavigate, Link } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, CheckSquare, Search, ShoppingCart, FileSignature, Building2, Users, SlidersHorizontal,
-  History, Bell, LogOut, ChevronDown, Menu, Settings, RotateCcw, ChevronsUpDown,
+  History, Bell, LogOut, ChevronDown, Menu, Settings, RotateCcw, ChevronsUpDown, PackageCheck, Receipt,
 } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
 import { Logo, SunMark } from './Logo'
@@ -16,7 +16,7 @@ interface NavItem { to: string; label: string; icon: React.ReactNode; roles?: Ro
 export default function Layout() {
   const user = useCurrentUser()!
   const nav = useNavigate()
-  const { logout, prs, pos, contracts, notifications, markRead, markAllRead, users, switchUser, settings, resetDemo } = useStore()
+  const { logout, prs, pos, contracts, invoices, notifications, markRead, markAllRead, users, switchUser, settings, resetDemo } = useStore()
   const [open, setOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   const [userOpen, setUserOpen] = useState(false)
@@ -24,8 +24,9 @@ export default function Layout() {
   const myApprovals = useMemo(
     () => prs.filter((p) => p.status === 'pending_approval' && canApprove(p.approvalChain, user)).length
         + pos.filter((p) => p.status === 'pending_approval' && canApprove(p.approvalChain, user)).length
+        + invoices.filter((i) => i.status === 'pending_approval' && canApprove(i.approvalChain, user)).length
         + (user.role === 'legal' ? contracts.filter((c) => c.status === 'legal_review').length : 0),
-    [prs, pos, contracts, user],
+    [prs, pos, contracts, invoices, user],
   )
   const sourcingCount = prs.filter((p) => p.status === 'approved' || p.status === 'sourcing').length
   const myNotifs = notifications.filter((n) => n.userId === user.id)
@@ -36,11 +37,13 @@ export default function Layout() {
       { to: '/', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
       { to: '/approvals', label: 'My approvals', icon: <CheckSquare size={17} />, badge: myApprovals },
     ] },
-    { title: 'Procure-to-contract', items: [
+    { title: 'Procure-to-pay', items: [
       { to: '/requisitions', label: 'Requisitions', icon: <FileText size={17} /> },
       { to: '/sourcing', label: 'Sourcing & quotations', icon: <Search size={17} />, roles: ['procurement_officer', 'procurement_manager', 'admin', 'executive_director', 'finance'], badge: sourcingCount },
       { to: '/orders', label: 'Purchase orders', icon: <ShoppingCart size={17} /> },
       { to: '/contracts', label: 'Contracts', icon: <FileSignature size={17} /> },
+      { to: '/receiving', label: 'Goods receipt', icon: <PackageCheck size={17} />, badge: pos.filter((p) => ['issued', 'contracted', 'partially_received'].includes(p.status)).length },
+      { to: '/invoices', label: 'Invoices & payments', icon: <Receipt size={17} />, roles: ['finance', 'procurement_officer', 'procurement_manager', 'admin', 'executive_director'], badge: invoices.filter((i) => i.status === 'exception').length },
     ] },
     { title: 'Masters', items: [
       { to: '/vendors', label: 'Vendors', icon: <Building2 size={17} /> },

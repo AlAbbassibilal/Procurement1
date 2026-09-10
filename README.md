@@ -8,6 +8,8 @@ A procure-to-contract system for **Restoring Hope Society (RHS)**, modelled on t
 
 ```
 Requisition (PR) → PR approvals → Sourcing (3 quotations) → Purchase order → PO approvals → Contract → Legal → Signatures
+                                                                    ↓
+                                          Goods receipt → Invoice (3-way match) → Finance approval → Payment → PO closed
 ```
 
 | Stage | Who | What the interface does |
@@ -19,6 +21,8 @@ Requisition (PR) → PR approvals → Sourcing (3 quotations) → Purchase order
 | **Purchase order** | Procurement | Auto-drafted from the awarded quotation, branded PO layout, terms, submit for approval |
 | **PO approvals** | Procurement Manager → Finance → Executive Director (by value band) | Same decision panel; approved POs are issued to the vendor |
 | **Contract** | Procurement → Legal → Signatories | Drafted from the issued PO with the RHS clause library, milestones/payment schedule, legal review loop, RHS + vendor signature, activation |
+| **Goods receipt** | Requester / Operations | Receive against PO lines (ordered / received / outstanding), condition, delivery note, photos; partial receipts; PO becomes *partially received* → *received* |
+| **Invoices** | Procurement / Finance | Register vendor invoice against a PO, **automatic 3-way match** (PO × receipt × invoice: quantity, price tolerance, cumulative total, duplicates), exception handling with Finance override, approval chain, payment recording; PO auto-closes when fully received and paid |
 | **Masters / Admin** | Admin, Procurement, Finance | Vendors register, users & roles, editable approval matrix, organisation settings, full audit trail |
 
 ## Run it
@@ -39,7 +43,7 @@ Everything visual is driven from **`src/theme/brand.css`** — the only file wit
 
 React 18 · TypeScript · Vite · Tailwind CSS · Zustand (persisted to `localStorage`) · React Router · lucide-react.
 
-State, approvals, numbering and notifications live in `src/store/useStore.ts`; the approval engine (matrix lookup, chain building, decisions, delegation, re-submission) is `src/lib/workflow.ts`. The store is the seam for a real backend: each action maps 1:1 to an API call.
+State, approvals, numbering and notifications live in `src/store/useStore.ts`; the approval engine (matrix lookup, chain building, decisions, delegation, re-submission) is `src/lib/workflow.ts`; the 3-way match rules are `src/lib/match.ts`. The store is the seam for a real backend: each action maps 1:1 to an API call.
 
 ## Project layout
 
@@ -49,7 +53,8 @@ src/
   types/                 domain model (PR, PO, Contract, Quotation, ApprovalRule, …)
   data/seed.ts           users, vendors, approval matrix, clause library, sample documents
   lib/workflow.ts        approval engine
+  lib/match.ts           3-way match (PO × goods receipt × invoice)
   store/useStore.ts      application state + all workflow actions + audit + notifications
   components/            Layout, Logo, ui primitives, workflow widgets (tracker, chain, decision panel, quotes)
-  pages/                 Login, Dashboard, Approvals, requisitions/, sourcing/, orders/, contracts/, Vendors, admin/, Audit
+  pages/                 Login, Dashboard, Approvals, requisitions/, sourcing/, orders/, contracts/, receiving/, invoices/, Vendors, admin/, Audit
 ```

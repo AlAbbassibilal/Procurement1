@@ -1,4 +1,4 @@
-import type { ApprovalRule, Contract, OrgSettings, PurchaseOrder, PurchaseRequisition, User, Vendor, ContractClause } from '@/types'
+import type { ApprovalRule, Contract, OrgSettings, PurchaseOrder, PurchaseRequisition, User, Vendor, ContractClause, GoodsReceipt, Invoice } from '@/types'
 import { addDays, toInputDate } from '@/lib/format'
 
 export const DOC_OWNER = 'Bilal Abbassi'
@@ -15,6 +15,8 @@ export const SEED_SETTINGS: OrgSettings = {
   taxRate: 16,
   quotationMinimum: 3,
   quotationThreshold: 500,
+  priceTolerancePct: 2,
+  paymentTermsDays: 30,
   fiscalYearStart: '01-01',
 }
 
@@ -44,6 +46,8 @@ export const SEED_RULES: ApprovalRule[] = [
   { id: 'r_pr_3', name: 'PR — High value',   docType: 'PR', minAmount: 10000.01, maxAmount: null, steps: [{ role: 'dept_manager', label: 'Department Manager' }, { role: 'finance', label: 'Finance — Budget Check' }, { role: 'executive_director', label: 'Executive Director' }] },
   { id: 'r_po_1', name: 'PO — Low value',    docType: 'PO', minAmount: 0,     maxAmount: 5000,  steps: [{ role: 'procurement_manager', label: 'Procurement Manager' }] },
   { id: 'r_po_2', name: 'PO — Medium value', docType: 'PO', minAmount: 5000.01, maxAmount: 25000, steps: [{ role: 'procurement_manager', label: 'Procurement Manager' }, { role: 'finance', label: 'Finance — Commitment' }] },
+  { id: 'r_inv_1', name: 'Invoice — Standard',   docType: 'INVOICE', minAmount: 0,     maxAmount: 10000, steps: [{ role: 'finance', label: 'Finance — Invoice Approval' }] },
+  { id: 'r_inv_2', name: 'Invoice — High value', docType: 'INVOICE', minAmount: 10000.01, maxAmount: null, steps: [{ role: 'finance', label: 'Finance — Invoice Approval' }, { role: 'executive_director', label: 'Executive Director — Payment Release' }] },
   { id: 'r_po_3', name: 'PO — High value',   docType: 'PO', minAmount: 25000.01, maxAmount: null, steps: [{ role: 'procurement_manager', label: 'Procurement Manager' }, { role: 'finance', label: 'Finance — Commitment' }, { role: 'executive_director', label: 'Executive Director' }] },
 ]
 
@@ -201,5 +205,24 @@ export const SEED_CONTRACTS: Contract[] = [
     attachments: [], status: 'legal_review', legalReviewer: 'u_dana',
     signatories: [{ name: 'Sami Barakat', title: 'Executive Director', party: 'RHS' }, { name: 'Rami Zayed', title: 'General Manager', party: 'Vendor' }],
     createdAt: ago(10), updatedAt: ago(9), comments: [],
+  },
+]
+
+export const SEED_GRNS: GoodsReceipt[] = [
+  {
+    id: 'grn_1', number: 'GRN-2025-0009', poId: 'po_1', poNumber: 'PO-2025-0017', vendorName: 'Amman Fleet & Logistics',
+    receivedBy: 'u_hani', receivedByName: 'Hani Odeh', receivedAt: ago(3), deliveryNoteRef: 'AFL-SVC-0925', location: 'RHS Operations Yard, Amman',
+    notes: 'Month 1 servicing of 3 MASU vans completed; job cards attached.', lines: [{ lineItemId: 'l1', quantity: 1, condition: 'good' }], attachments: [], createdAt: ago(3),
+  },
+]
+
+export const SEED_INVOICES: Invoice[] = [
+  {
+    id: 'inv_1', number: 'INV-2025-0012', vendorInvoiceNo: 'AFL/2025/1187', poId: 'po_1', poNumber: 'PO-2025-0017', vendorId: 'v_6', vendorName: 'Amman Fleet & Logistics',
+    ownerName: DOC_OWNER, registeredBy: 'u_yousef', registeredByName: 'Yousef Nasser', invoiceDate: toInputDate(addDays(new Date(), -2)), dueDate: toInputDate(addDays(new Date(), 28)),
+    currency: 'JOD', lines: [{ lineItemId: 'l1', description: 'Fleet maintenance & servicing — month 1', quantity: 1, unitPrice: 640 }], taxRate: 16,
+    status: 'pending_approval', matchIssues: [],
+    approvalChain: [{ id: 's1', order: 1, label: 'Finance — Invoice Approval', role: 'finance', approverId: 'u_rana', status: 'current' }],
+    attachments: [], createdAt: ago(2), updatedAt: ago(2), comments: [],
   },
 ]

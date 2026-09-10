@@ -2,9 +2,10 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type {
   ApprovalRule, Attachment, AuditEvent, Comment, Contract, ContractMilestone, LineItem, Notification, OrgSettings,
-  PurchaseOrder, PurchaseRequisition, Quotation, User, Vendor, DocType, Role,
+  PurchaseOrder, PurchaseRequisition, Quotation, User, Vendor, DocType, Role, GoodsReceipt, GoodsReceiptLine, Invoice, InvoiceLine,
 } from '@/types'
-import { DOC_OWNER, SEED_CONTRACTS, SEED_POS, SEED_PRS, SEED_RULES, SEED_SETTINGS, SEED_USERS, SEED_VENDORS, STANDARD_CLAUSES } from '@/data/seed'
+import { DOC_OWNER, SEED_CONTRACTS, SEED_GRNS, SEED_INVOICES, SEED_POS, SEED_PRS, SEED_RULES, SEED_SETTINGS, SEED_USERS, SEED_VENDORS, STANDARD_CLAUSES } from '@/data/seed'
+import { hasBlockingIssues, receiptProgress, runMatch, invoiceTotals } from '@/lib/match'
 import { applyDecision, buildChain, currentStep, resetChain, resolveApprover } from '@/lib/workflow'
 import { linesSubtotal, nowIso, uid } from '@/lib/format'
 
@@ -19,6 +20,8 @@ interface State {
   prs: PurchaseRequisition[]
   pos: PurchaseOrder[]
   contracts: Contract[]
+  grns: GoodsReceipt[]
+  invoices: Invoice[]
   notifications: Notification[]
   audit: AuditEvent[]
   counters: Record<string, number>
@@ -63,6 +66,20 @@ interface Actions {
   signContract: (id: string, party: 'RHS' | 'Vendor') => void
   addContractComment: (id: string, text: string) => void
 
+  // Goods receipt
+  postGoodsReceipt: (poId: string, data: { deliveryNoteRef: string; location: string; notes: string; lines: GoodsReceiptLine[]; attachments: Attachment[] }) => { ok: boolean; grnId?: string; error?: string }
+
+  // Invoices
+  registerInvoice: (data: { poId: string; vendorInvoiceNo: string; invoiceDate: string; dueDate: string; lines: InvoiceLine[]; taxRate: number; attachments: Attachment[] }) => { ok: boolean; invoiceId?: string; error?: string }
+  updateInvoice: (id: string, patch: Partial<Invoice>) => void
+  rematchInvoice: (id: string) => void
+  overrideMatch: (id: string, reason: string) => { ok: boolean; error?: string }
+  submitInvoice: (id: string) => { ok: boolean; error?: string }
+  decideInvoice: (id: string, decision: Decision, comment?: string, delegateTo?: string) => { ok: boolean; error?: string }
+  payInvoice: (id: string, payment: { reference: string; method: 'bank_transfer' | 'cheque' | 'cash'; paidAt: string }) => { ok: boolean; error?: string }
+  rejectInvoiceAtRegistration: (id: string, reason: string) => void
+  addInvoiceComment: (id: string, text: string) => void
+
   // masters / admin
   upsertVendor: (v: Partial<Vendor> & { id?: string }) => void
   upsertUser: (u: Partial<User> & { id?: string }) => void
@@ -86,7 +103,10 @@ const initial = (): State => ({
   prs: SEED_PRS,
   pos: SEED_POS,
   contracts: SEED_CONTRACTS,
+  grns: SEED_GRNS,
+  invoices: SEED_INVOICES,
   notifications: [
+    { id: 'n5', userId: 'u_rana', at: nowIso(), title: 'Invoice approval required', body: 'INV-2025-0012 · Amman Fleet & Logistics · JOD 742.40', link: '/invoices/inv_1', read: false, kind: 'approval' },
     { id: 'n1', userId: 'u_rana', at: nowIso(), title: 'Approval required', body: 'PR-2025-0042 · Laptops for field coordinators', link: '/requisitions/pr_2', read: false, kind: 'approval' },
     { id: 'n2', userId: 'u_omar', at: nowIso(), title: 'Approval required', body: 'PR-2025-0043 · Physiotherapy consumables', link: '/requisitions/pr_3', read: false, kind: 'approval' },
     { id: 'n3', userId: 'u_dana', at: nowIso(), title: 'Legal review requested', body: 'CT-2025-0006 · Fleet Maintenance Services Agreement', link: '/contracts/ct_1', read: false, kind: 'approval' },
@@ -95,7 +115,7 @@ const initial = (): State => ({
   audit: [
     { id: 'a1', at: nowIso(), actorId: 'u_bilal', actorName: DOC_OWNER, docType: 'SYSTEM', action: 'System initialised', detail: 'Demo dataset loaded' },
   ],
-  counters: { PR: 44, PO: 17, CT: 6 },
+  counters: { PR: 44, PO: 17, CT: 6, GRN: 9, INV: 12 },
 })
 
 export const useStore = create<State & Actions>()(
@@ -116,7 +136,7 @@ export const useStore = create<State & Actions>()(
       const notifyRole = (role: Role, n: Omit<Notification, 'id' | 'userId' | 'at' | 'read'>) => {
         get().users.filter((u) => u.active && u.role === role).forEach((u) => notify(u.id, n))
       }
-      const nextNumber = (t: 'PR' | 'PO' | 'CT') => {
+      const nextNumber = (t: 'PR' | 'PO' | 'CT' | 'GRN' | 'INV') => {
         const n = (get().counters[t] ?? 0) + 1
         set((s) => ({ counters: { ...s.counters, [t]: n } }))
         return `${t}-${new Date().getFullYear()}-${String(n).padStart(4, '0')}`
@@ -124,7 +144,7 @@ export const useStore = create<State & Actions>()(
       const notifyCurrentApprover = (docType: DocType, doc: { id: string; number: string; title: string; approvalChain: PurchaseRequisition['approvalChain']; department?: string }) => {
         const step = currentStep(doc.approvalChain)
         if (!step) return
-        const link = docType === 'PR' ? `/requisitions/${doc.id}` : `/orders/${doc.id}`
+        const link = docType === 'PR' ? `/requisitions/${doc.id}` : docType === 'INVOICE' ? `/invoices/${doc.id}` : `/orders/${doc.id}`
         const target = step.delegatedTo ?? step.approverId ?? resolveApprover(get().users, step.role, doc.department)?.id
         if (target) notify(target, { kind: 'approval', title: 'Approval required', body: `${doc.number} · ${doc.title}`, link })
         else notifyRole(step.role, { kind: 'approval', title: 'Approval required', body: `${doc.number} · ${doc.title}`, link })
@@ -339,6 +359,7 @@ export const useStore = create<State & Actions>()(
           const a = actor()
           if (!po) return { ok: false, error: 'Not found' }
           if (po.contractId) return { ok: false, error: 'A contract already exists for this PO.' }
+          if (!['issued', 'partially_received', 'received'].includes(po.status)) return { ok: false, error: 'Contracts can only be drafted from issued purchase orders.' }
           const total = linesSubtotal(po.lines) * (1 + po.taxRate / 100)
           const vendor = get().vendors.find((v) => v.id === po.vendorId)
           const ed = get().users.find((u) => u.role === 'executive_director')
@@ -352,7 +373,7 @@ export const useStore = create<State & Actions>()(
             signatories: [{ name: ed?.name ?? 'Executive Director', title: ed?.title ?? 'Executive Director', party: 'RHS' }, { name: vendor?.contactName ?? 'Authorised Signatory', title: 'Authorised Signatory', party: 'Vendor' }],
             createdAt: nowIso(), updatedAt: nowIso(), comments: [],
           }
-          set((s) => ({ contracts: [ct, ...s.contracts], pos: s.pos.map((p) => (p.id === poId ? { ...p, contractId: ct.id, status: 'contracted', updatedAt: nowIso() } : p)) }))
+          set((s) => ({ contracts: [ct, ...s.contracts], pos: s.pos.map((p) => (p.id === poId ? { ...p, contractId: ct.id, status: p.status === 'issued' ? 'contracted' : p.status, updatedAt: nowIso() } : p)) }))
           log('CONTRACT', 'Contract drafted from PO', ct, `From ${po.number}`)
           return { ok: true, contractId: ct.id }
         },
@@ -385,6 +406,143 @@ export const useStore = create<State & Actions>()(
           const a = actor()
           const c: Comment = { id: uid('c_'), authorId: a.id, authorName: a.name, at: nowIso(), text }
           set((s) => ({ contracts: s.contracts.map((x) => (x.id === id ? { ...x, comments: [...x.comments, c] } : x)) }))
+        },
+
+        // ---- Goods receipt -------------------------------------------------
+        postGoodsReceipt: (poId, data) => {
+          const po = get().pos.find((p) => p.id === poId)
+          const a = actor()
+          if (!po) return { ok: false, error: 'Not found' }
+          if (!['issued', 'contracted', 'partially_received'].includes(po.status)) return { ok: false, error: 'Goods can only be received against an issued purchase order.' }
+          const lines = data.lines.filter((l) => l.quantity > 0)
+          if (!lines.length) return { ok: false, error: 'Enter a received quantity on at least one line.' }
+          for (const l of lines) {
+            const pl = po.lines.find((x) => x.id === l.lineItemId)
+            if (!pl) continue
+            const prior = get().grns.filter((g) => g.poId === poId).reduce((s2, g) => s2 + (g.lines.find((x) => x.lineItemId === l.lineItemId)?.quantity ?? 0), 0)
+            if (prior + l.quantity > pl.quantity) return { ok: false, error: `${pl.description}: receiving ${l.quantity} would exceed the ordered quantity (${pl.quantity}, already received ${prior}).` }
+          }
+          const grn: GoodsReceipt = {
+            id: uid('grn_'), number: nextNumber('GRN'), poId, poNumber: po.number, vendorName: po.vendorName, receivedBy: a.id, receivedByName: a.name,
+            receivedAt: nowIso(), deliveryNoteRef: data.deliveryNoteRef, location: data.location, notes: data.notes, lines, attachments: data.attachments, createdAt: nowIso(),
+          }
+          const allGrns = [grn, ...get().grns]
+          const prog = receiptProgress(po, allGrns)
+          const status: PurchaseOrder['status'] = prog.complete ? 'received' : (po.status === 'contracted' ? 'contracted' : 'partially_received')
+          set((s) => ({ grns: allGrns, pos: s.pos.map((p) => (p.id === poId ? { ...p, status, updatedAt: nowIso() } : p)) }))
+          log('GRN', 'Goods receipt posted', grn, `${po.number} · ${prog.received}/${prog.ordered} received`)
+          // re-evaluate any open invoices on this PO
+          get().invoices.filter((i) => i.poId === poId && ['registered', 'exception', 'matched'].includes(i.status)).forEach((i) => get().rematchInvoice(i.id))
+          notifyRole('finance', { kind: 'info', title: prog.complete ? 'PO fully received' : 'Goods receipt posted', body: `${grn.number} · ${po.number} · ${po.vendorName}`, link: `/receiving/${poId}` })
+          const pr = get().prs.find((p) => p.id === po.prId)
+          if (pr) notify(pr.requesterId, { kind: 'success', title: prog.complete ? 'Your order has been fully received' : 'Goods received', body: `${po.number} · ${prog.received}/${prog.ordered} units`, link: `/receiving/${poId}` })
+          return { ok: true, grnId: grn.id }
+        },
+
+        // ---- Invoices ------------------------------------------------------
+        registerInvoice: (data) => {
+          const po = get().pos.find((p) => p.id === data.poId)
+          const a = actor()
+          if (!po) return { ok: false, error: 'Purchase order not found.' }
+          if (!data.vendorInvoiceNo.trim()) return { ok: false, error: 'Vendor invoice number is required.' }
+          const lines = data.lines.filter((l) => l.quantity > 0)
+          if (!lines.length) return { ok: false, error: 'Enter at least one invoice line.' }
+          const inv: Invoice = {
+            id: uid('inv_'), number: nextNumber('INV'), vendorInvoiceNo: data.vendorInvoiceNo.trim(), poId: po.id, poNumber: po.number, vendorId: po.vendorId, vendorName: po.vendorName,
+            ownerName: DOC_OWNER, registeredBy: a.id, registeredByName: a.name, invoiceDate: data.invoiceDate, dueDate: data.dueDate, currency: po.currency, lines, taxRate: data.taxRate,
+            status: 'registered', matchIssues: [], approvalChain: [], attachments: data.attachments, createdAt: nowIso(), updatedAt: nowIso(), comments: [],
+          }
+          const issues = runMatch(inv, po, get().grns, get().invoices, get().settings.priceTolerancePct)
+          inv.matchIssues = issues
+          inv.status = hasBlockingIssues(issues) ? 'exception' : 'matched'
+          set((s) => ({ invoices: [inv, ...s.invoices] }))
+          log('INVOICE', 'Invoice registered', inv, `${po.vendorName} · ${inv.vendorInvoiceNo} · ${inv.status === 'matched' ? '3-way match OK' : `${issues.length} exception(s)`}`)
+          return { ok: true, invoiceId: inv.id }
+        },
+        updateInvoice: (id, patch) => set((s) => ({ invoices: s.invoices.map((i) => (i.id === id ? { ...i, ...patch, updatedAt: nowIso() } : i)) })),
+        rematchInvoice: (id) => {
+          const inv = get().invoices.find((i) => i.id === id)
+          const po = inv && get().pos.find((p) => p.id === inv.poId)
+          if (!inv || !po || !['registered', 'exception', 'matched'].includes(inv.status)) return
+          const issues = runMatch(inv, po, get().grns, get().invoices, get().settings.priceTolerancePct)
+          const status: Invoice['status'] = hasBlockingIssues(issues) ? 'exception' : 'matched'
+          set((s) => ({ invoices: s.invoices.map((i) => (i.id === id ? { ...i, matchIssues: issues, status, matchOverrideReason: undefined, updatedAt: nowIso() } : i)) }))
+        },
+        overrideMatch: (id, reason) => {
+          const inv = get().invoices.find((i) => i.id === id)
+          if (!inv) return { ok: false, error: 'Not found' }
+          if (!reason.trim()) return { ok: false, error: 'An override reason is required.' }
+          if (inv.matchIssues.some((x) => x.kind === 'duplicate_invoice')) return { ok: false, error: 'Duplicate invoices cannot be overridden — reject this invoice instead.' }
+          set((s) => ({ invoices: s.invoices.map((i) => (i.id === id ? { ...i, status: 'matched', matchOverrideReason: reason, updatedAt: nowIso() } : i)) }))
+          log('INVOICE', 'Match exceptions overridden', inv, reason)
+          return { ok: true }
+        },
+        submitInvoice: (id) => {
+          const inv = get().invoices.find((i) => i.id === id)
+          if (!inv) return { ok: false, error: 'Not found' }
+          if (!['matched', 'returned'].includes(inv.status)) return { ok: false, error: 'Invoice must pass the 3-way match (or be overridden) before approval.' }
+          const amount = invoiceTotals(inv.lines, inv.taxRate).subtotal
+          const chain = inv.status === 'returned' && inv.approvalChain.length ? resetChain(inv.approvalChain) : buildChain(get().rules, get().users, 'INVOICE', amount)
+          if (!chain.length) return { ok: false, error: 'No invoice approval rule matches this amount.' }
+          const upd = { ...inv, status: 'pending_approval' as const, approvalChain: chain, updatedAt: nowIso() }
+          set((s) => ({ invoices: s.invoices.map((i) => (i.id === id ? upd : i)) }))
+          log('INVOICE', 'Invoice submitted for approval', inv)
+          notifyCurrentApprover('INVOICE', { ...upd, title: `${upd.vendorName} · ${upd.vendorInvoiceNo}` })
+          return { ok: true }
+        },
+        decideInvoice: (id, decision, comment, delegateTo) => {
+          const inv = get().invoices.find((i) => i.id === id)
+          const a = actor()
+          if (!inv) return { ok: false, error: 'Not found' }
+          if (inv.status !== 'pending_approval') return { ok: false, error: 'Invoice is not awaiting approval.' }
+          if (decision !== 'approved' && !comment?.trim()) return { ok: false, error: 'A comment is required for this decision.' }
+          const { chain, outcome } = applyDecision(inv.approvalChain, decision, a, comment, delegateTo)
+          let status: Invoice['status'] = inv.status
+          if (outcome === 'completed') status = 'approved'
+          if (outcome === 'rejected') status = 'rejected'
+          if (outcome === 'returned') status = 'returned'
+          const upd = { ...inv, approvalChain: chain, status, updatedAt: nowIso() }
+          set((s) => ({ invoices: s.invoices.map((i) => (i.id === id ? upd : i)) }))
+          log('INVOICE', `Step ${decision}`, inv, comment)
+          const link = `/invoices/${inv.id}`
+          if (outcome === 'advanced') notifyCurrentApprover('INVOICE', { ...upd, title: `${upd.vendorName} · ${upd.vendorInvoiceNo}` })
+          if (outcome === 'delegated') notify(delegateTo, { kind: 'approval', title: 'Invoice approval delegated to you', body: `${inv.number} · ${inv.vendorName}`, link })
+          if (outcome === 'completed') { notify(inv.registeredBy, { kind: 'success', title: 'Invoice approved for payment', body: `${inv.number} · ${inv.vendorName}`, link }); notifyRole('finance', { kind: 'info', title: 'Invoice ready for payment', body: `${inv.number} · ${inv.vendorName}`, link }) }
+          if (outcome === 'rejected' || outcome === 'returned') notify(inv.registeredBy, { kind: 'warning', title: `Invoice ${outcome}`, body: `${inv.number}: ${comment}`, link })
+          return { ok: true }
+        },
+        payInvoice: (id, payment) => {
+          const inv = get().invoices.find((i) => i.id === id)
+          const a = actor()
+          if (!inv) return { ok: false, error: 'Not found' }
+          if (inv.status !== 'approved') return { ok: false, error: 'Only approved invoices can be paid.' }
+          if (!payment.reference.trim()) return { ok: false, error: 'Payment reference is required.' }
+          const amount = invoiceTotals(inv.lines, inv.taxRate).total
+          set((s) => ({ invoices: s.invoices.map((i) => (i.id === id ? { ...i, status: 'paid', payment: { ...payment, paidBy: a.id, paidByName: a.name, amount }, updatedAt: nowIso() } : i)) }))
+          log('INVOICE', 'Payment recorded', inv, `${payment.method} · ${payment.reference} · ${amount.toFixed(2)}`)
+          // close PO when fully received and fully paid
+          const po = get().pos.find((p) => p.id === inv.poId)
+          if (po && po.status === 'received') {
+            const paid = get().invoices.filter((i) => i.poId === po.id && i.status === 'paid').reduce((s2, i) => s2 + invoiceTotals(i.lines, i.taxRate).total, 0)
+            const poTotal = po.lines.reduce((s2, l) => s2 + l.quantity * l.unitPrice, 0) * (1 + po.taxRate / 100)
+            if (paid >= poTotal - 0.01) {
+              set((s) => ({ pos: s.pos.map((p) => (p.id === po.id ? { ...p, status: 'closed', updatedAt: nowIso() } : p)), prs: s.prs.map((p) => (p.id === po.prId ? { ...p, status: 'closed', updatedAt: nowIso() } : p)) }))
+              log('PO', 'Purchase order closed — fully received and paid', po)
+            }
+          }
+          notify(inv.registeredBy, { kind: 'success', title: 'Invoice paid', body: `${inv.number} · ${inv.vendorName} · ${payment.reference}`, link: `/invoices/${inv.id}` })
+          return { ok: true }
+        },
+        rejectInvoiceAtRegistration: (id, reason) => {
+          const inv = get().invoices.find((i) => i.id === id)
+          if (!inv) return
+          set((s) => ({ invoices: s.invoices.map((i) => (i.id === id ? { ...i, status: 'rejected', updatedAt: nowIso() } : i)) }))
+          log('INVOICE', 'Invoice rejected', inv, reason)
+        },
+        addInvoiceComment: (id, text) => {
+          const a = actor()
+          const c: Comment = { id: uid('c_'), authorId: a.id, authorName: a.name, at: nowIso(), text }
+          set((s) => ({ invoices: s.invoices.map((i) => (i.id === id ? { ...i, comments: [...i.comments, c] } : i)) }))
         },
 
         // ---- masters -------------------------------------------------------
@@ -421,7 +579,7 @@ export const useStore = create<State & Actions>()(
         resetDemo: () => set({ ...initial(), currentUserId: get().currentUserId }),
       }
     },
-    { name: 'rhs-procurement-v1', version: 1 },
+    { name: 'rhs-procurement-v2', version: 2 },
   ),
 )
 

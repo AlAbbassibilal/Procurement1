@@ -33,6 +33,8 @@ export default function Settings() {
               <Field label="Required number of quotations"><input type="number" min={1} className="input" value={s.quotationMinimum} onChange={(e) => set({ quotationMinimum: Number(e.target.value) })} /></Field>
               <Field label="Quotation threshold" hint="Requisitions at or above this value require the full quotation set"><input type="number" className="input" value={s.quotationThreshold} onChange={(e) => set({ quotationThreshold: Number(e.target.value) })} /></Field>
               <Field label="Default currency"><select className="input" value={s.defaultCurrency} onChange={(e) => set({ defaultCurrency: e.target.value as OrgSettings['defaultCurrency'] })}><option>JOD</option><option>USD</option><option>EUR</option></select></Field>
+              <Field label="Invoice price tolerance %" hint="Unit-price variance vs PO allowed by the 3-way match"><input type="number" step="0.5" className="input" value={s.priceTolerancePct} onChange={(e) => set({ priceTolerancePct: Number(e.target.value) })} /></Field>
+              <Field label="Default payment terms (days)"><input type="number" className="input" value={s.paymentTermsDays} onChange={(e) => set({ paymentTermsDays: Number(e.target.value) })} /></Field>
               <Field label="Default tax rate %"><input type="number" className="input" value={s.taxRate} onChange={(e) => set({ taxRate: Number(e.target.value) })} /></Field>
             </div>
           </Card>

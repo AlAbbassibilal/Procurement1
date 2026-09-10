@@ -25,7 +25,7 @@ export interface User {
   active: boolean
 }
 
-export type DocType = 'PR' | 'PO' | 'CONTRACT'
+export type DocType = 'PR' | 'PO' | 'CONTRACT' | 'INVOICE' | 'GRN'
 
 export type PRStatus =
   | 'draft'
@@ -47,8 +47,9 @@ export type POStatus =
   | 'approved'
   | 'issued'            // sent to vendor
   | 'contracted'
-  | 'received'
-  | 'closed'
+  | 'partially_received'
+  | 'received'          // all lines received in full
+  | 'closed'            // received, invoiced and paid
   | 'cancelled'
 
 export type ContractStatus =
@@ -264,6 +265,84 @@ export interface Contract {
   comments: Comment[]
 }
 
+// ---------------------------------------------------------------------------
+// Procure-to-pay: goods receipt, invoices, payments
+// ---------------------------------------------------------------------------
+export interface GoodsReceiptLine {
+  lineItemId: string
+  quantity: number            // received in this GRN
+  condition: 'good' | 'damaged' | 'partial'
+  notes?: string
+}
+
+export interface GoodsReceipt {
+  id: string
+  number: string
+  poId: string
+  poNumber: string
+  vendorName: string
+  receivedBy: string
+  receivedByName: string
+  receivedAt: string
+  deliveryNoteRef: string
+  location: string
+  notes: string
+  lines: GoodsReceiptLine[]
+  attachments: Attachment[]
+  createdAt: string
+}
+
+export type InvoiceStatus =
+  | 'registered'        // captured, not yet matched
+  | 'matched'           // 3-way match passed, ready for approval
+  | 'exception'         // variances found, needs resolution / override
+  | 'pending_approval'
+  | 'returned'
+  | 'rejected'
+  | 'approved'          // ready for payment
+  | 'paid'
+
+export interface InvoiceLine {
+  lineItemId: string
+  description: string
+  quantity: number
+  unitPrice: number
+}
+
+export interface MatchIssue {
+  lineItemId?: string
+  kind: 'qty_over_received' | 'qty_over_ordered' | 'price_variance' | 'total_over_po' | 'no_receipt' | 'duplicate_invoice'
+  message: string
+  severity: 'block' | 'warn'
+}
+
+export interface Invoice {
+  id: string
+  number: string              // internal INV-YYYY-NNNN
+  vendorInvoiceNo: string
+  poId: string
+  poNumber: string
+  vendorId: string
+  vendorName: string
+  ownerName: string
+  registeredBy: string
+  registeredByName: string
+  invoiceDate: string
+  dueDate: string
+  currency: Currency
+  lines: InvoiceLine[]
+  taxRate: number
+  status: InvoiceStatus
+  matchIssues: MatchIssue[]
+  matchOverrideReason?: string
+  approvalChain: ApprovalStep[]
+  attachments: Attachment[]
+  payment?: { paidAt: string; reference: string; method: 'bank_transfer' | 'cheque' | 'cash'; paidBy: string; paidByName: string; amount: number }
+  createdAt: string
+  updatedAt: string
+  comments: Comment[]
+}
+
 export interface Notification {
   id: string
   userId: string
@@ -287,5 +366,7 @@ export interface OrgSettings {
   taxRate: number
   quotationMinimum: number       // required number of quotations (3)
   quotationThreshold: number     // amount above which 3 quotes are mandatory
+  priceTolerancePct: number      // invoice unit-price variance tolerated vs PO
+  paymentTermsDays: number       // default invoice due date offset
   fiscalYearStart: string
 }

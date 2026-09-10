@@ -1,16 +1,17 @@
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Send, SendHorizontal, FileSignature, Ban, Printer } from 'lucide-react'
+import { ArrowLeft, Send, SendHorizontal, FileSignature, Ban, Printer, PackageCheck, Receipt } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
 import { Card, PageHeader, StatusPill, KV, Alert, Field } from '@/components/ui'
 import { ApprovalChain, DecisionPanel, CommentThread, AttachmentList, LineItemsEditor, ProcessTracker } from '@/components/workflow'
 import { fmtMoney, fmtDate, fmtDateTime, linesSubtotal } from '@/lib/format'
 import { Logo } from '@/components/Logo'
+import { receiptProgress, invoiceTotals } from '@/lib/match'
 
 export default function OrderDetail() {
   const { id } = useParams()
   const nav = useNavigate()
   const user = useCurrentUser()!
-  const { pos, prs, users, vendors, settings, updatePO, submitPO, decidePO, issuePO, cancelPO, addPOComment, createContractFromPO } = useStore()
+  const { pos, prs, users, vendors, settings, grns, invoices, updatePO, submitPO, decidePO, issuePO, cancelPO, addPOComment, createContractFromPO } = useStore()
   const po = pos.find((p) => p.id === id)
   if (!po) return <Alert tone="danger">Purchase order not found.</Alert>
   const pr = prs.find((p) => p.id === po.prId)
@@ -18,7 +19,11 @@ export default function OrderDetail() {
   const isProc = ['procurement_officer', 'procurement_manager', 'admin'].includes(user.role)
   const editable = isProc && ['draft', 'returned'].includes(po.status)
   const sub = linesSubtotal(po.lines), tax = sub * po.taxRate / 100, total = sub + tax
-  const stage = po.status === 'draft' || po.status === 'returned' ? 'po' : po.status === 'pending_approval' || po.status === 'rejected' || po.status === 'approved' ? 'po_approval' : po.contractId ? 'contract' : 'po_approval'
+  const prog = receiptProgress(po, grns)
+  const poInvoices = invoices.filter((i) => i.poId === po.id)
+  const stage = po.status === 'draft' || po.status === 'returned' ? 'po' : po.status === 'pending_approval' || po.status === 'rejected' || po.status === 'approved' ? 'po_approval'
+    : po.status === 'closed' || poInvoices.length > 0 ? 'invoice' : po.status === 'received' || po.status === 'partially_received' ? 'receipt' : po.contractId ? 'contract' : 'po_approval'
+  const receivable = ['issued', 'contracted', 'partially_received'].includes(po.status)
 
   return (
     <>
@@ -29,12 +34,14 @@ export default function OrderDetail() {
           <button className="btn-ghost" onClick={() => window.print()}><Printer size={15} /> Print PO</button>
           {editable && <button className="btn-primary" onClick={() => { const r = submitPO(po.id); if (!r.ok) alert(r.error) }}><Send size={15} /> {po.status === 'returned' ? 'Re-submit' : 'Submit for approval'}</button>}
           {isProc && po.status === 'approved' && <button className="btn-primary" onClick={() => confirm(`Issue ${po.number} to ${po.vendorName}?`) && issuePO(po.id)}><SendHorizontal size={15} /> Issue to vendor</button>}
-          {isProc && po.status === 'issued' && !po.contractId && <button className="btn-primary" onClick={() => { const r = createContractFromPO(po.id); if (!r.ok) return alert(r.error); nav(`/contracts/${r.contractId}`) }}><FileSignature size={15} /> Draft contract</button>}
+          {receivable && <Link to={`/receiving/${po.id}`} className="btn-secondary"><PackageCheck size={15} /> Receive goods</Link>}
+          {prog.received > 0 && ['issued', 'contracted', 'partially_received', 'received'].includes(po.status) && <Link to={`/invoices/new?po=${po.id}`} className="btn-secondary"><Receipt size={15} /> Register invoice</Link>}
+          {isProc && ['issued', 'partially_received', 'received'].includes(po.status) && !po.contractId && <button className="btn-primary" onClick={() => { const r = createContractFromPO(po.id); if (!r.ok) return alert(r.error); nav(`/contracts/${r.contractId}`) }}><FileSignature size={15} /> Draft contract</button>}
           {po.contractId && <Link to={`/contracts/${po.contractId}`} className="btn-secondary"><FileSignature size={15} /> Open contract</Link>}
           {isProc && ['draft', 'returned', 'pending_approval', 'approved'].includes(po.status) && <button className="btn-danger-soft" onClick={() => confirm('Cancel this PO? The requisition returns to "awarded".') && cancelPO(po.id)}><Ban size={15} /> Cancel</button>}
         </>} />
 
-      <div className="card mb-6 px-5 py-4"><ProcessTracker current={stage} failed={po.status === 'rejected' || po.status === 'cancelled'} /></div>
+      <div className="card mb-6 px-5 py-4"><ProcessTracker current={stage} failed={po.status === 'rejected' || po.status === 'cancelled'} complete={po.status === 'closed'} /></div>
 
       {po.status === 'pending_approval' && <div className="mb-6"><DecisionPanel chain={po.approvalChain} docLabel={po.number} onDecide={(d, c, del) => decidePO(po.id, d, c, del)} /></div>}
       {po.status === 'rejected' && <div className="mb-6"><Alert tone="danger"><b>Rejected.</b> {po.approvalChain.find((s) => s.status === 'rejected')?.comment}</Alert></div>}
@@ -102,6 +109,16 @@ export default function OrderDetail() {
             <div className="text-[12.5px] text-ink-500">incl. {po.taxRate}% tax · {po.lines.length} line(s)</div>
           </Card>
           <Card title="Approval chain"><ApprovalChain chain={po.approvalChain} users={users} /></Card>
+          {['issued', 'contracted', 'partially_received', 'received', 'closed'].includes(po.status) && (
+            <Card title="Receipt & invoicing">
+              <div className="mb-1 flex items-center justify-between text-[12.5px]"><span className="text-ink-500">Goods received</span><span className="font-medium text-ink-900">{prog.received}/{prog.ordered} · {prog.pct}%</span></div>
+              <div className="mb-4 h-1.5 w-full rounded-pill bg-ink-100"><div className={prog.complete ? 'h-full rounded-pill bg-brand-600' : 'h-full rounded-pill bg-sun-500'} style={{ width: `${prog.pct}%` }} /></div>
+              {poInvoices.length === 0 ? <div className="text-[13px] text-ink-500">No invoices registered.</div> : (
+                <ul className="space-y-1.5">{poInvoices.map((i) => <li key={i.id}><Link to={`/invoices/${i.id}`} className="flex items-center justify-between gap-2 text-[13px] hover:underline"><span className="truncate">{i.vendorInvoiceNo} · {fmtMoney(invoiceTotals(i.lines, i.taxRate).total, i.currency)}</span><StatusPill status={i.status} /></Link></li>)}</ul>
+              )}
+              <div className="mt-3 flex flex-wrap gap-2">{receivable && <Link to={`/receiving/${po.id}`} className="btn-secondary btn-sm">Receive</Link>}{prog.received > 0 && po.status !== 'closed' && <Link to={`/invoices/new?po=${po.id}`} className="btn-secondary btn-sm">Register invoice</Link>}</div>
+            </Card>
+          )}
           <Card title="Document control">
             <KV k="Document owner" v={po.ownerName} /><KV k="Prepared by" v={po.createdByName} /><KV k="Requisition" v={<Link className="text-brand-700 hover:underline" to={`/requisitions/${po.prId}`}>{po.prNumber}</Link>} />
             <KV k="Issued" v={fmtDateTime(po.issuedAt)} /><KV k="Contract" v={po.contractId ? <Link className="text-brand-700 hover:underline" to={`/contracts/${po.contractId}`}>Open</Link> : '—'} /><KV k="Last updated" v={fmtDateTime(po.updatedAt)} />

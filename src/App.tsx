@@ -18,6 +18,11 @@ import Users from '@/pages/admin/Users'
 import ApprovalMatrix from '@/pages/admin/ApprovalMatrix'
 import Settings from '@/pages/admin/Settings'
 import Audit from '@/pages/Audit'
+import ReceivingList from '@/pages/receiving/List'
+import ReceivingDetail from '@/pages/receiving/Detail'
+import InvoiceList from '@/pages/invoices/List'
+import InvoiceNew from '@/pages/invoices/New'
+import InvoiceDetail from '@/pages/invoices/Detail'
 
 function RequireAuth() {
   const authed = useStore((s) => !!s.currentUserId)
@@ -43,6 +48,11 @@ export default function App() {
           <Route path="orders/:id" element={<OrderDetail />} />
           <Route path="contracts" element={<ContractList />} />
           <Route path="contracts/:id" element={<ContractDetail />} />
+          <Route path="receiving" element={<ReceivingList />} />
+          <Route path="receiving/:id" element={<ReceivingDetail />} />
+          <Route path="invoices" element={<InvoiceList />} />
+          <Route path="invoices/new" element={<InvoiceNew />} />
+          <Route path="invoices/:id" element={<InvoiceDetail />} />
           <Route path="vendors" element={<Vendors />} />
           <Route path="admin/users" element={<Users />} />
           <Route path="admin/approval-matrix" element={<ApprovalMatrix />} />

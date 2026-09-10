@@ -39,7 +39,7 @@ export default function ApprovalMatrix() {
     <>
       <PageHeader title="Approval matrix" subtitle="Configure who approves what, by document type and value band. Chains are generated at submission time." />
       {!canEdit && <div className="mb-4"><Alert tone="info">Read-only view. Only administrators can change the approval matrix.</Alert></div>}
-      <div className="space-y-6"><Section docType="PR" title="Purchase requisitions" /><Section docType="PO" title="Purchase orders" /></div>
+      <div className="space-y-6"><Section docType="PR" title="Purchase requisitions" /><Section docType="PO" title="Purchase orders" /><Section docType="INVOICE" title="Vendor invoices (payment approval)" /></div>
 
       <Modal open={!!edit} onClose={() => setEdit(null)} title="Approval rule" width="max-w-2xl"
         footer={<><button className="btn-secondary" onClick={() => setEdit(null)}>Cancel</button><button className="btn-primary" onClick={() => { if (!edit?.name.trim() || !edit.steps.length) return alert('Name and at least one step are required.'); upsertRule(edit!); setEdit(null) }}>Save rule</button></>}>
@@ -47,7 +47,7 @@ export default function ApprovalMatrix() {
           <div className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-3">
               <Field label="Rule name" required className="sm:col-span-3"><input className="input" value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></Field>
-              <Field label="Document"><select className="input" value={edit.docType} onChange={(e) => setEdit({ ...edit, docType: e.target.value as DocType })}><option value="PR">Requisition</option><option value="PO">Purchase order</option></select></Field>
+              <Field label="Document"><select className="input" value={edit.docType} onChange={(e) => setEdit({ ...edit, docType: e.target.value as DocType })}><option value="PR">Requisition</option><option value="PO">Purchase order</option><option value="INVOICE">Invoice</option></select></Field>
               <Field label={`From (${ccy})`}><input type="number" className="input" value={edit.minAmount} onChange={(e) => setEdit({ ...edit, minAmount: Number(e.target.value) })} /></Field>
               <Field label={`To (${ccy})`} hint="Leave empty for no upper limit"><input type="number" className="input" value={edit.maxAmount ?? ''} onChange={(e) => setEdit({ ...edit, maxAmount: e.target.value === '' ? null : Number(e.target.value) })} /></Field>
             </div>

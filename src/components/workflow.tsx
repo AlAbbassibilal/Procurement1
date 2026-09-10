@@ -10,7 +10,7 @@ import { CATEGORIES, COST_CENTERS, BUDGET_LINES, UNITS } from '@/data/seed'
 // ---------------------------------------------------------------------------
 // Process tracker — the end-to-end procure-to-contract journey
 // ---------------------------------------------------------------------------
-export type Stage = 'pr' | 'pr_approval' | 'sourcing' | 'po' | 'po_approval' | 'contract'
+export type Stage = 'pr' | 'pr_approval' | 'sourcing' | 'po' | 'po_approval' | 'contract' | 'receipt' | 'invoice'
 const STAGES: { id: Stage; label: string }[] = [
   { id: 'pr', label: 'Requisition' },
   { id: 'pr_approval', label: 'PR approvals' },
@@ -18,15 +18,17 @@ const STAGES: { id: Stage; label: string }[] = [
   { id: 'po', label: 'Purchase order' },
   { id: 'po_approval', label: 'PO approvals' },
   { id: 'contract', label: 'Contract' },
+  { id: 'receipt', label: 'Goods receipt' },
+  { id: 'invoice', label: 'Invoice & pay' },
 ]
-export function ProcessTracker({ current, failed }: { current: Stage; failed?: boolean }) {
-  const idx = STAGES.findIndex((s) => s.id === current)
+export function ProcessTracker({ current, failed, complete }: { current: Stage; failed?: boolean; complete?: boolean }) {
+  const idx = complete ? STAGES.length : STAGES.findIndex((s) => s.id === current)
   return (
     <ol className="flex w-full items-center gap-0 overflow-x-auto scrollbar-thin">
       {STAGES.map((s, i) => {
         const state = i < idx ? 'done' : i === idx ? (failed ? 'failed' : 'current') : 'todo'
         return (
-          <li key={s.id} className="flex flex-1 items-center min-w-[120px]">
+          <li key={s.id} className="flex flex-1 items-center min-w-[110px]">
             <div className="flex items-center gap-2">
               <span className={cx('flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ring-2',
                 state === 'done' && 'bg-brand-600 text-white ring-brand-600',

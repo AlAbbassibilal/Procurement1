@@ -1,19 +1,22 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { FileText, CheckSquare, Search, ShoppingCart, FileSignature, Plus, ArrowRight, Clock } from 'lucide-react'
+import { FileText, CheckSquare, Search, ShoppingCart, FileSignature, Plus, ArrowRight, Clock, Receipt } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
 import { Card, PageHeader, Stat, StatusPill, EmptyState, PriorityDot } from '@/components/ui'
 import { fmtMoney, fmtDate, linesSubtotal, timeAgo } from '@/lib/format'
 import { canApprove, ROLE_LABEL } from '@/lib/workflow'
+import { invoiceTotals } from '@/lib/match'
 
 export default function Dashboard() {
   const user = useCurrentUser()!
   const nav = useNavigate()
-  const { prs, pos, contracts, audit, settings } = useStore()
+  const { prs, pos, contracts, invoices, audit, settings } = useStore()
 
   const myPRs = prs.filter((p) => p.requesterId === user.id)
   const pendingMine = prs.filter((p) => p.status === 'pending_approval' && canApprove(p.approvalChain, user))
   const pendingPO = pos.filter((p) => p.status === 'pending_approval' && canApprove(p.approvalChain, user))
   const legalQueue = user.role === 'legal' ? contracts.filter((c) => c.status === 'legal_review') : []
+  const pendingINV = invoices.filter((i) => i.status === 'pending_approval' && canApprove(i.approvalChain, user))
+  const queueTotal = pendingMine.length + pendingPO.length + legalQueue.length + pendingINV.length
   const inSourcing = prs.filter((p) => p.status === 'approved' || p.status === 'sourcing' || p.status === 'awarded')
   const openPOs = pos.filter((p) => ['draft', 'pending_approval', 'approved', 'issued'].includes(p.status))
   const committed = pos.filter((p) => ['issued', 'contracted', 'received'].includes(p.status)).reduce((s, p) => s + linesSubtotal(p.lines) * (1 + p.taxRate / 100), 0)
@@ -28,12 +31,12 @@ export default function Dashboard() {
       <PageHeader eyebrow={ROLE_LABEL[user.role]} title={`${greet}, ${user.name.split(' ')[0]}`}
         subtitle={`Here is what needs your attention across ${settings.orgShort} procurement today.`}
         actions={<>
-          <Link to="/approvals" className="btn-secondary"><CheckSquare size={15} /> My approvals {pendingMine.length + pendingPO.length + legalQueue.length > 0 && <span className="rounded-pill bg-sun-500 px-1.5 text-[11px] font-bold text-ink-900">{pendingMine.length + pendingPO.length + legalQueue.length}</span>}</Link>
+          <Link to="/approvals" className="btn-secondary"><CheckSquare size={15} /> My approvals {queueTotal > 0 && <span className="rounded-pill bg-sun-500 px-1.5 text-[11px] font-bold text-ink-900">{queueTotal}</span>}</Link>
           <button className="btn-primary" onClick={() => nav('/requisitions/new')}><Plus size={15} /> New requisition</button>
         </>} />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat label="Awaiting my approval" value={pendingMine.length + pendingPO.length + legalQueue.length} hint="PRs, POs and contracts" tone="sun" icon={<CheckSquare size={18} />} />
+        <Stat label="Awaiting my approval" value={queueTotal} hint="PRs, POs, invoices and contracts" tone="sun" icon={<CheckSquare size={18} />} />
         <Stat label="In sourcing" value={inSourcing.length} hint="Approved PRs with Procurement" tone="brand" icon={<Search size={18} />} />
         <Stat label="Open purchase orders" value={openPOs.length} hint={`${fmtMoney(committed, settings.defaultCurrency)} committed`} tone="ink" icon={<ShoppingCart size={18} />} />
         <Stat label="Pipeline value" value={fmtMoney(pipeline, settings.defaultCurrency)} hint="PRs in approval or sourcing" tone="accent" icon={<FileText size={18} />} />
@@ -44,7 +47,7 @@ export default function Dashboard() {
           {/* Approvals queue */}
           <Card title="Awaiting your decision" description="Documents where you are the current approver" padded={false}
             actions={<Link to="/approvals" className="text-[12.5px] font-medium text-brand-700 hover:underline">View all</Link>}>
-            {pendingMine.length + pendingPO.length + legalQueue.length === 0 ? (
+            {queueTotal === 0 ? (
               <div className="p-5"><EmptyState title="Nothing waiting on you" body="You'll see requisitions, purchase orders and contracts here when they reach your step." icon={<CheckSquare size={22} />} /></div>
             ) : (
               <ul className="divide-y divide-line">
@@ -67,6 +70,17 @@ export default function Dashboard() {
                       <span className="block text-[12px] text-ink-500">{p.number} · {p.vendorName}</span>
                     </span>
                     <span className="hidden text-[13.5px] font-semibold tabular-nums sm:block">{fmtMoney(linesSubtotal(p.lines), p.currency)}</span>
+                    <ArrowRight size={16} className="text-ink-400" />
+                  </Link></li>
+                ))}
+                {pendingINV.slice(0, 5).map((i) => (
+                  <li key={i.id}><Link to={`/invoices/${i.id}`} className="flex items-center gap-4 px-5 py-3 hover:bg-surface-muted">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-sun-100 text-sun-700"><Receipt size={16} /></span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13.5px] font-medium text-ink-900">Invoice {i.vendorInvoiceNo} · {i.vendorName}</span>
+                      <span className="block text-[12px] text-ink-500">{i.number} · {i.poNumber} · due {fmtDate(i.dueDate)}</span>
+                    </span>
+                    <span className="hidden text-[13.5px] font-semibold tabular-nums sm:block">{fmtMoney(invoiceTotals(i.lines, i.taxRate).total, i.currency)}</span>
                     <ArrowRight size={16} className="text-ink-400" />
                   </Link></li>
                 ))}
@@ -132,6 +146,9 @@ export default function Dashboard() {
                 { l: 'POs pending approval', n: pos.filter((p) => p.status === 'pending_approval').length, to: '/orders' },
                 { l: 'POs issued to vendors', n: pos.filter((p) => p.status === 'issued' || p.status === 'contracted').length, to: '/orders' },
                 { l: 'Contracts in legal review', n: contracts.filter((c) => c.status === 'legal_review').length, to: '/contracts' },
+                { l: 'POs awaiting goods receipt', n: pos.filter((p) => ['issued', 'contracted', 'partially_received'].includes(p.status)).length, to: '/receiving' },
+                { l: 'Invoices with match exceptions', n: invoices.filter((i) => i.status === 'exception').length, to: '/invoices' },
+                { l: 'Invoices approved — to pay', n: invoices.filter((i) => i.status === 'approved').length, to: '/invoices' },
                 { l: 'Active contracts', n: contracts.filter((c) => c.status === 'active').length, to: '/contracts' },
               ].map((r) => (
                 <li key={r.l}><Link to={r.to} className="flex items-center justify-between rounded-control px-2 py-1.5 -mx-2 hover:bg-surface-muted">

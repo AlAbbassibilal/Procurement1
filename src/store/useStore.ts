@@ -2,11 +2,12 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type {
   ApprovalRule, Attachment, AuditEvent, Comment, Contract, ContractMilestone, LineItem, Notification, OrgSettings,
-  PurchaseOrder, PurchaseRequisition, Quotation, User, Vendor, DocType, Role, GoodsReceipt, GoodsReceiptLine, Invoice, InvoiceLine,
+  PurchaseOrder, PurchaseRequisition, Quotation, User, Vendor, DocType, Role, GoodsReceipt, GoodsReceiptLine, Invoice, InvoiceLine, SourcingRecord, ExceptionType,
 } from '@/types'
 import { DOC_OWNER, SEED_CONTRACTS, SEED_GRNS, SEED_INVOICES, SEED_POS, SEED_PRS, SEED_RULES, SEED_SETTINGS, SEED_USERS, SEED_VENDORS, STANDARD_CLAUSES } from '@/data/seed'
 import { hasBlockingIssues, receiptProgress, runMatch, invoiceTotals } from '@/lib/match'
-import { applyDecision, buildChain, currentStep, resetChain, resolveApprover } from '@/lib/workflow'
+import { blockingFailures, emptySourcing, isBidMethod, sourcingRequirements, tierForPR, toUSD, resolveTier } from '@/lib/tiers'
+import { applyDecision, buildChain, currentStep, resetChain, resolveApprover, chainFromSteps } from '@/lib/workflow'
 import { linesSubtotal, nowIso, uid } from '@/lib/format'
 
 type Decision = 'approved' | 'rejected' | 'returned' | 'delegated'
@@ -48,6 +49,13 @@ interface Actions {
   updateQuotation: (prId: string, qId: string, patch: Partial<Quotation>) => void
   removeQuotation: (prId: string, qId: string) => void
   awardQuotation: (prId: string, qId: string, justification: string) => { ok: boolean; error?: string }
+  updateSourcing: (prId: string, patch: Partial<SourcingRecord>) => void
+  requestException: (prId: string, type: ExceptionType, justification: string) => { ok: boolean; error?: string }
+  clearException: (prId: string) => void
+  decideException: (prId: string, decision: 'approved' | 'rejected', comment: string) => { ok: boolean; error?: string }
+  approveFewerQuotes: (prId: string) => { ok: boolean; error?: string }
+  signEvaluationReport: (prId: string) => { ok: boolean; error?: string }
+  markDonorNotified: (prId: string) => void
 
   // PO
   createPOFromAward: (prId: string) => { ok: boolean; poId?: string; error?: string }
@@ -168,12 +176,13 @@ export const useStore = create<State & Actions>()(
 
         // ---- PR ------------------------------------------------------------
         createPR: (data) => {
+          data = { ...data, procurementType: data.procurementType ?? 'goods', sourcing: data.sourcing ?? emptySourcing() }
           const a = actor()
           const pr: PurchaseRequisition = {
             id: uid('pr_'), number: nextNumber('PR'), title: '', justification: '', department: a.department,
-            requesterId: a.id, requesterName: a.name, ownerName: DOC_OWNER, priority: 'normal',
+            requesterId: a.id, requesterName: a.name, ownerName: DOC_OWNER, priority: 'normal', procurementType: 'goods',
             neededBy: '', currency: get().settings.defaultCurrency, lines: [], attachments: [], status: 'draft',
-            approvalChain: [], createdAt: nowIso(), updatedAt: nowIso(), quotations: [], comments: [],
+            approvalChain: [], createdAt: nowIso(), updatedAt: nowIso(), quotations: [], comments: [], sourcing: emptySourcing(),
             ...data,
           }
           set((s) => ({ prs: [pr, ...s.prs] }))
@@ -262,19 +271,68 @@ export const useStore = create<State & Actions>()(
         },
         awardQuotation: (prId, qId, justification) => {
           const pr = get().prs.find((p) => p.id === prId)
-          const { quotationMinimum, quotationThreshold } = get().settings
           if (!pr) return { ok: false, error: 'Not found' }
-          const amount = linesSubtotal(pr.lines)
-          if (amount >= quotationThreshold && pr.quotations.length < quotationMinimum)
-            return { ok: false, error: `At least ${quotationMinimum} quotations are required for requisitions ≥ ${quotationThreshold} ${pr.currency}. Currently ${pr.quotations.length}.` }
-          if (!justification.trim()) return { ok: false, error: 'Award justification is required.' }
           const q = pr.quotations.find((x) => x.id === qId)
           if (!q) return { ok: false, error: 'Quotation not found' }
+          if (q.late) return { ok: false, error: 'Quotations received after the deadline must be rejected (SOP-PRO-03 §3).' }
+          const { tier, reqs } = sourcingRequirements(pr, get().settings, get().users)
+          const fails = blockingFailures(reqs)
+          if (fails.length) return { ok: false, error: `SOP requirement not met: ${fails[0]!.label}.` }
+          if (!q.compliant) return { ok: false, error: 'Only technically compliant quotations can be awarded.' }
+          if (tier && isBidMethod(tier.method) && !pr.sourcing.exception && (q.technicalScore ?? 0) < pr.sourcing.technicalPassMark)
+            return { ok: false, error: `This bid scored ${q.technicalScore ?? 0} — below the technical pass mark of ${pr.sourcing.technicalPassMark} and is disqualified from financial evaluation.` }
+          if (!justification.trim()) return { ok: false, error: 'Award justification is required.' }
           set((s) => ({ prs: s.prs.map((p) => (p.id === prId ? { ...p, status: 'awarded', awardedQuotationId: qId, awardJustification: justification, updatedAt: nowIso() } : p)) }))
-          log('PR', 'Quotation awarded', pr, `${q.vendorName} · ${q.reference}`)
+          log('PR', 'Quotation awarded', pr, `${q.vendorName} · ${q.reference} · ${tier?.name ?? ''}`)
           notify(pr.requesterId, { kind: 'success', title: 'Vendor selected', body: `${pr.number}: awarded to ${q.vendorName}.`, link: `/requisitions/${pr.id}` })
           return { ok: true }
         },
+        updateSourcing: (prId, patch) => set((s) => ({ prs: s.prs.map((p) => (p.id === prId ? { ...p, sourcing: { ...p.sourcing, ...patch }, updatedAt: nowIso() } : p)) })),
+        requestException: (prId, type, justification) => {
+          const pr = get().prs.find((p) => p.id === prId)
+          const a = actor()
+          if (!pr) return { ok: false, error: 'Not found' }
+          if (justification.trim().length < 20) return { ok: false, error: 'Write the justification memo — why competitive procurement is not possible.' }
+          const { amountUSD } = tierForPR(pr, get().settings)
+          const needsED = amountUSD > get().settings.soleSourceEdThresholdUSD
+          get().updateSourcing(prId, { exception: { type, justification, requestedBy: a.id, requestedByName: a.name, requestedAt: nowIso(), decision: needsED ? undefined : 'approved' } })
+          log('PR', 'Sole-source / emergency exception requested', pr, `${type} · ${justification.slice(0, 80)}`)
+          if (needsED) notifyRole('executive_director', { kind: 'approval', title: 'Sole-source / emergency pre-approval required', body: `${pr.number} · ${pr.title}`, link: `/sourcing/${pr.id}` })
+          return { ok: true }
+        },
+        clearException: (prId) => { const pr = get().prs.find((p) => p.id === prId); get().updateSourcing(prId, { exception: undefined }); if (pr) log('PR', 'Exception withdrawn — competitive sourcing resumed', pr) },
+        decideException: (prId, decision, comment) => {
+          const pr = get().prs.find((p) => p.id === prId)
+          const a = actor()
+          if (!pr || !pr.sourcing.exception) return { ok: false, error: 'No exception pending' }
+          if (!['executive_director', 'admin'].includes(a.role)) return { ok: false, error: 'Only the Executive Director can approve exceptions.' }
+          if (decision === 'rejected' && !comment.trim()) return { ok: false, error: 'A comment is required to reject.' }
+          get().updateSourcing(prId, { exception: { ...pr.sourcing.exception, decision, approvedBy: a.id, approvedByName: a.name, approvedAt: nowIso(), comment } })
+          log('PR', `Exception ${decision} by Executive Director`, pr, comment)
+          notify(pr.sourcingOwnerId ?? pr.requesterId, { kind: decision === 'approved' ? 'success' : 'warning', title: `Sole-source exception ${decision}`, body: `${pr.number}${comment ? `: ${comment}` : ''}`, link: `/sourcing/${pr.id}` })
+          return { ok: true }
+        },
+        approveFewerQuotes: (prId) => {
+          const pr = get().prs.find((p) => p.id === prId)
+          const a = actor()
+          if (!pr) return { ok: false, error: 'Not found' }
+          if (!['procurement_manager', 'finance_director', 'programs_director', 'executive_director', 'admin'].includes(a.role)) return { ok: false, error: 'Supervisor approval required (Procurement Manager or a Director).' }
+          if (!pr.sourcing.fewerQuotesReason?.trim()) return { ok: false, error: 'Document the reason first (non-response, market limitation…).' }
+          get().updateSourcing(prId, { fewerQuotesApprovedBy: a.id, fewerQuotesApprovedByName: a.name, fewerQuotesApprovedAt: nowIso() })
+          log('PR', 'Proceeding with fewer quotations approved', pr, pr.sourcing.fewerQuotesReason)
+          return { ok: true }
+        },
+        signEvaluationReport: (prId) => {
+          const pr = get().prs.find((p) => p.id === prId)
+          const a = actor()
+          if (!pr) return { ok: false, error: 'Not found' }
+          if (!pr.sourcing.committee.some((m) => m.userId === a.id) && a.role !== 'admin') return { ok: false, error: 'Only a member of the evaluation committee can sign the report.' }
+          if ((pr.sourcing.evaluationReport?.trim().length ?? 0) < 30) return { ok: false, error: 'Write the evaluation report first.' }
+          get().updateSourcing(prId, { evaluationSignedAt: nowIso() })
+          log('PR', 'Evaluation report signed', pr, `by ${a.name}`)
+          return { ok: true }
+        },
+        markDonorNotified: (prId) => { const pr = get().prs.find((p) => p.id === prId); get().updateSourcing(prId, { donorNotifiedAt: nowIso() }); if (pr) log('PR', 'Donor notified', pr) },
 
         // ---- PO ------------------------------------------------------------
         createPOFromAward: (prId) => {
@@ -301,7 +359,8 @@ export const useStore = create<State & Actions>()(
           if (!po) return { ok: false, error: 'Not found' }
           if (!po.deliveryDate) return { ok: false, error: 'Delivery date is required.' }
           const amount = linesSubtotal(po.lines)
-          const chain = po.status === 'returned' && po.approvalChain.length ? resetChain(po.approvalChain) : buildChain(get().rules, get().users, 'PO', amount)
+          const pr = get().prs.find((p) => p.id === po.prId)
+          const chain = po.status === 'returned' && po.approvalChain.length ? resetChain(po.approvalChain) : (() => { const t = resolveTier(toUSD(amount, po.currency, get().settings), get().settings.tiers); return t ? chainFromSteps(t.approvers, get().users, pr?.department) : [] })()
           if (!chain.length) return { ok: false, error: 'No PO approval rule matches this amount.' }
           const upd = { ...po, status: 'pending_approval' as const, approvalChain: chain, updatedAt: nowIso() }
           set((s) => ({ pos: s.pos.map((p) => (p.id === id ? upd : p)) }))
@@ -579,7 +638,7 @@ export const useStore = create<State & Actions>()(
         resetDemo: () => set({ ...initial(), currentUserId: get().currentUserId }),
       }
     },
-    { name: 'rhs-procurement-v2', version: 2 },
+    { name: 'rhs-procurement-v3', version: 3 },
   ),
 )
 

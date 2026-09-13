@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Plus, Pencil, Trash2, ArrowDown } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { MethodBadge } from '@/components/tier'
 import { useStore, useCurrentUser } from '@/store/useStore'
 import { Card, PageHeader, Modal, Field, Alert } from '@/components/ui'
 import { ROLE_LABEL } from '@/lib/workflow'
@@ -39,7 +41,23 @@ export default function ApprovalMatrix() {
     <>
       <PageHeader title="Approval matrix" subtitle="Configure who approves what, by document type and value band. Chains are generated at submission time." />
       {!canEdit && <div className="mb-4"><Alert tone="info">Read-only view. Only administrators can change the approval matrix.</Alert></div>}
-      <div className="space-y-6"><Section docType="PR" title="Purchase requisitions" /><Section docType="PO" title="Purchase orders" /><Section docType="INVOICE" title="Vendor invoices (payment approval)" /></div>
+      <div className="space-y-6">
+        <Section docType="PR" title="Purchase requisitions (SOP-PRO-01)" />
+        <Card title="Purchase orders — approval authority by procurement tier (SOP §3)" description="PO chains are generated from the tier that the PO value falls into. Edit tiers under Procurement thresholds." padded={false}
+          actions={<Link to="/admin/thresholds" className="btn-secondary btn-sm">Edit thresholds</Link>}>
+          <table className="w-full text-[13px]">
+            <thead><tr><th className="table-th">Tier</th><th className="table-th">Value (USD)</th><th className="table-th">Method</th><th className="table-th">Approval steps (in order)</th></tr></thead>
+            <tbody>{[...settings.tiers].sort((a, b) => a.minUSD - b.minUSD).map((t) => (
+              <tr key={t.id} className="hover:bg-surface-muted">
+                <td className="table-td font-medium text-ink-900">{t.name}</td>
+                <td className="table-td tabular-nums">{t.minUSD.toLocaleString()} – {t.maxUSD === null ? <span className="text-ink-500">no limit</span> : t.maxUSD.toLocaleString()}</td>
+                <td className="table-td"><MethodBadge method={t.method} /></td>
+                <td className="table-td"><div className="flex flex-wrap items-center gap-1.5">{t.approvers.map((s, i) => <span key={i} className="flex items-center gap-1.5"><span className="rounded-pill bg-brand-100 px-2 py-0.5 text-[12px] font-medium text-brand-800">{i + 1}. {s.label}</span>{i < t.approvers.length - 1 && <span className="text-ink-300">→</span>}</span>)}{t.donorApproval && <span className="rounded-pill bg-sun-100 px-2 py-0.5 text-[12px] font-medium text-sun-700">+ Donor approval</span>}</div></td>
+              </tr>))}</tbody>
+          </table>
+        </Card>
+        <Section docType="INVOICE" title="Vendor invoices — payment authorisation (SOP-PRO-07)" />
+      </div>
 
       <Modal open={!!edit} onClose={() => setEdit(null)} title="Approval rule" width="max-w-2xl"
         footer={<><button className="btn-secondary" onClick={() => setEdit(null)}>Cancel</button><button className="btn-primary" onClick={() => { if (!edit?.name.trim() || !edit.steps.length) return alert('Name and at least one step are required.'); upsertRule(edit!); setEdit(null) }}>Save rule</button></>}>
@@ -47,7 +65,7 @@ export default function ApprovalMatrix() {
           <div className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-3">
               <Field label="Rule name" required className="sm:col-span-3"><input className="input" value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></Field>
-              <Field label="Document"><select className="input" value={edit.docType} onChange={(e) => setEdit({ ...edit, docType: e.target.value as DocType })}><option value="PR">Requisition</option><option value="PO">Purchase order</option><option value="INVOICE">Invoice</option></select></Field>
+              <Field label="Document"><select className="input" value={edit.docType} onChange={(e) => setEdit({ ...edit, docType: e.target.value as DocType })}><option value="PR">Requisition</option><option value="INVOICE">Invoice</option></select></Field>
               <Field label={`From (${ccy})`}><input type="number" className="input" value={edit.minAmount} onChange={(e) => setEdit({ ...edit, minAmount: Number(e.target.value) })} /></Field>
               <Field label={`To (${ccy})`} hint="Leave empty for no upper limit"><input type="number" className="input" value={edit.maxAmount ?? ''} onChange={(e) => setEdit({ ...edit, maxAmount: e.target.value === '' ? null : Number(e.target.value) })} /></Field>
             </div>

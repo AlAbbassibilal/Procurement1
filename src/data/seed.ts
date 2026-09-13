@@ -1,4 +1,5 @@
-import type { ApprovalRule, Contract, OrgSettings, PurchaseOrder, PurchaseRequisition, User, Vendor, ContractClause, GoodsReceipt, Invoice } from '@/types'
+import type { ApprovalRule, Contract, OrgSettings, PurchaseOrder, PurchaseRequisition, User, Vendor, ContractClause, GoodsReceipt, Invoice, ProcurementTier } from '@/types'
+import { emptySourcing } from '@/lib/tiers'
 import { addDays, toInputDate } from '@/lib/format'
 
 export const DOC_OWNER = 'Bilal Abbassi'
@@ -13,12 +14,31 @@ export const SEED_SETTINGS: OrgSettings = {
   website: 'www.restoringhopejo.org',
   defaultCurrency: 'JOD',
   taxRate: 16,
-  quotationMinimum: 3,
-  quotationThreshold: 500,
+  fxToUSD: { JOD: 1.41, USD: 1, EUR: 1.08 },
+  tiers: [] as ProcurementTier[],   // filled below (SEED_TIERS)
+  contractThresholdUSD: 2500,
+  legalReviewThresholdUSD: 10000,
+  soleSourceEdThresholdUSD: 2500,
+  dualAuthThresholdUSD: 10000,
   priceTolerancePct: 2,
   paymentTermsDays: 30,
   fiscalYearStart: '01-01',
 }
+
+/** Procurement SOPs §3 — thresholds apply to the total value of a single transaction and must not be split. */
+export const SEED_TIERS: ProcurementTier[] = [
+  { id: 't0', name: 'Petty cash / Direct purchase', minUSD: 0, maxUSD: 500, method: 'direct', minQuotations: 0, invitedSuppliersMin: 0, deadlineWorkingDays: 0, committeeMin: 0, donorApproval: false,
+    approvers: [{ role: 'dept_manager', label: 'Department Head' }] },
+  { id: 't1', name: 'Tier 1 — Small purchase', minUSD: 500.01, maxUSD: 2500, method: 'rfq', minQuotations: 3, invitedSuppliersMin: 3, deadlineWorkingDays: 0, committeeMin: 0, donorApproval: false,
+    approvers: [{ role: 'procurement_officer', label: 'Procurement Officer' }, { role: 'finance', label: 'Finance Manager' }] },
+  { id: 't2', name: 'Tier 2 — Medium purchase', minUSD: 2500.01, maxUSD: 10000, method: 'rfq_formal', minQuotations: 3, invitedSuppliersMin: 3, deadlineWorkingDays: 0, committeeMin: 0, donorApproval: false,
+    approvers: [{ role: 'programs_director', label: 'Director of Programs' }, { role: 'finance_director', label: 'Director of Finance & Support' }] },
+  { id: 't3', name: 'Tier 3 — Large purchase', minUSD: 10000.01, maxUSD: 50000, method: 'closed_bid', minQuotations: 3, invitedSuppliersMin: 5, deadlineWorkingDays: 14, committeeMin: 3, donorApproval: false,
+    approvers: [{ role: 'programs_director', label: 'Director of Programs' }, { role: 'executive_director', label: 'Executive Director' }] },
+  { id: 't4', name: 'Tier 4 — High value / Works', minUSD: 50000.01, maxUSD: null, method: 'open_bid', minQuotations: 5, invitedSuppliersMin: 0, deadlineWorkingDays: 14, committeeMin: 3, donorApproval: true,
+    approvers: [{ role: 'programs_director', label: 'Director of Programs' }, { role: 'executive_director', label: 'Executive Director' }, { role: 'finance_director', label: 'Director of Finance & Support' }] },
+]
+SEED_SETTINGS.tiers = SEED_TIERS
 
 export const DEPARTMENTS = ['Procurement', 'Finance', 'Medical Programs', 'Operations', 'Field Services', 'Executive Office', 'Legal', 'IT']
 export const CATEGORIES = ['Medical Equipment', 'Prosthetic Components', 'Rehabilitation Supplies', 'IT & Software', 'Vehicles & Fleet', 'Office Supplies', 'Professional Services', 'Logistics', 'Facilities']
@@ -27,13 +47,15 @@ export const COST_CENTERS = ['CC-100 Executive', 'CC-200 Medical', 'CC-210 Prost
 export const BUDGET_LINES = ['BL-01 Program Delivery', 'BL-02 Medical Supplies', 'BL-03 Capital Equipment', 'BL-04 Admin & Overheads', 'BL-05 Logistics', 'BL-06 Technology']
 
 export const SEED_USERS: User[] = [
-  { id: 'u_bilal',  name: 'Bilal Abbassi',   email: 'AlAbbassi.bilal@icloud.com', password: 'rhs2025', role: 'admin',               department: 'Procurement',       title: 'Head of Procurement & Systems', avatarColor: 'bg-brand-600',  active: true },
+  { id: 'u_bilal',  name: 'Bilal Abbassi',   email: 'AlAbbassi.bilal@icloud.com', password: 'rhs2025', role: 'admin', approverRoles: ['programs_director'], department: 'Programs', title: 'Director of Programs', avatarColor: 'bg-brand-600',  active: true },
+  { id: 'u_shatha', name: 'Shatha Homsi',    email: 'shatha.homsi@rhs.jo',       password: 'rhs2025', role: 'finance_director',    department: 'Finance',           title: 'Director of Finance & Support', avatarColor: 'bg-sun-700',    active: true },
+  { id: 'u_khalid', name: 'Khalid Mansour',  email: 'khalid.mansour@rhs.jo',     password: 'rhs2025', role: 'logistics',           department: 'Operations',        title: 'Logistics & Warehouse Officer', avatarColor: 'bg-ink-600',    active: true },
   { id: 'u_lina',   name: 'Lina Haddad',     email: 'lina.haddad@rhs.jo',        password: 'rhs2025', role: 'requester',           department: 'Medical Programs',  title: 'Program Coordinator',           avatarColor: 'bg-accent-600', active: true },
   { id: 'u_omar',   name: 'Omar Khalil',     email: 'omar.khalil@rhs.jo',        password: 'rhs2025', role: 'dept_manager',        department: 'Medical Programs',  title: 'Medical Programs Manager',      avatarColor: 'bg-ink-700',    active: true },
   { id: 'u_rana',   name: 'Rana Suleiman',   email: 'rana.suleiman@rhs.jo',      password: 'rhs2025', role: 'finance',             department: 'Finance',           title: 'Finance Manager',               avatarColor: 'bg-sun-700',    active: true },
   { id: 'u_yousef', name: 'Yousef Nasser',   email: 'yousef.nasser@rhs.jo',      password: 'rhs2025', role: 'procurement_officer', department: 'Procurement',       title: 'Procurement Officer',           avatarColor: 'bg-brand-800',  active: true },
   { id: 'u_maha',   name: 'Maha Al-Rawi',    email: 'maha.alrawi@rhs.jo',        password: 'rhs2025', role: 'procurement_manager', department: 'Procurement',       title: 'Procurement Manager',           avatarColor: 'bg-info-700',   active: true },
-  { id: 'u_sami',   name: 'Sami Barakat',    email: 'sami.barakat@rhs.jo',       password: 'rhs2025', role: 'executive_director',  department: 'Executive Office',  title: 'Executive Director',            avatarColor: 'bg-ink-900',    active: true },
+  { id: 'u_fawaz',  name: 'Fawaz Al Shakaa', email: 'fawaz.alshakaa@rhs.jo',     password: 'rhs2025', role: 'executive_director',  department: 'Executive Office',  title: 'Executive Director / Board Chairperson', avatarColor: 'bg-ink-900', active: true },
   { id: 'u_dana',   name: 'Dana Qasem',      email: 'dana.qasem@rhs.jo',         password: 'rhs2025', role: 'legal',               department: 'Legal',             title: 'Legal Counsel',                 avatarColor: 'bg-accent-700', active: true },
   { id: 'u_hani',   name: 'Hani Odeh',       email: 'hani.odeh@rhs.jo',          password: 'rhs2025', role: 'dept_manager',        department: 'Operations',        title: 'Operations Manager',            avatarColor: 'bg-ink-600',    active: true },
   { id: 'u_nour',   name: 'Nour Saleh',      email: 'nour.saleh@rhs.jo',         password: 'rhs2025', role: 'requester',           department: 'Field Services',    title: 'Field Coordinator',             avatarColor: 'bg-brand-500',  active: true },
@@ -41,14 +63,8 @@ export const SEED_USERS: User[] = [
 
 /** Approval matrix — amount bands drive the chain. Editable from Admin → Approval Matrix. */
 export const SEED_RULES: ApprovalRule[] = [
-  { id: 'r_pr_1', name: 'PR — Low value',    docType: 'PR', minAmount: 0,     maxAmount: 1000,  steps: [{ role: 'dept_manager', label: 'Department Manager' }] },
-  { id: 'r_pr_2', name: 'PR — Medium value', docType: 'PR', minAmount: 1000.01, maxAmount: 10000, steps: [{ role: 'dept_manager', label: 'Department Manager' }, { role: 'finance', label: 'Finance — Budget Check' }] },
-  { id: 'r_pr_3', name: 'PR — High value',   docType: 'PR', minAmount: 10000.01, maxAmount: null, steps: [{ role: 'dept_manager', label: 'Department Manager' }, { role: 'finance', label: 'Finance — Budget Check' }, { role: 'executive_director', label: 'Executive Director' }] },
-  { id: 'r_po_1', name: 'PO — Low value',    docType: 'PO', minAmount: 0,     maxAmount: 5000,  steps: [{ role: 'procurement_manager', label: 'Procurement Manager' }] },
-  { id: 'r_po_2', name: 'PO — Medium value', docType: 'PO', minAmount: 5000.01, maxAmount: 25000, steps: [{ role: 'procurement_manager', label: 'Procurement Manager' }, { role: 'finance', label: 'Finance — Commitment' }] },
-  { id: 'r_inv_1', name: 'Invoice — Standard',   docType: 'INVOICE', minAmount: 0,     maxAmount: 10000, steps: [{ role: 'finance', label: 'Finance — Invoice Approval' }] },
-  { id: 'r_inv_2', name: 'Invoice — High value', docType: 'INVOICE', minAmount: 10000.01, maxAmount: null, steps: [{ role: 'finance', label: 'Finance — Invoice Approval' }, { role: 'executive_director', label: 'Executive Director — Payment Release' }] },
-  { id: 'r_po_3', name: 'PO — High value',   docType: 'PO', minAmount: 25000.01, maxAmount: null, steps: [{ role: 'procurement_manager', label: 'Procurement Manager' }, { role: 'finance', label: 'Finance — Commitment' }, { role: 'executive_director', label: 'Executive Director' }] },
+  { id: 'r_pr_1', name: 'PR — all values (SOP-PRO-01)', docType: 'PR', minAmount: 0, maxAmount: null, steps: [{ role: 'finance', label: 'Finance — Budget verification & budget code' }, { role: 'dept_manager', label: 'Line Manager — Operational justification' }] },
+  { id: 'r_inv_1', name: 'Invoice payment — all values (SOP-PRO-07)', docType: 'INVOICE', minAmount: 0, maxAmount: null, steps: [{ role: 'finance_director', label: 'Finance Director — Payment authorisation' }, { role: 'executive_director', label: 'Executive Director — Second signatory' }] },
 ]
 
 export const SEED_VENDORS: Vendor[] = [
@@ -86,7 +102,7 @@ export const SEED_PRS: PurchaseRequisition[] = [
     id: 'pr_1', number: 'PR-2025-0041', title: 'Modular prosthetic knee joints — Q4 fitting program',
     justification: 'Replenishment of prosthetic components for the Q4 Mobile Amputee Support Unit fitting programme (est. 24 beneficiaries).',
     department: 'Medical Programs', requesterId: 'u_lina', requesterName: 'Lina Haddad', ownerName: DOC_OWNER,
-    priority: 'high', neededBy: toInputDate(addDays(new Date(), 30)), currency: 'JOD',
+    procurementType: 'goods', priority: 'high', neededBy: toInputDate(addDays(new Date(), 30)), currency: 'JOD',
     lines: [
       { id: 'l1', description: 'Modular polycentric knee joint (adult)', category: 'Prosthetic Components', quantity: 24, unit: 'each', unitPrice: 620, costCenter: 'CC-210 Prosthetics Lab', budgetLine: 'BL-02 Medical Supplies' },
       { id: 'l2', description: 'Pylon tube adapter set 30mm', category: 'Prosthetic Components', quantity: 24, unit: 'set', unitPrice: 85, costCenter: 'CC-210 Prosthetics Lab', budgetLine: 'BL-02 Medical Supplies' },
@@ -95,7 +111,7 @@ export const SEED_PRS: PurchaseRequisition[] = [
     approvalChain: [
       { id: 's1', order: 1, label: 'Department Manager', role: 'dept_manager', approverId: 'u_omar', status: 'approved', decidedBy: 'u_omar', decidedAt: ago(9), comment: 'Aligned with Q4 plan.' },
       { id: 's2', order: 2, label: 'Finance — Budget Check', role: 'finance', approverId: 'u_rana', status: 'approved', decidedBy: 'u_rana', decidedAt: ago(8), comment: 'Budget available under BL-02.' },
-      { id: 's3', order: 3, label: 'Executive Director', role: 'executive_director', approverId: 'u_sami', status: 'approved', decidedBy: 'u_sami', decidedAt: ago(7), comment: 'Approved.' },
+      { id: 's3', order: 3, label: 'Executive Director', role: 'executive_director', approverId: 'u_fawaz', status: 'approved', decidedBy: 'u_fawaz', decidedAt: ago(7), comment: 'Approved.' },
     ],
     createdAt: ago(11), updatedAt: ago(2), submittedAt: ago(10), approvedAt: ago(7), sourcingOwnerId: 'u_yousef',
     quotations: [
@@ -103,38 +119,40 @@ export const SEED_PRS: PurchaseRequisition[] = [
       { id: 'q2', vendorId: 'v_2', vendorName: 'Össur Regional Distributors', reference: 'OSS-2025-1174', receivedAt: ago(3), validUntil: d(30), currency: 'JOD', subtotal: 15960, taxRate: 16, deliveryDays: 28, paymentTerms: '30 days net', warranty: '18 months', notes: '', attachments: [], lines: [{ lineItemId: 'l1', unitPrice: 585 }, { lineItemId: 'l2', unitPrice: 80 }], compliant: true },
     ],
     comments: [{ id: 'cm1', authorId: 'u_yousef', authorName: 'Yousef Nasser', at: ago(2), text: 'Two quotations received; awaiting Global Ortho response by Thursday.' }],
+    sourcing: { ...emptySourcing(), issuedAt: toInputDate(addDays(new Date(), -20)), deadline: toInputDate(addDays(new Date(), 2)), invitedVendorIds: ['v_1', 'v_2', 'v_8', 'v_3', 'v_7'],
+      committee: [{ userId: 'u_maha', name: 'Maha Al-Rawi', role: 'chair', ndaSigned: true, coiDeclared: true }, { userId: 'u_omar', name: 'Omar Khalil', role: 'technical', ndaSigned: true, coiDeclared: true }, { userId: 'u_rana', name: 'Rana Suleiman', role: 'member', ndaSigned: true, coiDeclared: false }] },
   },
   {
     id: 'pr_2', number: 'PR-2025-0042', title: 'Laptops for field coordinators (6 units)',
     justification: 'Replace end-of-life devices used by MASU field teams for beneficiary intake and reporting.',
     department: 'Field Services', requesterId: 'u_nour', requesterName: 'Nour Saleh', ownerName: DOC_OWNER,
-    priority: 'normal', neededBy: toInputDate(addDays(new Date(), 45)), currency: 'JOD',
+    procurementType: 'goods', priority: 'normal', neededBy: toInputDate(addDays(new Date(), 45)), currency: 'JOD',
     lines: [{ id: 'l1', description: 'Business laptop 14", 16GB RAM, 512GB SSD, 3yr warranty', category: 'IT & Software', quantity: 6, unit: 'each', unitPrice: 780, costCenter: 'CC-300 Field Ops', budgetLine: 'BL-06 Technology' }],
     attachments: [], status: 'pending_approval',
     approvalChain: [
       { id: 's1', order: 1, label: 'Department Manager', role: 'dept_manager', approverId: 'u_hani', status: 'approved', decidedBy: 'u_hani', decidedAt: ago(1), comment: 'Needed for field intake.' },
       { id: 's2', order: 2, label: 'Finance — Budget Check', role: 'finance', approverId: 'u_rana', status: 'current' },
     ],
-    createdAt: ago(3), updatedAt: ago(1), submittedAt: ago(2), quotations: [], comments: [],
+    createdAt: ago(3), updatedAt: ago(1), submittedAt: ago(2), quotations: [], comments: [], sourcing: emptySourcing(),
   },
   {
     id: 'pr_3', number: 'PR-2025-0043', title: 'Physiotherapy consumables — resistance bands & mats',
     justification: 'Monthly rehabilitation supplies for the Amman centre.',
     department: 'Medical Programs', requesterId: 'u_lina', requesterName: 'Lina Haddad', ownerName: DOC_OWNER,
-    priority: 'low', neededBy: toInputDate(addDays(new Date(), 20)), currency: 'JOD',
+    procurementType: 'goods', priority: 'low', neededBy: toInputDate(addDays(new Date(), 20)), currency: 'JOD',
     lines: [
       { id: 'l1', description: 'Resistance band set (5 levels)', category: 'Rehabilitation Supplies', quantity: 40, unit: 'set', unitPrice: 9.5, costCenter: 'CC-200 Medical', budgetLine: 'BL-02 Medical Supplies' },
       { id: 'l2', description: 'Exercise mat 180x60cm', category: 'Rehabilitation Supplies', quantity: 20, unit: 'each', unitPrice: 14, costCenter: 'CC-200 Medical', budgetLine: 'BL-02 Medical Supplies' },
     ],
     attachments: [], status: 'pending_approval',
     approvalChain: [{ id: 's1', order: 1, label: 'Department Manager', role: 'dept_manager', approverId: 'u_omar', status: 'current' }],
-    createdAt: ago(1), updatedAt: ago(1), submittedAt: ago(1), quotations: [], comments: [],
+    createdAt: ago(1), updatedAt: ago(1), submittedAt: ago(1), quotations: [], comments: [], sourcing: emptySourcing(),
   },
   {
     id: 'pr_4', number: 'PR-2025-0039', title: 'Annual maintenance — MASU vehicle fleet',
     justification: 'Scheduled maintenance contract for 3 Mobile Amputee Support Unit vans.',
     department: 'Operations', requesterId: 'u_hani', requesterName: 'Hani Odeh', ownerName: DOC_OWNER,
-    priority: 'normal', neededBy: toInputDate(addDays(new Date(), 10)), currency: 'JOD',
+    procurementType: 'services', priority: 'normal', neededBy: toInputDate(addDays(new Date(), 10)), currency: 'JOD',
     lines: [{ id: 'l1', description: 'Fleet maintenance & servicing — 12 months, 3 vans', category: 'Vehicles & Fleet', quantity: 12, unit: 'month', unitPrice: 640, costCenter: 'CC-300 Field Ops', budgetLine: 'BL-05 Logistics' }],
     attachments: [], status: 'ordered',
     approvalChain: [
@@ -148,28 +166,53 @@ export const SEED_PRS: PurchaseRequisition[] = [
       { id: 'q3', vendorId: 'v_5', vendorName: 'TechNova IT Services', reference: 'TN-FLT-04', receivedAt: ago(23), validUntil: d(8), currency: 'JOD', subtotal: 8040, taxRate: 16, deliveryDays: 14, paymentTerms: '30 days net', warranty: '90 days', notes: '', attachments: [], lines: [{ lineItemId: 'l1', unitPrice: 670 }], compliant: true },
     ],
     awardedQuotationId: 'q1', awardJustification: 'Lowest compliant price; strongest fleet-specific track record; monthly billing matches cash-flow.',
-    poId: 'po_1', comments: [],
+    poId: 'po_1', comments: [], sourcing: emptySourcing(),
   },
   {
     id: 'pr_5', number: 'PR-2025-0044', title: 'Office chairs — Amman rehabilitation centre reception',
     justification: 'Replace damaged reception seating.',
     department: 'Operations', requesterId: 'u_nour', requesterName: 'Nour Saleh', ownerName: DOC_OWNER,
-    priority: 'low', neededBy: toInputDate(addDays(new Date(), 60)), currency: 'JOD',
+    procurementType: 'goods', priority: 'low', neededBy: toInputDate(addDays(new Date(), 60)), currency: 'JOD',
     lines: [{ id: 'l1', description: 'Waiting-area chair, 4-seat bench', category: 'Office Supplies', quantity: 3, unit: 'each', unitPrice: 210, costCenter: 'CC-400 Admin', budgetLine: 'BL-04 Admin & Overheads' }],
-    attachments: [], status: 'draft', approvalChain: [], createdAt: ago(0.2), updatedAt: ago(0.2), quotations: [], comments: [],
+    attachments: [], status: 'draft', approvalChain: [], createdAt: ago(0.2), updatedAt: ago(0.2), quotations: [], comments: [], sourcing: emptySourcing(),
   },
   {
     id: 'pr_6', number: 'PR-2025-0038', title: 'Beneficiary case-management software licence',
     justification: 'Annual licence renewal for the case-management platform.',
     department: 'IT', requesterId: 'u_lina', requesterName: 'Lina Haddad', ownerName: DOC_OWNER,
-    priority: 'urgent', neededBy: toInputDate(addDays(new Date(), 5)), currency: 'JOD',
+    procurementType: 'services', priority: 'urgent', neededBy: toInputDate(addDays(new Date(), 5)), currency: 'JOD',
     lines: [{ id: 'l1', description: 'Case management SaaS — 25 seats, 12 months', category: 'IT & Software', quantity: 1, unit: 'each', unitPrice: 4200, costCenter: 'CC-500 IT', budgetLine: 'BL-06 Technology' }],
     attachments: [], status: 'returned',
     approvalChain: [
       { id: 's1', order: 1, label: 'Department Manager', role: 'dept_manager', approverId: 'u_omar', status: 'approved', decidedBy: 'u_omar', decidedAt: ago(5) },
       { id: 's2', order: 2, label: 'Finance — Budget Check', role: 'finance', approverId: 'u_rana', status: 'returned', decidedBy: 'u_rana', decidedAt: ago(4), comment: 'Please attach last year’s invoice and confirm seat count — we had 20 seats previously.' },
     ],
-    createdAt: ago(6), updatedAt: ago(4), submittedAt: ago(6), quotations: [], comments: [],
+    createdAt: ago(6), updatedAt: ago(4), submittedAt: ago(6), quotations: [], comments: [], sourcing: emptySourcing(),
+  },
+  {
+    id: 'pr_7', number: 'PR-2025-0045', title: 'Printer toner cartridges — HQ admin office',
+    justification: 'Replacement toner for the two shared HQ printers; stock exhausted.',
+    department: 'Operations', requesterId: 'u_nour', requesterName: 'Nour Saleh', ownerName: DOC_OWNER, procurementType: 'goods', priority: 'normal', neededBy: toInputDate(addDays(new Date(), 7)), currency: 'JOD',
+    lines: [{ id: 'l1', description: 'Toner cartridge, black, HP 26A compatible', category: 'Office Supplies', quantity: 4, unit: 'each', unitPrice: 55, costCenter: 'CC-400 Admin', budgetLine: 'BL-04 Admin & Overheads' }],
+    attachments: [], status: 'approved',
+    approvalChain: [
+      { id: 's1', order: 1, label: 'Finance — Budget verification & budget code', role: 'finance', approverId: 'u_rana', status: 'approved', decidedBy: 'u_rana', decidedAt: ago(1.5), comment: 'BL-04 confirmed.' },
+      { id: 's2', order: 2, label: 'Line Manager — Operational justification', role: 'dept_manager', approverId: 'u_hani', status: 'approved', decidedBy: 'u_hani', decidedAt: ago(1) },
+    ],
+    createdAt: ago(2), updatedAt: ago(1), submittedAt: ago(2), approvedAt: ago(1), quotations: [], comments: [], sourcing: emptySourcing(),
+  },
+  {
+    id: 'pr_8', number: 'PR-2025-0046', title: 'Construction of prosthetics workshop extension — Irbid centre',
+    justification: 'Extension of the Irbid rehabilitation centre workshop (120 m²) to add two fitting rooms and a gait-training lane, funded under the Irbid Access grant.',
+    department: 'Operations', requesterId: 'u_hani', requesterName: 'Hani Odeh', ownerName: DOC_OWNER, procurementType: 'works', donorCode: 'GR-2025-IRB-03', priority: 'high', neededBy: toInputDate(addDays(new Date(), 120)), currency: 'JOD',
+    lines: [{ id: 'l1', description: 'Civil works — workshop extension per BoQ and drawings (Annex A)', category: 'Works', quantity: 1, unit: 'lot', unitPrice: 62000, costCenter: 'CC-300 Field Ops', budgetLine: 'BL-08 Capital Works' }],
+    attachments: [], status: 'sourcing', sourcingOwnerId: 'u_yousef',
+    approvalChain: [
+      { id: 's1', order: 1, label: 'Finance — Budget verification & budget code', role: 'finance', approverId: 'u_rana', status: 'approved', decidedBy: 'u_rana', decidedAt: ago(12), comment: 'Grant budget line confirmed.' },
+      { id: 's2', order: 2, label: 'Line Manager — Operational justification', role: 'dept_manager', approverId: 'u_hani', status: 'approved', decidedBy: 'u_hani', decidedAt: ago(11) },
+    ],
+    createdAt: ago(14), updatedAt: ago(6), submittedAt: ago(13), approvedAt: ago(11), quotations: [], comments: [],
+    sourcing: { ...emptySourcing(), issuedAt: toInputDate(addDays(new Date(), -6)), deadline: toInputDate(addDays(new Date(), 16)), advertisementRef: 'Al-Rai daily + RHS website + donor portal, ref ITB-2025-003', committee: [] },
   },
 ]
 

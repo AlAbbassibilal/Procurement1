@@ -7,6 +7,7 @@ import { LineItemsEditor, AttachmentList, newLine, ProcessTracker } from '@/comp
 import { DEPARTMENTS } from '@/data/seed'
 import { fmtMoney, linesSubtotal } from '@/lib/format'
 import { findRule } from '@/lib/workflow'
+import { TierCard } from '@/components/tier'
 import type { PurchaseRequisition } from '@/types'
 
 export default function RequisitionForm() {
@@ -16,7 +17,7 @@ export default function RequisitionForm() {
   const { prs, createPR, updatePR, submitPR, rules, settings } = useStore()
   const existing = id ? prs.find((p) => p.id === id) : undefined
   const [draft, setDraft] = useState<Partial<PurchaseRequisition>>(() => existing ?? {
-    title: '', justification: '', department: user.department, priority: 'normal', neededBy: '', currency: settings.defaultCurrency, lines: [newLine()], attachments: [],
+    title: '', justification: '', department: user.department, priority: 'normal', procurementType: 'goods', donorCode: '', neededBy: '', currency: settings.defaultCurrency, lines: [newLine()], attachments: [],
   })
   const [err, setErr] = useState<string | null>(null)
   useEffect(() => { if (existing) setDraft(existing) }, [existing?.id])
@@ -63,6 +64,8 @@ export default function RequisitionForm() {
               <Field label="Title" required className="sm:col-span-2"><input className="input" value={draft.title ?? ''} onChange={(e) => set({ title: e.target.value })} placeholder="What are you requesting?" /></Field>
               <Field label="Business justification" required className="sm:col-span-2"><textarea className="input min-h-[96px]" value={draft.justification ?? ''} onChange={(e) => set({ justification: e.target.value })} placeholder="Why is this needed, which programme/beneficiaries does it serve, and what happens if it is not procured?" /></Field>
               <Field label="Department" required><select className="input" value={draft.department} onChange={(e) => set({ department: e.target.value })}>{DEPARTMENTS.map((d) => <option key={d}>{d}</option>)}</select></Field>
+              <Field label="Procurement type" required hint="Services and works above USD 2,500 need a formal contract"><select className="input" value={draft.procurementType ?? 'goods'} onChange={(e) => set({ procurementType: e.target.value as PurchaseRequisition['procurementType'] })}><option value="goods">Goods</option><option value="services">Services</option><option value="works">Works</option></select></Field>
+              <Field label="Donor / project code" hint="Leave empty for core funds"><input className="input" value={draft.donorCode ?? ''} onChange={(e) => set({ donorCode: e.target.value })} placeholder="e.g. GR-2025-IRB-03" /></Field>
               <Field label="Priority"><select className="input" value={draft.priority} onChange={(e) => set({ priority: e.target.value as PurchaseRequisition['priority'] })}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option></select></Field>
               <Field label="Needed by" required><input type="date" className="input" value={draft.neededBy ?? ''} onChange={(e) => set({ neededBy: e.target.value })} /></Field>
               <Field label="Currency"><select className="input" value={draft.currency} onChange={(e) => set({ currency: e.target.value as PurchaseRequisition['currency'] })}><option>JOD</option><option>USD</option><option>EUR</option></select></Field>
@@ -99,7 +102,9 @@ export default function RequisitionForm() {
                 <li className="pt-2 text-[12px] text-ink-500">Rule: {rule.name} ({fmtMoney(rule.minAmount, draft.currency)} – {rule.maxAmount === null ? 'no limit' : fmtMoney(rule.maxAmount, draft.currency)})</li>
               </ol>
             ) : <Alert tone="warning">No approval rule covers this amount. Contact the administrator.</Alert>}
-            {amount >= settings.quotationThreshold && <div className="mt-3 text-[12px] text-ink-600">≥ {fmtMoney(settings.quotationThreshold, draft.currency)}: Procurement must obtain <b>{settings.quotationMinimum} quotations</b> before award.</div>}
+          </Card>
+          <Card title="Procurement method" description="Resolved from the SOP thresholds (§3) on the estimated value">
+            <TierCard amount={amount} currency={draft.currency ?? settings.defaultCurrency} procurementType={draft.procurementType ?? 'goods'} donorCode={draft.donorCode} />
           </Card>
         </div>
       </div>

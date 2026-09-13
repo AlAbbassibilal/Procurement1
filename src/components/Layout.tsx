@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { NavLink, Outlet, useNavigate, Link } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, CheckSquare, Search, ShoppingCart, FileSignature, Building2, Users, SlidersHorizontal,
-  History, Bell, LogOut, ChevronDown, Menu, Settings, RotateCcw, ChevronsUpDown, PackageCheck, Receipt,
+  History, Bell, LogOut, ChevronDown, Menu, Settings, RotateCcw, ChevronsUpDown, PackageCheck, Receipt, Scale,
 } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
 import { Logo, SunMark } from './Logo'
@@ -39,20 +39,21 @@ export default function Layout() {
     ] },
     { title: 'Procure-to-pay', items: [
       { to: '/requisitions', label: 'Requisitions', icon: <FileText size={17} /> },
-      { to: '/sourcing', label: 'Sourcing & quotations', icon: <Search size={17} />, roles: ['procurement_officer', 'procurement_manager', 'admin', 'executive_director', 'finance'], badge: sourcingCount },
+      { to: '/sourcing', label: 'Sourcing & quotations', icon: <Search size={17} />, roles: ['procurement_officer', 'procurement_manager', 'admin', 'executive_director', 'finance', 'finance_director', 'programs_director', 'dept_manager'], badge: sourcingCount },
       { to: '/orders', label: 'Purchase orders', icon: <ShoppingCart size={17} /> },
       { to: '/contracts', label: 'Contracts', icon: <FileSignature size={17} /> },
       { to: '/receiving', label: 'Goods receipt', icon: <PackageCheck size={17} />, badge: pos.filter((p) => ['issued', 'contracted', 'partially_received'].includes(p.status)).length },
-      { to: '/invoices', label: 'Invoices & payments', icon: <Receipt size={17} />, roles: ['finance', 'procurement_officer', 'procurement_manager', 'admin', 'executive_director'], badge: invoices.filter((i) => i.status === 'exception').length },
+      { to: '/invoices', label: 'Invoices & payments', icon: <Receipt size={17} />, roles: ['finance', 'finance_director', 'procurement_officer', 'procurement_manager', 'admin', 'executive_director', 'programs_director'], badge: invoices.filter((i) => i.status === 'exception').length },
     ] },
     { title: 'Masters', items: [
       { to: '/vendors', label: 'Vendors', icon: <Building2 size={17} /> },
     ] },
     { title: 'Administration', items: [
       { to: '/admin/users', label: 'Users & roles', icon: <Users size={17} />, roles: ['admin'] },
-      { to: '/admin/approval-matrix', label: 'Approval matrix', icon: <SlidersHorizontal size={17} />, roles: ['admin', 'procurement_manager', 'finance'] },
+      { to: '/admin/thresholds', label: 'Procurement thresholds', icon: <Scale size={17} />, roles: ['admin', 'procurement_manager', 'procurement_officer', 'finance', 'finance_director', 'programs_director', 'executive_director'] },
+      { to: '/admin/approval-matrix', label: 'Approval matrix', icon: <SlidersHorizontal size={17} />, roles: ['admin', 'procurement_manager', 'finance', 'finance_director', 'programs_director'] },
       { to: '/admin/settings', label: 'Settings', icon: <Settings size={17} />, roles: ['admin'] },
-      { to: '/audit', label: 'Audit trail', icon: <History size={17} />, roles: ['admin', 'finance', 'procurement_manager', 'executive_director', 'legal'] },
+      { to: '/audit', label: 'Audit trail', icon: <History size={17} />, roles: ['admin', 'finance', 'finance_director', 'programs_director', 'procurement_manager', 'executive_director', 'legal'] },
     ] },
   ]
 

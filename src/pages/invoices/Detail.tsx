@@ -22,8 +22,8 @@ export default function InvoiceDetail() {
   if (!inv) return <Alert tone="danger">Invoice not found.</Alert>
   const po = pos.find((p) => p.id === inv.poId)
   const t = invoiceTotals(inv.lines, inv.taxRate)
-  const isFinance = ['finance', 'admin'].includes(user.role)
-  const isAP = ['finance', 'procurement_officer', 'procurement_manager', 'admin'].includes(user.role)
+  const isFinance = ['finance', 'finance_director', 'admin'].includes(user.role)
+  const isAP = ['finance', 'finance_director', 'procurement_officer', 'procurement_manager', 'admin'].includes(user.role)
   const blocks = inv.matchIssues.filter((i) => i.severity === 'block')
   const warns = inv.matchIssues.filter((i) => i.severity === 'warn')
 

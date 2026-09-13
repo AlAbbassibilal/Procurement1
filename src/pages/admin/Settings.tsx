@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Save } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useStore } from '@/store/useStore'
 import { Card, PageHeader, Field, Alert } from '@/components/ui'
 import { Logo } from '@/components/Logo'
@@ -30,8 +31,7 @@ export default function Settings() {
           </Card>
           <Card title="Procurement policy">
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Required number of quotations"><input type="number" min={1} className="input" value={s.quotationMinimum} onChange={(e) => set({ quotationMinimum: Number(e.target.value) })} /></Field>
-              <Field label="Quotation threshold" hint="Requisitions at or above this value require the full quotation set"><input type="number" className="input" value={s.quotationThreshold} onChange={(e) => set({ quotationThreshold: Number(e.target.value) })} /></Field>
+              <div className="sm:col-span-2 rounded-control border border-line bg-surface-muted px-3 py-2 text-[13px] text-ink-700">Value tiers, sourcing methods and approval authority are configured under <Link to="/admin/thresholds" className="font-medium text-brand-700 hover:underline">Procurement thresholds</Link> (SOP §3).</div>
               <Field label="Default currency"><select className="input" value={s.defaultCurrency} onChange={(e) => set({ defaultCurrency: e.target.value as OrgSettings['defaultCurrency'] })}><option>JOD</option><option>USD</option><option>EUR</option></select></Field>
               <Field label="Invoice price tolerance %" hint="Unit-price variance vs PO allowed by the 3-way match"><input type="number" step="0.5" className="input" value={s.priceTolerancePct} onChange={(e) => set({ priceTolerancePct: Number(e.target.value) })} /></Field>
               <Field label="Default payment terms (days)"><input type="number" className="input" value={s.paymentTermsDays} onChange={(e) => set({ paymentTermsDays: Number(e.target.value) })} /></Field>

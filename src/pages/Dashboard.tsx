@@ -5,6 +5,7 @@ import { Card, PageHeader, Stat, StatusPill, EmptyState, PriorityDot } from '@/c
 import { fmtMoney, fmtDate, linesSubtotal, timeAgo } from '@/lib/format'
 import { canApprove, ROLE_LABEL } from '@/lib/workflow'
 import { invoiceTotals } from '@/lib/match'
+import { tierForPR } from '@/lib/tiers'
 
 export default function Dashboard() {
   const user = useCurrentUser()!
@@ -108,7 +109,7 @@ export default function Dashboard() {
                     <tr key={p.id} className="hover:bg-surface-muted cursor-pointer" onClick={() => nav(`/sourcing/${p.id}`)}>
                       <td className="table-td"><div className="font-medium text-ink-900">{p.title}</div><div className="text-[11.5px] text-ink-500">{p.number}</div></td>
                       <td className="table-td">{p.department}</td>
-                      <td className="table-td"><span className={p.quotations.length >= settings.quotationMinimum ? 'text-brand-700 font-semibold' : 'text-ink-700'}>{p.quotations.length}/{settings.quotationMinimum}</span></td>
+                      <td className="table-td">{(() => { const t = tierForPR(p, settings).tier; const need = Math.max(t?.minQuotations ?? 0, 1); return <span className={p.quotations.length >= need ? 'text-brand-700 font-semibold' : 'text-ink-700'}>{p.quotations.length}/{need}</span> })()}</td>
                       <td className="table-td">{fmtDate(p.neededBy)}</td>
                       <td className="table-td text-right tabular-nums">{fmtMoney(linesSubtotal(p.lines), p.currency)}</td>
                       <td className="table-td"><StatusPill status={p.status} /></td>

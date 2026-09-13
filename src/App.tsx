@@ -18,6 +18,7 @@ import Users from '@/pages/admin/Users'
 import ApprovalMatrix from '@/pages/admin/ApprovalMatrix'
 import Settings from '@/pages/admin/Settings'
 import Audit from '@/pages/Audit'
+import Thresholds from '@/pages/admin/Thresholds'
 import ReceivingList from '@/pages/receiving/List'
 import ReceivingDetail from '@/pages/receiving/Detail'
 import InvoiceList from '@/pages/invoices/List'
@@ -56,6 +57,7 @@ export default function App() {
           <Route path="vendors" element={<Vendors />} />
           <Route path="admin/users" element={<Users />} />
           <Route path="admin/approval-matrix" element={<ApprovalMatrix />} />
+          <Route path="admin/thresholds" element={<Thresholds />} />
           <Route path="admin/settings" element={<Settings />} />
           <Route path="audit" element={<Audit />} />
           <Route path="*" element={<Navigate to="/" replace />} />

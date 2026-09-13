@@ -43,7 +43,7 @@ Everything visual is driven from **`src/theme/brand.css`** — the only file wit
 
 React 18 · TypeScript · Vite · Tailwind CSS · Zustand (persisted to `localStorage`) · React Router · lucide-react.
 
-State, approvals, numbering and notifications live in `src/store/useStore.ts`; the approval engine (matrix lookup, chain building, decisions, delegation, re-submission) is `src/lib/workflow.ts`; the 3-way match rules are `src/lib/match.ts`. The store is the seam for a real backend: each action maps 1:1 to an API call.
+State, approvals, numbering and notifications live in `src/store/useStore.ts`; the approval engine (matrix lookup, chain building, decisions, delegation, re-submission) is `src/lib/workflow.ts`; the 3-way match rules are `src/lib/match.ts`; the SOP tier / method engine and sourcing checklist are `src/lib/tiers.ts`. The store is the seam for a real backend: each action maps 1:1 to an API call.
 
 ## Project layout
 
@@ -54,6 +54,7 @@ src/
   data/seed.ts           users, vendors, approval matrix, clause library, sample documents
   lib/workflow.ts        approval engine
   lib/match.ts           3-way match (PO × goods receipt × invoice)
+  lib/tiers.ts           SOP §3 thresholds → method, requirements checklist, exception route
   store/useStore.ts      application state + all workflow actions + audit + notifications
   components/            Layout, Logo, ui primitives, workflow widgets (tracker, chain, decision panel, quotes)
   pages/                 Login, Dashboard, Approvals, requisitions/, sourcing/, orders/, contracts/, receiving/, invoices/, Vendors, admin/, Audit

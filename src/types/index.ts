@@ -5,12 +5,15 @@
 
 export type Role =
   | 'requester'
-  | 'dept_manager'
-  | 'finance'
+  | 'dept_manager'          // Department Head / Line Manager / Budget Holder
+  | 'finance'               // Finance Manager / Finance Officer
+  | 'finance_director'      // Director of Finance and Support
   | 'procurement_officer'
   | 'procurement_manager'
+  | 'programs_director'     // Director of Programs
   | 'executive_director'
   | 'legal'
+  | 'logistics'             // Logistics / Warehouse Officer / Storekeeper
   | 'admin'
 
 export interface User {
@@ -19,10 +22,77 @@ export interface User {
   email: string
   password: string // demo-only; replace with real auth
   role: Role
+  approverRoles?: Role[]   // additional approval capacities this user holds (e.g. admin acting as Director of Programs)
   department: string
   title: string
   avatarColor: string
   active: boolean
+}
+
+// ---------------------------------------------------------------------------
+// Procurement thresholds & methods — RHS Procurement SOPs §3
+// ---------------------------------------------------------------------------
+export type SourcingMethod =
+  | 'direct'        // Petty cash / direct purchase — no formal quotation
+  | 'rfq'           // Tier 1 — minimum 3 written quotations
+  | 'rfq_formal'    // Tier 2 — RFQ with formal bid comparison table
+  | 'closed_bid'    // Tier 3 — RFP / ITB issued to a shortlist (min 5 suppliers), evaluation committee
+  | 'open_bid'      // Tier 4 — publicly advertised international competitive tender (ICB)
+
+export interface ProcurementTier {
+  id: string
+  name: string
+  minUSD: number
+  maxUSD: number | null
+  method: SourcingMethod
+  minQuotations: number          // minimum quotations / bids to be received
+  invitedSuppliersMin: number    // minimum suppliers the RFQ / RFP is issued to
+  deadlineWorkingDays: number    // minimum submission period (0 = none)
+  committeeMin: number           // evaluation committee size (0 = no committee)
+  donorApproval: boolean         // donor approval required before PO
+  approvers: { role: Role; label: string }[]   // approval authority for the PO / award
+}
+
+export type ExceptionType = 'emergency' | 'sole_source' | 'proprietary' | 'donor_restriction'
+
+export interface CommitteeMember {
+  userId: string
+  name: string
+  role: 'chair' | 'technical' | 'member'
+  ndaSigned: boolean
+  coiDeclared: boolean
+}
+
+/** Everything Procurement records while running the sourcing method for a requisition. */
+export interface SourcingRecord {
+  exception?: {
+    type: ExceptionType
+    justification: string
+    requestedBy: string
+    requestedByName: string
+    requestedAt: string
+    approvedBy?: string
+    approvedByName?: string
+    approvedAt?: string
+    decision?: 'approved' | 'rejected'
+    comment?: string
+  }
+  issuedAt?: string              // RFQ / tender issue date
+  deadline?: string              // quotation / bid submission deadline
+  invitedVendorIds: string[]
+  advertisementRef?: string      // open bid: where it was advertised
+  openedAt?: string
+  openingWitnessId?: string
+  committee: CommitteeMember[]
+  technicalPassMark: number      // bids scoring below are disqualified from financial evaluation
+  evaluationReport?: string
+  evaluationSignedAt?: string
+  fewerQuotesReason?: string
+  fewerQuotesApprovedBy?: string
+  fewerQuotesApprovedByName?: string
+  fewerQuotesApprovedAt?: string
+  donorApprovalRef?: string
+  donorNotifiedAt?: string
 }
 
 export type DocType = 'PR' | 'PO' | 'CONTRACT' | 'INVOICE' | 'GRN'
@@ -151,6 +221,8 @@ export interface Quotation {
   attachments: Attachment[]
   lines: { lineItemId: string; unitPrice: number }[]
   compliant: boolean
+  technicalScore?: number   // 0-100, evaluation committee (bid methods)
+  late?: boolean            // received after the deadline → must be rejected
   score?: number
 }
 
@@ -164,6 +236,8 @@ export interface PurchaseRequisition {
   requesterName: string
   ownerName: string        // document owner (Bilal Abbassi)
   priority: 'low' | 'normal' | 'high' | 'urgent'
+  procurementType: 'goods' | 'services' | 'works'
+  donorCode?: string
   neededBy: string
   currency: Currency
   lines: LineItem[]
@@ -179,6 +253,7 @@ export interface PurchaseRequisition {
   awardedQuotationId?: string
   awardJustification?: string
   sourcingOwnerId?: string
+  sourcing: SourcingRecord
   poId?: string
   comments: Comment[]
 }
@@ -364,8 +439,12 @@ export interface OrgSettings {
   website: string
   defaultCurrency: Currency
   taxRate: number
-  quotationMinimum: number       // required number of quotations (3)
-  quotationThreshold: number     // amount above which 3 quotes are mandatory
+  fxToUSD: Record<Currency, number>   // thresholds are defined in USD (SOP §3)
+  tiers: ProcurementTier[]
+  contractThresholdUSD: number        // services / works above this need a formal contract
+  legalReviewThresholdUSD: number     // contracts above this need legal review
+  soleSourceEdThresholdUSD: number    // sole-source / emergency above this needs ED pre-approval
+  dualAuthThresholdUSD: number        // POs above this need dual authorisation
   priceTolerancePct: number      // invoice unit-price variance tolerated vs PO
   paymentTermsDays: number       // default invoice due date offset
   fiscalYearStart: string

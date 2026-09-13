@@ -4,6 +4,8 @@ import { useStore, useCurrentUser } from '@/store/useStore'
 import { Card, PageHeader, StatusPill, KV, PriorityDot, Alert } from '@/components/ui'
 import { ApprovalChain, DecisionPanel, CommentThread, AttachmentList, LineItemsEditor, ProcessTracker, type Stage } from '@/components/workflow'
 import { fmtMoney, fmtDate, fmtDateTime, linesSubtotal } from '@/lib/format'
+import { TierCard } from '@/components/tier'
+import { tierForPR } from '@/lib/tiers'
 
 export default function RequisitionDetail() {
   const { id } = useParams()
@@ -20,6 +22,7 @@ export default function RequisitionDetail() {
   const stage: Stage = pr.status === 'draft' || pr.status === 'returned' ? 'pr' : pr.status === 'pending_approval' || pr.status === 'rejected' ? 'pr_approval'
     : pr.status === 'approved' || pr.status === 'sourcing' ? 'sourcing' : pr.status === 'awarded' ? 'po' : po?.status === 'pending_approval' ? 'po_approval' : po?.contractId ? 'contract' : 'po'
   const awarded = pr.quotations.find((q) => q.id === pr.awardedQuotationId)
+  const { tier } = tierForPR(pr, settings)
 
   return (
     <>
@@ -42,7 +45,7 @@ export default function RequisitionDetail() {
       )}
       {pr.status === 'rejected' && <div className="mb-6"><Alert tone="danger"><b>Rejected.</b> {pr.approvalChain.find((s) => s.status === 'rejected')?.comment}</Alert></div>}
       {pr.status === 'returned' && <div className="mb-6"><Alert tone="warning"><b>Returned for changes.</b> {pr.approvalChain.find((s) => s.status === 'returned')?.comment}</Alert></div>}
-      {pr.status === 'approved' && <div className="mb-6"><Alert tone="success"><b>Fully approved</b> on {fmtDateTime(pr.approvedAt)}. Now with Procurement to collect {settings.quotationMinimum} quotations.</Alert></div>}
+      {pr.status === 'approved' && <div className="mb-6"><Alert tone="success"><b>Fully approved</b> on {fmtDateTime(pr.approvedAt)}. Now with Procurement — method: <b>{tier?.name}</b>{tier && tier.minQuotations > 0 ? ` (${tier.minQuotations} quotations / bids)` : ''}.</Alert></div>}
 
       <div className="grid gap-6 xl:grid-cols-3">
         <div className="space-y-6 xl:col-span-2">
@@ -50,6 +53,8 @@ export default function RequisitionDetail() {
             <p className="text-[13.5px] leading-relaxed text-ink-800 whitespace-pre-wrap">{pr.justification || <i className="text-ink-400">No justification provided.</i>}</p>
             <div className="mt-4 grid gap-x-8 sm:grid-cols-2">
               <KV k="Priority" v={<PriorityDot p={pr.priority} />} />
+              <KV k="Type" v={pr.procurementType.charAt(0).toUpperCase() + pr.procurementType.slice(1)} />
+              <KV k="Donor / project" v={pr.donorCode || 'Core funds'} />
               <KV k="Needed by" v={fmtDate(pr.neededBy)} />
               <KV k="Department" v={pr.department} />
               <KV k="Currency" v={pr.currency} />
@@ -60,7 +65,7 @@ export default function RequisitionDetail() {
           <Card title="Line items" padded={false}><div className="p-4"><LineItemsEditor lines={pr.lines} currency={pr.currency} readOnly /></div></Card>
 
           {(pr.quotations.length > 0 || awarded) && (
-            <Card title="Sourcing outcome" description={`${pr.quotations.length} of ${settings.quotationMinimum} quotations recorded`} actions={isProc && <Link to={`/sourcing/${pr.id}`} className="text-[12.5px] font-medium text-brand-700 hover:underline">Manage</Link>}>
+            <Card title="Sourcing outcome" description={`${pr.quotations.length} quotation(s) recorded · ${tier?.name ?? ''}`} actions={isProc && <Link to={`/sourcing/${pr.id}`} className="text-[12.5px] font-medium text-brand-700 hover:underline">Manage</Link>}>
               <ul className="divide-y divide-line">
                 {pr.quotations.map((q) => (
                   <li key={q.id} className="flex items-center justify-between gap-3 py-2 text-[13px]">
@@ -82,6 +87,7 @@ export default function RequisitionDetail() {
             <div className="text-[26px] font-semibold text-ink-900">{fmtMoney(amount, pr.currency)}</div>
             <div className="text-[12.5px] text-ink-500">{pr.lines.length} line(s) · excl. tax</div>
           </Card>
+          <Card title="Procurement method"><TierCard compact amount={linesSubtotal(pr.lines)} currency={pr.currency} procurementType={pr.procurementType} donorCode={pr.donorCode} /></Card>
           <Card title="Approval chain"><ApprovalChain chain={pr.approvalChain} users={users} /></Card>
           <Card title="Document control">
             <KV k="Document owner" v={pr.ownerName} />

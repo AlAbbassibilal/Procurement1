@@ -7,15 +7,20 @@ import type { ApprovalRule, ApprovalStep, DocType, Role, User } from '@/types'
 import { uid } from './format'
 
 export const ROLE_LABEL: Record<Role, string> = {
-  requester: 'Requester',
-  dept_manager: 'Department Manager',
-  finance: 'Finance',
+  requester: 'Requesting Officer',
+  dept_manager: 'Department Head / Line Manager',
+  finance: 'Finance Manager',
+  finance_director: 'Director of Finance & Support',
   procurement_officer: 'Procurement Officer',
   procurement_manager: 'Procurement Manager',
+  programs_director: 'Director of Programs',
   executive_director: 'Executive Director',
   legal: 'Legal Counsel',
+  logistics: 'Logistics / Warehouse Officer',
   admin: 'System Administrator',
 }
+
+export const hasRole = (u: User, role: Role) => u.role === role || (u.approverRoles?.includes(role) ?? false)
 
 export function findRule(rules: ApprovalRule[], docType: DocType, amount: number): ApprovalRule | undefined {
   return rules
@@ -26,7 +31,7 @@ export function findRule(rules: ApprovalRule[], docType: DocType, amount: number
 
 /** Resolve a specific approver for a step: same-department manager where relevant, else first active user with the role. */
 export function resolveApprover(users: User[], role: Role, department?: string): User | undefined {
-  const active = users.filter((u) => u.active && u.role === role)
+  const active = users.filter((u) => u.active && hasRole(u, role))
   if (role === 'dept_manager' && department) {
     const same = active.find((u) => u.department === department)
     if (same) return same
@@ -37,7 +42,12 @@ export function resolveApprover(users: User[], role: Role, department?: string):
 export function buildChain(rules: ApprovalRule[], users: User[], docType: DocType, amount: number, department?: string): ApprovalStep[] {
   const rule = findRule(rules, docType, amount)
   if (!rule) return []
-  return rule.steps.map((s, i) => ({
+  return chainFromSteps(rule.steps, users, department)
+}
+
+/** Build a chain from an explicit list of steps (e.g. a procurement tier's approval authority). */
+export function chainFromSteps(steps: { role: Role; label: string }[], users: User[], department?: string): ApprovalStep[] {
+  return steps.map((s, i) => ({
     id: uid('step_'),
     order: i + 1,
     label: s.label,
@@ -57,7 +67,7 @@ export function canApprove(chain: ApprovalStep[], user: User): boolean {
   if (!step) return false
   if (step.delegatedTo) return step.delegatedTo === user.id
   if (step.approverId) return step.approverId === user.id || (user.role === 'admin')
-  return step.role === user.role || user.role === 'admin'
+  return hasRole(user, step.role) || user.role === 'admin'
 }
 
 export type DecisionResult = { chain: ApprovalStep[]; outcome: 'advanced' | 'completed' | 'rejected' | 'returned' | 'delegated' }

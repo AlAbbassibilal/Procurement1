@@ -21,7 +21,7 @@ export default function BudgetDetail() {
   return (
     <>
       <PageHeader eyebrow={<span className="font-mono">{b.donorCode}</span>} title={b.name}
-        subtitle={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><StatusPill status={b.status} /><span>{b.donor}</span><span>· {fmtDate(b.startDate)} – {fmtDate(b.endDate)}</span><span>· Owner {b.ownerName}</span></span>}
+        subtitle={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><StatusPill status={b.status} /><span>{b.donor}</span>{(b.startDate || b.endDate) && <span>· {fmtDate(b.startDate)} – {fmtDate(b.endDate)}</span>}<span>· Owner {b.ownerName}</span></span>}
         actions={<>
           <button className="btn-ghost" onClick={() => nav(-1)}><ArrowLeft size={15} /> Back</button>
           <button className="btn-ghost" onClick={() => window.print()}><Printer size={15} /> Print</button>

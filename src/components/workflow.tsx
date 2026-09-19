@@ -233,11 +233,11 @@ export function LineItemsEditor({ lines, onChange, currency, readOnly, priceLabe
   const lineLabel = (code: string) => { const bl = (budgetLines ?? budgets.flatMap((b) => b.lines)).find((x) => x.code === code); return bl ? `${bl.code} · ${bl.description}` : code || '—' }
   return (
     <div className="overflow-x-auto scrollbar-thin">
-      <table className="w-full min-w-[1280px] table-fixed text-[13px]">
+      <table className="w-full table-fixed text-[13px]">
         <thead><tr>
-          <th className="table-th w-10">#</th><th className="table-th">Description</th><th className="table-th w-44">Category</th>
-          <th className="table-th w-28">Qty</th><th className="table-th w-32">Unit</th><th className="table-th w-40">{priceLabel}</th>
-          <th className="table-th w-52">Cost centre</th><th className="table-th w-72">Budget line</th><th className="table-th w-32 text-right">Total</th>{!readOnly && <th className="table-th w-10" />}
+          <th className="table-th w-10">#</th><th className="table-th w-64">Description</th><th className="table-th w-40">Category</th>
+          <th className="table-th w-28">Qty</th><th className="table-th w-28">Unit</th><th className="table-th w-36">{priceLabel}</th>
+          <th className="table-th w-48">Cost centre</th><th className="table-th w-64">Budget line</th><th className="table-th w-28 text-right">Total</th>{!readOnly && <th className="table-th w-10" />}
         </tr></thead>
         <tbody>
           {lines.map((l, i) => (

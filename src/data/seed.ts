@@ -1,4 +1,4 @@
-import type { ApprovalRule, Contract, OrgSettings, PurchaseOrder, PurchaseRequisition, User, Vendor, ContractClause, GoodsReceipt, Invoice, ProcurementTier } from '@/types'
+import type { ApprovalRule, Contract, OrgSettings, PurchaseOrder, PurchaseRequisition, User, Vendor, ContractClause, GoodsReceipt, Invoice, ProcurementTier, ProjectBudget } from '@/types'
 import { emptySourcing } from '@/lib/tiers'
 import { addDays, toInputDate } from '@/lib/format'
 
@@ -20,6 +20,7 @@ export const SEED_SETTINGS: OrgSettings = {
   legalReviewThresholdUSD: 10000,
   soleSourceEdThresholdUSD: 2500,
   dualAuthThresholdUSD: 10000,
+  templates: {},
   priceTolerancePct: 2,
   paymentTermsDays: 30,
   fiscalYearStart: '01-01',
@@ -104,8 +105,8 @@ export const SEED_PRS: PurchaseRequisition[] = [
     department: 'Medical Programs', requesterId: 'u_lina', requesterName: 'Lina Haddad', ownerName: DOC_OWNER,
     procurementType: 'goods', priority: 'high', neededBy: toInputDate(addDays(new Date(), 30)), currency: 'JOD',
     lines: [
-      { id: 'l1', description: 'Modular polycentric knee joint (adult)', category: 'Prosthetic Components', quantity: 24, unit: 'each', unitPrice: 620, costCenter: 'CC-210 Prosthetics Lab', budgetLine: 'BL-02 Medical Supplies' },
-      { id: 'l2', description: 'Pylon tube adapter set 30mm', category: 'Prosthetic Components', quantity: 24, unit: 'set', unitPrice: 85, costCenter: 'CC-210 Prosthetics Lab', budgetLine: 'BL-02 Medical Supplies' },
+      { id: 'l1', description: 'Modular polycentric knee joint (adult)', category: 'Prosthetic Components', quantity: 24, unit: 'each', unitPrice: 620, costCenter: 'CC-210 Prosthetics Lab', budgetLine: 'BL-02' },
+      { id: 'l2', description: 'Pylon tube adapter set 30mm', category: 'Prosthetic Components', quantity: 24, unit: 'set', unitPrice: 85, costCenter: 'CC-210 Prosthetics Lab', budgetLine: 'BL-02' },
     ],
     attachments: [], status: 'sourcing',
     approvalChain: [
@@ -127,7 +128,7 @@ export const SEED_PRS: PurchaseRequisition[] = [
     justification: 'Replace end-of-life devices used by MASU field teams for beneficiary intake and reporting.',
     department: 'Field Services', requesterId: 'u_nour', requesterName: 'Nour Saleh', ownerName: DOC_OWNER,
     procurementType: 'goods', priority: 'normal', neededBy: toInputDate(addDays(new Date(), 45)), currency: 'JOD',
-    lines: [{ id: 'l1', description: 'Business laptop 14", 16GB RAM, 512GB SSD, 3yr warranty', category: 'IT & Software', quantity: 6, unit: 'each', unitPrice: 780, costCenter: 'CC-300 Field Ops', budgetLine: 'BL-06 Technology' }],
+    lines: [{ id: 'l1', description: 'Business laptop 14", 16GB RAM, 512GB SSD, 3yr warranty', category: 'IT & Software', quantity: 6, unit: 'each', unitPrice: 780, costCenter: 'CC-300 Field Ops', budgetLine: 'BL-06' }],
     attachments: [], status: 'pending_approval',
     approvalChain: [
       { id: 's1', order: 1, label: 'Department Manager', role: 'dept_manager', approverId: 'u_hani', status: 'approved', decidedBy: 'u_hani', decidedAt: ago(1), comment: 'Needed for field intake.' },
@@ -141,8 +142,8 @@ export const SEED_PRS: PurchaseRequisition[] = [
     department: 'Medical Programs', requesterId: 'u_lina', requesterName: 'Lina Haddad', ownerName: DOC_OWNER,
     procurementType: 'goods', priority: 'low', neededBy: toInputDate(addDays(new Date(), 20)), currency: 'JOD',
     lines: [
-      { id: 'l1', description: 'Resistance band set (5 levels)', category: 'Rehabilitation Supplies', quantity: 40, unit: 'set', unitPrice: 9.5, costCenter: 'CC-200 Medical', budgetLine: 'BL-02 Medical Supplies' },
-      { id: 'l2', description: 'Exercise mat 180x60cm', category: 'Rehabilitation Supplies', quantity: 20, unit: 'each', unitPrice: 14, costCenter: 'CC-200 Medical', budgetLine: 'BL-02 Medical Supplies' },
+      { id: 'l1', description: 'Resistance band set (5 levels)', category: 'Rehabilitation Supplies', quantity: 40, unit: 'set', unitPrice: 9.5, costCenter: 'CC-200 Medical', budgetLine: 'BL-02' },
+      { id: 'l2', description: 'Exercise mat 180x60cm', category: 'Rehabilitation Supplies', quantity: 20, unit: 'each', unitPrice: 14, costCenter: 'CC-200 Medical', budgetLine: 'BL-02' },
     ],
     attachments: [], status: 'pending_approval',
     approvalChain: [{ id: 's1', order: 1, label: 'Department Manager', role: 'dept_manager', approverId: 'u_omar', status: 'current' }],
@@ -153,7 +154,7 @@ export const SEED_PRS: PurchaseRequisition[] = [
     justification: 'Scheduled maintenance contract for 3 Mobile Amputee Support Unit vans.',
     department: 'Operations', requesterId: 'u_hani', requesterName: 'Hani Odeh', ownerName: DOC_OWNER,
     procurementType: 'services', priority: 'normal', neededBy: toInputDate(addDays(new Date(), 10)), currency: 'JOD',
-    lines: [{ id: 'l1', description: 'Fleet maintenance & servicing — 12 months, 3 vans', category: 'Vehicles & Fleet', quantity: 12, unit: 'month', unitPrice: 640, costCenter: 'CC-300 Field Ops', budgetLine: 'BL-05 Logistics' }],
+    lines: [{ id: 'l1', description: 'Fleet maintenance & servicing — 12 months, 3 vans', category: 'Vehicles & Fleet', quantity: 12, unit: 'month', unitPrice: 640, costCenter: 'CC-300 Field Ops', budgetLine: 'BL-05' }],
     attachments: [], status: 'ordered',
     approvalChain: [
       { id: 's1', order: 1, label: 'Department Manager', role: 'dept_manager', approverId: 'u_hani', status: 'approved', decidedBy: 'u_hani', decidedAt: ago(30) },
@@ -173,7 +174,7 @@ export const SEED_PRS: PurchaseRequisition[] = [
     justification: 'Replace damaged reception seating.',
     department: 'Operations', requesterId: 'u_nour', requesterName: 'Nour Saleh', ownerName: DOC_OWNER,
     procurementType: 'goods', priority: 'low', neededBy: toInputDate(addDays(new Date(), 60)), currency: 'JOD',
-    lines: [{ id: 'l1', description: 'Waiting-area chair, 4-seat bench', category: 'Office Supplies', quantity: 3, unit: 'each', unitPrice: 210, costCenter: 'CC-400 Admin', budgetLine: 'BL-04 Admin & Overheads' }],
+    lines: [{ id: 'l1', description: 'Waiting-area chair, 4-seat bench', category: 'Office Supplies', quantity: 3, unit: 'each', unitPrice: 210, costCenter: 'CC-400 Admin', budgetLine: 'BL-04' }],
     attachments: [], status: 'draft', approvalChain: [], createdAt: ago(0.2), updatedAt: ago(0.2), quotations: [], comments: [], sourcing: emptySourcing(),
   },
   {
@@ -181,7 +182,7 @@ export const SEED_PRS: PurchaseRequisition[] = [
     justification: 'Annual licence renewal for the case-management platform.',
     department: 'IT', requesterId: 'u_lina', requesterName: 'Lina Haddad', ownerName: DOC_OWNER,
     procurementType: 'services', priority: 'urgent', neededBy: toInputDate(addDays(new Date(), 5)), currency: 'JOD',
-    lines: [{ id: 'l1', description: 'Case management SaaS — 25 seats, 12 months', category: 'IT & Software', quantity: 1, unit: 'each', unitPrice: 4200, costCenter: 'CC-500 IT', budgetLine: 'BL-06 Technology' }],
+    lines: [{ id: 'l1', description: 'Case management SaaS — 25 seats, 12 months', category: 'IT & Software', quantity: 1, unit: 'each', unitPrice: 4200, costCenter: 'CC-500 IT', budgetLine: 'BL-06' }],
     attachments: [], status: 'returned',
     approvalChain: [
       { id: 's1', order: 1, label: 'Department Manager', role: 'dept_manager', approverId: 'u_omar', status: 'approved', decidedBy: 'u_omar', decidedAt: ago(5) },
@@ -192,8 +193,8 @@ export const SEED_PRS: PurchaseRequisition[] = [
   {
     id: 'pr_7', number: 'PR-2025-0045', title: 'Printer toner cartridges — HQ admin office',
     justification: 'Replacement toner for the two shared HQ printers; stock exhausted.',
-    department: 'Operations', requesterId: 'u_nour', requesterName: 'Nour Saleh', ownerName: DOC_OWNER, procurementType: 'goods', priority: 'normal', neededBy: toInputDate(addDays(new Date(), 7)), currency: 'JOD',
-    lines: [{ id: 'l1', description: 'Toner cartridge, black, HP 26A compatible', category: 'Office Supplies', quantity: 4, unit: 'each', unitPrice: 55, costCenter: 'CC-400 Admin', budgetLine: 'BL-04 Admin & Overheads' }],
+    department: 'Operations', requesterId: 'u_nour', requesterName: 'Nour Saleh', ownerName: DOC_OWNER, donorCode: 'CORE-2026', procurementType: 'goods', priority: 'normal', neededBy: toInputDate(addDays(new Date(), 7)), currency: 'JOD',
+    lines: [{ id: 'l1', description: 'Toner cartridge, black, HP 26A compatible', category: 'Office Supplies', quantity: 4, unit: 'each', unitPrice: 55, costCenter: 'CC-400 Admin', budgetLine: 'BL-04' }],
     attachments: [], status: 'approved',
     approvalChain: [
       { id: 's1', order: 1, label: 'Finance — Budget verification & budget code', role: 'finance', approverId: 'u_rana', status: 'approved', decidedBy: 'u_rana', decidedAt: ago(1.5), comment: 'BL-04 confirmed.' },
@@ -205,7 +206,7 @@ export const SEED_PRS: PurchaseRequisition[] = [
     id: 'pr_8', number: 'PR-2025-0046', title: 'Construction of prosthetics workshop extension — Irbid centre',
     justification: 'Extension of the Irbid rehabilitation centre workshop (120 m²) to add two fitting rooms and a gait-training lane, funded under the Irbid Access grant.',
     department: 'Operations', requesterId: 'u_hani', requesterName: 'Hani Odeh', ownerName: DOC_OWNER, procurementType: 'works', donorCode: 'GR-2025-IRB-03', priority: 'high', neededBy: toInputDate(addDays(new Date(), 120)), currency: 'JOD',
-    lines: [{ id: 'l1', description: 'Civil works — workshop extension per BoQ and drawings (Annex A)', category: 'Works', quantity: 1, unit: 'lot', unitPrice: 62000, costCenter: 'CC-300 Field Ops', budgetLine: 'BL-08 Capital Works' }],
+    lines: [{ id: 'l1', description: 'Civil works — workshop extension per BoQ and drawings (Annex A)', category: 'Works', quantity: 1, unit: 'lot', unitPrice: 62000, costCenter: 'CC-300 Field Ops', budgetLine: 'BL-08' }],
     attachments: [], status: 'sourcing', sourcingOwnerId: 'u_yousef',
     approvalChain: [
       { id: 's1', order: 1, label: 'Finance — Budget verification & budget code', role: 'finance', approverId: 'u_rana', status: 'approved', decidedBy: 'u_rana', decidedAt: ago(12), comment: 'Grant budget line confirmed.' },
@@ -221,7 +222,7 @@ export const SEED_POS: PurchaseOrder[] = [
     id: 'po_1', number: 'PO-2025-0017', prId: 'pr_4', prNumber: 'PR-2025-0039', title: 'Annual maintenance — MASU vehicle fleet',
     vendorId: 'v_6', vendorName: 'Amman Fleet & Logistics', quotationId: 'q1', ownerName: DOC_OWNER, createdBy: 'u_yousef', createdByName: 'Yousef Nasser',
     currency: 'JOD',
-    lines: [{ id: 'l1', description: 'Fleet maintenance & servicing — 12 months, 3 vans', category: 'Vehicles & Fleet', quantity: 12, unit: 'month', unitPrice: 640, costCenter: 'CC-300 Field Ops', budgetLine: 'BL-05 Logistics' }],
+    lines: [{ id: 'l1', description: 'Fleet maintenance & servicing — 12 months, 3 vans', category: 'Vehicles & Fleet', quantity: 12, unit: 'month', unitPrice: 640, costCenter: 'CC-300 Field Ops', budgetLine: 'BL-05' }],
     taxRate: 16, deliveryAddress: 'RHS Operations Yard, Amman', deliveryDate: toInputDate(addDays(new Date(), 7)), paymentTerms: 'Monthly in arrears', incoterms: 'DAP', notes: 'Service schedule to be agreed with Operations Manager.',
     status: 'issued',
     approvalChain: [
@@ -248,6 +249,32 @@ export const SEED_CONTRACTS: Contract[] = [
     attachments: [], status: 'legal_review', legalReviewer: 'u_dana',
     signatories: [{ name: 'Sami Barakat', title: 'Executive Director', party: 'RHS' }, { name: 'Rami Zayed', title: 'General Manager', party: 'Vendor' }],
     createdAt: ago(10), updatedAt: ago(9), comments: [],
+  },
+]
+
+export const SEED_BUDGETS: ProjectBudget[] = [
+  {
+    id: 'bud_core', donorCode: 'CORE-2026', name: 'Core operating budget 2026', donor: 'RHS unrestricted funds', currency: 'JOD', startDate: '2026-01-01', endDate: '2026-12-31', approvedAt: '2025-12-15', status: 'active',
+    lines: [
+      { id: 'bl_c1', code: 'BL-01', description: 'Program Delivery', category: 'Programs', amount: 120000 },
+      { id: 'bl_c2', code: 'BL-02', description: 'Medical Supplies', category: 'Programs', amount: 85000 },
+      { id: 'bl_c3', code: 'BL-03', description: 'Capital Equipment', category: 'Capital', amount: 40000 },
+      { id: 'bl_c4', code: 'BL-04', description: 'Admin & Overheads', category: 'Support', amount: 32000 },
+      { id: 'bl_c5', code: 'BL-05', description: 'Logistics', category: 'Support', amount: 18000 },
+      { id: 'bl_c6', code: 'BL-06', description: 'Technology', category: 'Support', amount: 15000 },
+    ],
+    uploadedBy: 'u_shatha', uploadedByName: 'Shatha Homsi', uploadedAt: '2025-12-16T09:00:00Z', ownerName: DOC_OWNER, notes: 'Board-approved annual budget.',
+  },
+  {
+    id: 'bud_irb', donorCode: 'GR-2025-IRB-03', name: 'Irbid Access — prosthetics workshop & outreach', donor: 'Irbid Access Grant (bilateral donor)', currency: 'JOD', startDate: '2025-10-01', endDate: '2026-12-31', approvedAt: '2025-09-20', status: 'active',
+    lines: [
+      { id: 'bl_i1', code: 'BL-08', description: 'Capital Works — workshop extension', category: 'Capital', amount: 70000 },
+      { id: 'bl_i2', code: 'BL-02', description: 'Medical Supplies — prosthetic components', category: 'Programs', amount: 45000 },
+      { id: 'bl_i3', code: 'BL-09', description: 'Outreach & transport', category: 'Programs', amount: 12000 },
+      { id: 'bl_i4', code: 'BL-10', description: 'Project staff', category: 'HR', amount: 38000 },
+      { id: 'bl_i5', code: 'BL-11', description: 'Indirect costs (7%)', category: 'Support', amount: 11550 },
+    ],
+    uploadedBy: 'u_shatha', uploadedByName: 'Shatha Homsi', uploadedAt: '2025-09-22T09:00:00Z', ownerName: DOC_OWNER, notes: 'Approved donor budget, annex B of the grant agreement.',
   },
 ]
 

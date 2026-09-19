@@ -2,9 +2,9 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type {
   ApprovalRule, Attachment, AuditEvent, Comment, Contract, ContractMilestone, LineItem, Notification, OrgSettings,
-  PurchaseOrder, PurchaseRequisition, Quotation, User, Vendor, DocType, Role, GoodsReceipt, GoodsReceiptLine, Invoice, InvoiceLine, SourcingRecord, ExceptionType,
+  PurchaseOrder, PurchaseRequisition, Quotation, User, Vendor, DocType, Role, GoodsReceipt, GoodsReceiptLine, Invoice, InvoiceLine, SourcingRecord, ExceptionType, ProjectBudget,
 } from '@/types'
-import { DOC_OWNER, SEED_CONTRACTS, SEED_GRNS, SEED_INVOICES, SEED_POS, SEED_PRS, SEED_RULES, SEED_SETTINGS, SEED_USERS, SEED_VENDORS, STANDARD_CLAUSES } from '@/data/seed'
+import { DOC_OWNER, SEED_BUDGETS, SEED_CONTRACTS, SEED_GRNS, SEED_INVOICES, SEED_POS, SEED_PRS, SEED_RULES, SEED_SETTINGS, SEED_USERS, SEED_VENDORS, STANDARD_CLAUSES } from '@/data/seed'
 import { hasBlockingIssues, receiptProgress, runMatch, invoiceTotals } from '@/lib/match'
 import { blockingFailures, emptySourcing, isBidMethod, sourcingRequirements, tierForPR, toUSD, resolveTier } from '@/lib/tiers'
 import { applyDecision, buildChain, currentStep, resetChain, resolveApprover, chainFromSteps } from '@/lib/workflow'
@@ -23,6 +23,7 @@ interface State {
   contracts: Contract[]
   grns: GoodsReceipt[]
   invoices: Invoice[]
+  budgets: ProjectBudget[]
   notifications: Notification[]
   audit: AuditEvent[]
   counters: Record<string, number>
@@ -88,6 +89,11 @@ interface Actions {
   rejectInvoiceAtRegistration: (id: string, reason: string) => void
   addInvoiceComment: (id: string, text: string) => void
 
+  // Budgets
+  upsertBudget: (b: ProjectBudget) => void
+  deleteBudget: (id: string) => void
+  setTemplate: (kind: 'budget' | 'bva', file?: Attachment) => void
+
   // masters / admin
   upsertVendor: (v: Partial<Vendor> & { id?: string }) => void
   upsertUser: (u: Partial<User> & { id?: string }) => void
@@ -113,6 +119,7 @@ const initial = (): State => ({
   contracts: SEED_CONTRACTS,
   grns: SEED_GRNS,
   invoices: SEED_INVOICES,
+  budgets: SEED_BUDGETS,
   notifications: [
     { id: 'n5', userId: 'u_rana', at: nowIso(), title: 'Invoice approval required', body: 'INV-2025-0012 · Amman Fleet & Logistics · JOD 742.40', link: '/invoices/inv_1', read: false, kind: 'approval' },
     { id: 'n1', userId: 'u_rana', at: nowIso(), title: 'Approval required', body: 'PR-2025-0042 · Laptops for field coordinators', link: '/requisitions/pr_2', read: false, kind: 'approval' },
@@ -199,6 +206,8 @@ export const useStore = create<State & Actions>()(
           if (!pr.lines.length) return { ok: false, error: 'Add at least one line item.' }
           if (pr.lines.some((l) => !l.description.trim() || l.quantity <= 0)) return { ok: false, error: 'Every line needs a description and quantity.' }
           if (!pr.neededBy) return { ok: false, error: 'Needed-by date is required.' }
+          if (!pr.donorCode) return { ok: false, error: 'Select the project / donor code the requisition is charged to.' }
+          if (pr.lines.some((l) => !l.budgetLine)) return { ok: false, error: 'Every line item needs a budget line.' }
           const amount = linesSubtotal(pr.lines)
           const chain = pr.status === 'returned' && pr.approvalChain.length ? resetChain(pr.approvalChain) : buildChain(get().rules, get().users, 'PR', amount, pr.department)
           if (!chain.length) return { ok: false, error: 'No approval rule matches this amount. Ask an administrator to configure the approval matrix.' }
@@ -604,6 +613,15 @@ export const useStore = create<State & Actions>()(
           set((s) => ({ invoices: s.invoices.map((i) => (i.id === id ? { ...i, comments: [...i.comments, c] } : i)) }))
         },
 
+        // ---- Budgets -------------------------------------------------------
+        upsertBudget: (b) => {
+          const exists = get().budgets.some((x) => x.id === b.id)
+          set((s) => ({ budgets: exists ? s.budgets.map((x) => (x.id === b.id ? b : x)) : [b, ...s.budgets] }))
+          log('BUDGET', exists ? 'Budget updated' : 'Approved budget uploaded', { id: b.id, number: b.donorCode }, `${b.lines.length} line(s) · ${b.currency} ${b.lines.reduce((t, l) => t + l.amount, 0).toLocaleString()}`)
+        },
+        deleteBudget: (id) => { const b = get().budgets.find((x) => x.id === id); set((s) => ({ budgets: s.budgets.filter((x) => x.id !== id) })); if (b) log('BUDGET', 'Budget removed', { id: b.id, number: b.donorCode }) },
+        setTemplate: (kind, file) => { set((s) => ({ settings: { ...s.settings, templates: { ...s.settings.templates, [kind]: file } } })); log('SETTINGS', file ? `${kind === 'bva' ? 'BvA' : 'Budget'} template uploaded` : `${kind === 'bva' ? 'BvA' : 'Budget'} template removed`, undefined, file?.name) },
+
         // ---- masters -------------------------------------------------------
         upsertVendor: (v) => {
           const existing = v.id ? get().vendors.find((x) => x.id === v.id) : undefined
@@ -638,7 +656,7 @@ export const useStore = create<State & Actions>()(
         resetDemo: () => set({ ...initial(), currentUserId: get().currentUserId }),
       }
     },
-    { name: 'rhs-procurement-v3', version: 3 },
+    { name: 'rhs-procurement-v4', version: 4 },
   ),
 )
 

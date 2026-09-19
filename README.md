@@ -23,6 +23,7 @@ Requisition (PR) → PR approvals → Sourcing (3 quotations) → Purchase order
 | **Contract** | Procurement → Legal → Signatories | Drafted from the issued PO with the RHS clause library, milestones/payment schedule, legal review loop, RHS + vendor signature, activation |
 | **Goods receipt** | Requester / Operations | Receive against PO lines (ordered / received / outstanding), condition, delivery note, photos; partial receipts; PO becomes *partially received* → *received* |
 | **Invoices** | Procurement / Finance | Register vendor invoice against a PO, **automatic 3-way match** (PO × receipt × invoice: quantity, price tolerance, cumulative total, duplicates), exception handling with Finance override, approval chain, payment recording; PO auto-closes when fully received and paid |
+| **Budgets & BvA** | Finance / Programs | Upload an approved budget (Excel/CSV) — header row and columns are detected and mappable, sub-totals skipped — save as a project / grant with its budget lines; requisitions pick the project code and budget line from dropdowns; Budget-vs-Actual per line (approved · requested · committed · actual · available · burn %) with Excel export; organisation budget and BvA templates stored in the system |
 | **Masters / Admin** | Admin, Procurement, Finance | Vendors register, users & roles, editable approval matrix, organisation settings, full audit trail |
 
 ## Run it
@@ -55,6 +56,7 @@ src/
   lib/workflow.ts        approval engine
   lib/match.ts           3-way match (PO × goods receipt × invoice)
   lib/tiers.ts           SOP §3 thresholds → method, requirements checklist, exception route
+  lib/budget.ts          Excel budget extraction (header / column detection) and BvA computation + export
   store/useStore.ts      application state + all workflow actions + audit + notifications
   components/            Layout, Logo, ui primitives, workflow widgets (tracker, chain, decision panel, quotes)
   pages/                 Login, Dashboard, Approvals, requisitions/, sourcing/, orders/, contracts/, receiving/, invoices/, Vendors, admin/, Audit

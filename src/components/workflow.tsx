@@ -5,7 +5,8 @@ import { useStore, useCurrentUser, attachmentFromFile } from '@/store/useStore'
 import { cx, fmtBytes, fmtDateTime, timeAgo, uid } from '@/lib/format'
 import { canApprove, chainProgress, currentStep } from '@/lib/workflow'
 import { Avatar, Alert, Field, Modal } from './ui'
-import { CATEGORIES, COST_CENTERS, BUDGET_LINES, UNITS } from '@/data/seed'
+import { CATEGORIES, COST_CENTERS, UNITS } from '@/data/seed'
+import type { BudgetLine } from '@/types'
 
 // ---------------------------------------------------------------------------
 // Process tracker — the end-to-end procure-to-contract journey
@@ -223,18 +224,20 @@ export function AttachmentList({ items, onAdd, onRemove, readOnly }: { items: At
 // Line items editor
 // ---------------------------------------------------------------------------
 export function newLine(): LineItem {
-  return { id: uid('l_'), description: '', category: CATEGORIES[0]!, quantity: 1, unit: 'each', unitPrice: 0, costCenter: COST_CENTERS[0]!, budgetLine: BUDGET_LINES[0]!, }
+  return { id: uid('l_'), description: '', category: CATEGORIES[0]!, quantity: 1, unit: 'each', unitPrice: 0, costCenter: COST_CENTERS[0]!, budgetLine: '', }
 }
-export function LineItemsEditor({ lines, onChange, currency, readOnly, priceLabel = 'Est. unit price' }: { lines: LineItem[]; onChange?: (l: LineItem[]) => void; currency: string; readOnly?: boolean; priceLabel?: string }) {
+export function LineItemsEditor({ lines, onChange, currency, readOnly, priceLabel = 'Est. unit price', budgetLines }: { lines: LineItem[]; onChange?: (l: LineItem[]) => void; currency: string; readOnly?: boolean; priceLabel?: string; budgetLines?: BudgetLine[] }) {
+  const { budgets } = useStore()
   const upd = (id: string, patch: Partial<LineItem>) => onChange?.(lines.map((l) => (l.id === id ? { ...l, ...patch } : l)))
   const subtotal = lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0)
+  const lineLabel = (code: string) => { const bl = (budgetLines ?? budgets.flatMap((b) => b.lines)).find((x) => x.code === code); return bl ? `${bl.code} · ${bl.description}` : code || '—' }
   return (
     <div className="overflow-x-auto scrollbar-thin">
-      <table className="w-full min-w-[860px] text-[13px]">
+      <table className="w-full min-w-[1280px] table-fixed text-[13px]">
         <thead><tr>
-          <th className="table-th w-8">#</th><th className="table-th">Description</th><th className="table-th">Category</th>
-          <th className="table-th w-20">Qty</th><th className="table-th w-24">Unit</th><th className="table-th w-32">{priceLabel}</th>
-          <th className="table-th">Cost centre</th><th className="table-th">Budget line</th><th className="table-th w-28 text-right">Total</th>{!readOnly && <th className="table-th w-10" />}
+          <th className="table-th w-10">#</th><th className="table-th">Description</th><th className="table-th w-44">Category</th>
+          <th className="table-th w-28">Qty</th><th className="table-th w-32">Unit</th><th className="table-th w-40">{priceLabel}</th>
+          <th className="table-th w-52">Cost centre</th><th className="table-th w-72">Budget line</th><th className="table-th w-32 text-right">Total</th>{!readOnly && <th className="table-th w-10" />}
         </tr></thead>
         <tbody>
           {lines.map((l, i) => (
@@ -246,7 +249,7 @@ export function LineItemsEditor({ lines, onChange, currency, readOnly, priceLabe
               <td className="table-td">{readOnly ? l.unit : <select className="input" value={l.unit} onChange={(e) => upd(l.id, { unit: e.target.value })}>{UNITS.map((u) => <option key={u}>{u}</option>)}</select>}</td>
               <td className="table-td">{readOnly ? l.unitPrice.toFixed(2) : <input type="number" min={0} step="0.01" className="input" value={l.unitPrice} onChange={(e) => upd(l.id, { unitPrice: Number(e.target.value) })} />}</td>
               <td className="table-td">{readOnly ? l.costCenter : <select className="input" value={l.costCenter} onChange={(e) => upd(l.id, { costCenter: e.target.value })}>{COST_CENTERS.map((c) => <option key={c}>{c}</option>)}</select>}</td>
-              <td className="table-td">{readOnly ? l.budgetLine : <select className="input" value={l.budgetLine} onChange={(e) => upd(l.id, { budgetLine: e.target.value })}>{BUDGET_LINES.map((c) => <option key={c}>{c}</option>)}</select>}</td>
+              <td className="table-td">{readOnly ? lineLabel(l.budgetLine) : budgetLines ? <select className="input" value={l.budgetLine} onChange={(e) => upd(l.id, { budgetLine: e.target.value })}><option value="">Select budget line…</option>{budgetLines.map((bl) => <option key={bl.id} value={bl.code}>{bl.code} · {bl.description}</option>)}</select> : <input className="input" value={l.budgetLine} placeholder="Select a project first" disabled />}</td>
               <td className="table-td text-right font-medium tabular-nums">{(l.quantity * l.unitPrice).toLocaleString('en', { minimumFractionDigits: 2 })}</td>
               {!readOnly && <td className="table-td"><button className="btn-ghost btn-sm text-ink-400 hover:text-accent-700" onClick={() => onChange?.(lines.filter((x) => x.id !== l.id))}><Trash2 size={14} /></button></td>}
             </tr>

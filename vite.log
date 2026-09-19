@@ -1,0 +1,11 @@
+Re-optimizing dependencies because lockfile has changed
+
+  VITE v5.4.21  ready in 216 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://192.0.2.2:5173/
+3:01:55 PM [vite] hmr update /src/pages/budgets/Detail.tsx, /src/index.css, /src/pages/budgets/List.tsx, /src/pages/budgets/Upload.tsx
+3:01:55 PM [vite] hmr update /src/pages/budgets/Upload.tsx, /src/index.css
+3:01:55 PM [vite] hmr update /src/components/workflow.tsx, /src/index.css
+3:02:35 PM [vite] hmr update /src/pages/budgets/Detail.tsx, /src/index.css, /src/pages/budgets/List.tsx, /src/pages/budgets/Upload.tsx
+3:02:35 PM [vite] hmr update /src/components/workflow.tsx, /src/index.css

@@ -182,7 +182,7 @@ export interface AuditEvent {
   at: string
   actorId: string
   actorName: string
-  docType: DocType | 'SYSTEM' | 'VENDOR' | 'USER'
+  docType: DocType | 'SYSTEM' | 'VENDOR' | 'USER' | 'BUDGET' | 'SETTINGS'
   docId?: string
   docNumber?: string
   action: string
@@ -418,6 +418,37 @@ export interface Invoice {
   comments: Comment[]
 }
 
+// ---------------------------------------------------------------------------
+// Project / grant budgets and Budget-vs-Actual
+// ---------------------------------------------------------------------------
+export interface BudgetLine {
+  id: string
+  code: string            // e.g. BL-02 or donor line 1.2.3
+  description: string
+  category?: string
+  amount: number          // approved budget in the budget currency
+}
+
+export interface ProjectBudget {
+  id: string
+  donorCode: string       // project / grant code used on requisitions
+  name: string
+  donor: string
+  currency: Currency
+  startDate?: string
+  endDate?: string
+  approvedAt?: string
+  status: 'active' | 'closed'
+  lines: BudgetLine[]
+  sourceFile?: Attachment
+  sourceSheet?: string
+  uploadedBy: string
+  uploadedByName: string
+  uploadedAt: string
+  ownerName: string
+  notes?: string
+}
+
 export interface Notification {
   id: string
   userId: string
@@ -445,6 +476,7 @@ export interface OrgSettings {
   legalReviewThresholdUSD: number     // contracts above this need legal review
   soleSourceEdThresholdUSD: number    // sole-source / emergency above this needs ED pre-approval
   dualAuthThresholdUSD: number        // POs above this need dual authorisation
+  templates: { budget?: Attachment; bva?: Attachment }   // organisation's approved-budget and BvA templates
   priceTolerancePct: number      // invoice unit-price variance tolerated vs PO
   paymentTermsDays: number       // default invoice due date offset
   fiscalYearStart: string

@@ -19,6 +19,9 @@ import ApprovalMatrix from '@/pages/admin/ApprovalMatrix'
 import Settings from '@/pages/admin/Settings'
 import Audit from '@/pages/Audit'
 import Thresholds from '@/pages/admin/Thresholds'
+import BudgetList from '@/pages/budgets/List'
+import BudgetUpload from '@/pages/budgets/Upload'
+import BudgetDetail from '@/pages/budgets/Detail'
 import ReceivingList from '@/pages/receiving/List'
 import ReceivingDetail from '@/pages/receiving/Detail'
 import InvoiceList from '@/pages/invoices/List'
@@ -55,6 +58,9 @@ export default function App() {
           <Route path="invoices/new" element={<InvoiceNew />} />
           <Route path="invoices/:id" element={<InvoiceDetail />} />
           <Route path="vendors" element={<Vendors />} />
+          <Route path="budgets" element={<BudgetList />} />
+          <Route path="budgets/upload" element={<BudgetUpload />} />
+          <Route path="budgets/:id" element={<BudgetDetail />} />
           <Route path="admin/users" element={<Users />} />
           <Route path="admin/approval-matrix" element={<ApprovalMatrix />} />
           <Route path="admin/thresholds" element={<Thresholds />} />

@@ -14,7 +14,7 @@ export default function RequisitionForm() {
   const { id } = useParams()
   const nav = useNavigate()
   const user = useCurrentUser()!
-  const { prs, createPR, updatePR, submitPR, rules, settings } = useStore()
+  const { prs, createPR, updatePR, submitPR, rules, settings, budgets } = useStore()
   const existing = id ? prs.find((p) => p.id === id) : undefined
   const [draft, setDraft] = useState<Partial<PurchaseRequisition>>(() => existing ?? {
     title: '', justification: '', department: user.department, priority: 'normal', procurementType: 'goods', donorCode: '', neededBy: '', currency: settings.defaultCurrency, lines: [newLine()], attachments: [],
@@ -26,6 +26,11 @@ export default function RequisitionForm() {
   const rule = useMemo(() => findRule(rules, 'PR', amount), [rules, amount])
   const set = (patch: Partial<PurchaseRequisition>) => setDraft((d) => ({ ...d, ...patch }))
   const editable = !existing || ['draft', 'returned'].includes(existing.status)
+  const project = budgets.find((b) => b.donorCode === draft.donorCode && b.status === 'active')
+  const pickProject = (code: string) => {
+    const b = budgets.find((x) => x.donorCode === code)
+    set({ donorCode: code, currency: b?.currency ?? draft.currency, lines: (draft.lines ?? []).map((l) => ({ ...l, budgetLine: b?.lines.some((bl) => bl.code === l.budgetLine) ? l.budgetLine : (b?.lines[0]?.code ?? '') })) })
+  }
 
   if (existing && !editable) return <Alert tone="warning">This requisition can no longer be edited (status: {existing.status}).</Alert>
 
@@ -65,15 +70,15 @@ export default function RequisitionForm() {
               <Field label="Business justification" required className="sm:col-span-2"><textarea className="input min-h-[96px]" value={draft.justification ?? ''} onChange={(e) => set({ justification: e.target.value })} placeholder="Why is this needed, which programme/beneficiaries does it serve, and what happens if it is not procured?" /></Field>
               <Field label="Department" required><select className="input" value={draft.department} onChange={(e) => set({ department: e.target.value })}>{DEPARTMENTS.map((d) => <option key={d}>{d}</option>)}</select></Field>
               <Field label="Procurement type" required hint="Services and works above USD 2,500 need a formal contract"><select className="input" value={draft.procurementType ?? 'goods'} onChange={(e) => set({ procurementType: e.target.value as PurchaseRequisition['procurementType'] })}><option value="goods">Goods</option><option value="services">Services</option><option value="works">Works</option></select></Field>
-              <Field label="Donor / project code" hint="Leave empty for core funds"><input className="input" value={draft.donorCode ?? ''} onChange={(e) => set({ donorCode: e.target.value })} placeholder="e.g. GR-2025-IRB-03" /></Field>
+              <Field label="Project / donor code" required hint={project ? `${project.donor} · ${project.lines.length} budget lines` : 'Budget lines below come from the selected project budget'}><select className="input" value={draft.donorCode ?? ''} onChange={(e) => pickProject(e.target.value)}><option value="">Select project…</option>{budgets.filter((b) => b.status === 'active').map((b) => <option key={b.id} value={b.donorCode}>{b.donorCode} — {b.name}</option>)}</select></Field>
               <Field label="Priority"><select className="input" value={draft.priority} onChange={(e) => set({ priority: e.target.value as PurchaseRequisition['priority'] })}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option></select></Field>
               <Field label="Needed by" required><input type="date" className="input" value={draft.neededBy ?? ''} onChange={(e) => set({ neededBy: e.target.value })} /></Field>
               <Field label="Currency"><select className="input" value={draft.currency} onChange={(e) => set({ currency: e.target.value as PurchaseRequisition['currency'] })}><option>JOD</option><option>USD</option><option>EUR</option></select></Field>
             </div>
           </Card>
 
-          <Card title="Line items" description="Estimated prices — Procurement will replace these with quoted prices." padded={false}>
-            <div className="p-4"><LineItemsEditor lines={draft.lines ?? []} onChange={(lines) => set({ lines })} currency={draft.currency ?? 'JOD'} /></div>
+          <Card title="Line items" description={project ? `Estimated prices — budget lines from ${project.donorCode}.` : 'Select a project / donor code first to choose budget lines.'} padded={false}>
+            <div className="p-4"><LineItemsEditor lines={draft.lines ?? []} onChange={(lines) => set({ lines })} currency={draft.currency ?? 'JOD'} budgetLines={project?.lines} /></div>
           </Card>
 
           <Card title="Supporting documents" description="Specifications, screenshots, previous invoices, programme plans.">

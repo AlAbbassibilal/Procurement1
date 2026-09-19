@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { NavLink, Outlet, useNavigate, Link } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, CheckSquare, Search, ShoppingCart, FileSignature, Building2, Users, SlidersHorizontal,
-  History, Bell, LogOut, ChevronDown, Menu, Settings, RotateCcw, ChevronsUpDown, PackageCheck, Receipt, Scale,
+  History, Bell, LogOut, ChevronDown, Menu, Settings, RotateCcw, ChevronsUpDown, PackageCheck, Receipt, Scale, Wallet,
 } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
 import { Logo, SunMark } from './Logo'
@@ -47,6 +47,7 @@ export default function Layout() {
     ] },
     { title: 'Masters', items: [
       { to: '/vendors', label: 'Vendors', icon: <Building2 size={17} /> },
+      { to: '/budgets', label: 'Budgets & BvA', icon: <Wallet size={17} /> },
     ] },
     { title: 'Administration', items: [
       { to: '/admin/users', label: 'Users & roles', icon: <Users size={17} />, roles: ['admin'] },

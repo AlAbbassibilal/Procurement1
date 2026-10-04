@@ -29,7 +29,7 @@ export default function BudgetList() {
   const { budgets, prs, pos, invoices, settings, deleteBudget } = useStore()
   const canEdit = ['finance', 'finance_director', 'programs_director', 'admin'].includes(user.role)
   const rows = budgets.map((b) => ({ b, ...computeBvA(b, prs, pos, invoices) }))
-  const totalBudget = rows.reduce((s, r) => s + r.totals.budget, 0), totalSpent = rows.reduce((s, r) => s + r.totals.actual, 0), totalCommitted = rows.reduce((s, r) => s + r.totals.committed, 0)
+  const totalBudget = rows.reduce((s, r) => s + r.totals.budget, 0), totalSpent = rows.reduce((s, r) => s + r.totals.actual, 0), totalCommitted = rows.reduce((s, r) => s + r.totals.commitments, 0)
 
   return (
     <>
@@ -52,9 +52,9 @@ export default function BudgetList() {
                       <td className="table-td"><div className="font-mono text-[12px] font-semibold text-brand-700">{b.donorCode}</div><div className="font-medium text-ink-900">{b.name}</div><div className="text-[11.5px] text-ink-500">{b.donor}{b.status === 'closed' && ' · closed'}</div></td>
                       <td className="table-td whitespace-nowrap text-ink-600">{fmtDate(b.startDate)} – {fmtDate(b.endDate)}</td>
                       <td className="table-td text-right font-medium tabular-nums">{fmtMoney(totals.budget, b.currency)}</td>
-                      <td className="table-td text-right tabular-nums text-sun-700">{fmtMoney(totals.committed, b.currency)}</td>
+                      <td className="table-td text-right tabular-nums text-sun-700">{fmtMoney(totals.commitments, b.currency)}</td>
                       <td className="table-td text-right tabular-nums text-ink-900">{fmtMoney(totals.actual, b.currency)}</td>
-                      <td className="table-td"><div className="flex items-center gap-2"><div className="h-2 flex-1 rounded-pill bg-ink-100"><div className={cx('h-full rounded-pill', totals.burnPct > 90 ? 'bg-accent-600' : totals.burnPct > 70 ? 'bg-sun-500' : 'bg-brand-600')} style={{ width: `${Math.min(100, totals.burnPct)}%` }} /></div><span className="w-10 text-right tabular-nums text-ink-700">{totals.burnPct}%</span></div></td>
+                      <td className="table-td"><div className="flex items-center gap-2"><div className="h-2 flex-1 rounded-pill bg-ink-100"><div className={cx('h-full rounded-pill', totals.burnWithCommitPct > 90 ? 'bg-accent-600' : totals.burnWithCommitPct > 70 ? 'bg-sun-500' : 'bg-brand-600')} style={{ width: `${Math.min(100, totals.burnWithCommitPct)}%` }} /></div><span className="w-10 text-right tabular-nums text-ink-700">{totals.burnWithCommitPct}%</span></div></td>
                       <td className="table-td tabular-nums">{b.lines.length}</td>
                       {canEdit && <td className="table-td"><button className="btn-ghost btn-sm text-accent-700" onClick={(e) => { e.stopPropagation(); if (confirm(`Remove budget ${b.donorCode}?`)) deleteBudget(b.id) }}><Trash2 size={14} /></button></td>}
                     </tr>))}</tbody>

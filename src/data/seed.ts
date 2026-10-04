@@ -20,7 +20,10 @@ export const SEED_SETTINGS: OrgSettings = {
   legalReviewThresholdUSD: 10000,
   soleSourceEdThresholdUSD: 2500,
   dualAuthThresholdUSD: 10000,
-  templates: {},
+  templates: {
+    budget: { id: 'tpl_budget', name: 'RHS_Project_Budget_Template.xlsx', size: 39782, type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', uploadedBy: 'Bilal Abbassi', uploadedAt: '2026-10-04T09:00:00Z', dataUrl: '/templates/RHS_Project_Budget_Template.xlsx' },
+    bva: { id: 'tpl_bva', name: 'Annex1_Project_Budget_BvA_Template.xlsx', size: 61299, type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', uploadedBy: 'Bilal Abbassi', uploadedAt: '2026-10-04T09:00:00Z', dataUrl: '/templates/RHS_BvA_Template_Annex1.xlsx' },
+  },
   priceTolerancePct: 2,
   paymentTermsDays: 30,
   fiscalYearStart: '01-01',

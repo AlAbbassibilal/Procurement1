@@ -423,10 +423,20 @@ export interface Invoice {
 // ---------------------------------------------------------------------------
 export interface BudgetLine {
   id: string
-  code: string            // e.g. BL-02 or donor line 1.2.3
+  code: string            // e.g. D-01, SAL_8, Prog_1, BL-02
   description: string
-  category?: string
+  category?: string       // section heading in the budget (e.g. "A. Personnel — Gaza Field Team")
   amount: number          // approved budget in the budget currency
+  // RHS budget template detail (optional)
+  costType?: 'direct' | 'admin' | 'unbudgeted'
+  activityCode?: string   // S02, R02, PM01 …
+  accountNo?: string      // 2601 …
+  location?: string       // Gaza / Amman
+  unit?: string
+  units?: number
+  frequency?: number
+  unitCost?: number
+  pct?: number            // LoE % / % allocated / covering percentage (0-1)
 }
 
 export interface ProjectBudget {
@@ -439,6 +449,9 @@ export interface ProjectBudget {
   endDate?: string
   approvedAt?: string
   status: 'active' | 'closed'
+  duration?: string       // e.g. "18 Months"
+  locations?: string
+  fundsReceived?: number  // donation received to date (financial summary)
   lines: BudgetLine[]
   sourceFile?: Attachment
   sourceSheet?: string

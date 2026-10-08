@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Scale, PenLine, Plus, Trash2, Printer, CheckCircle2, Undo2 } from 'lucide-react'
+import { ArrowLeft, PenLine, Scale, Plus, Trash2, Printer, CheckCircle2, Undo2 } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
 import { Card, PageHeader, StatusPill, KV, Alert, Field, Modal } from '@/components/ui'
 import { CommentThread, AttachmentList, ProcessTracker } from '@/components/workflow'
@@ -33,6 +33,7 @@ export default function ContractDetail() {
         subtitle={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><StatusPill status={ct.status} /><span>{ct.vendorName}</span><span>· from <Link to={`/orders/${ct.poId}`} className="text-brand-700 hover:underline">{ct.poNumber}</Link></span><span>· Owner {ct.ownerName}</span></span>}
         actions={<>
           <button className="btn-ghost" onClick={() => nav(-1)}><ArrowLeft size={15} /> Back</button>
+          <Link to={`/esign/new?subject=${encodeURIComponent(`Contract ${ct.number} — ${ct.vendorName}`)}&link=CONTRACT&id=${ct.id}&number=${ct.number}`} className="btn-secondary"><PenLine size={15} /> Send for e-signature</Link>
           <button className="btn-ghost" onClick={() => window.print()}><Printer size={15} /> Print</button>
           {editable && <button className="btn-primary" onClick={() => sendContractToLegal(ct.id)}><Scale size={15} /> Send to Legal</button>}
           {isLegal && ct.status === 'legal_review' && <>

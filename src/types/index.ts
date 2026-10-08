@@ -191,7 +191,7 @@ export interface AuditEvent {
   at: string
   actorId: string
   actorName: string
-  docType: DocType | 'SYSTEM' | 'VENDOR' | 'USER' | 'BUDGET' | 'SETTINGS' | 'ESIGN'
+  docType: DocType | 'SYSTEM' | 'VENDOR' | 'USER' | 'BUDGET' | 'SETTINGS' | 'ESIGN' | 'PROJECT' | 'TASK' | 'DONOR'
   docId?: string
   docNumber?: string
   action: string
@@ -457,7 +457,7 @@ export interface ProjectBudget {
   startDate?: string
   endDate?: string
   approvedAt?: string
-  status: 'active' | 'closed'
+  status: 'draft' | 'active' | 'closed'   // draft = project under development / submitted; active once granted
   duration?: string       // e.g. "18 Months"
   locations?: string
   fundsReceived?: number  // donation received to date (financial summary)
@@ -532,6 +532,149 @@ export interface Envelope {
   linkedDoc?: { type: DocType; id: string; number: string }
 }
 
+// ---------------------------------------------------------------------------
+// Grants — projects (PCM), donors, logframe, work plan, IPTT, reports, tasks
+// ---------------------------------------------------------------------------
+export type ProjectStage = 'development' | 'submitted' | 'granted' | 'active' | 'closed'
+export const PROJECT_STAGES: ProjectStage[] = ['development', 'submitted', 'granted', 'active', 'closed']
+
+export interface DonorContact { id: string; name: string; title: string; email: string; phone: string; primary: boolean }
+export interface Donor {
+  id: string
+  name: string
+  type: 'bilateral' | 'multilateral' | 'un' | 'foundation' | 'private' | 'ingo' | 'other'
+  country: string
+  website?: string
+  focus?: string
+  contacts: DonorContact[]
+  notes?: string
+  createdAt: string
+}
+
+export interface LogframeIndicator {
+  id: string
+  code: string                 // 1.1, 2.3 …
+  type: 'impact' | 'outcome' | 'output'
+  text: string
+  definition?: string
+  calculation?: string
+  baseline: number
+  target: number
+  unit?: string                // '#', '%'
+  mov?: string
+  disaggregation?: string
+  responsible?: string
+  method?: string
+  frequency?: string
+}
+export interface LogframeRow {
+  id: string
+  level: 'goal' | 'outcome' | 'output' | 'activity'
+  code: string                 // Outcome 1, Output 1.1, Activity 1.1.1
+  narrative: string
+  indicators: LogframeIndicator[]
+  mov?: string
+  assumptions?: string
+}
+
+export interface WorkplanActivity {
+  id: string
+  section: string
+  title: string
+  description?: string
+  budgetLine?: string
+  responsibleId?: string
+  status: 'planned' | 'ongoing' | 'completed'
+  weeks: Record<string, 'P' | 'O' | 'C'>   // key YYYY-MM-W1..W4
+  progress: number             // 0-100
+  notes?: string
+}
+
+export interface IPTTEntry { indicatorId: string; period: string; male: number; female: number; other: number; note?: string }   // period YYYY-MM
+export interface SpendingPlanEntry { lineCode: string; period: string; amount: number }
+
+export type ReportStatus = 'upcoming' | 'due' | 'submitted' | 'approved' | 'overdue'
+export interface ProjectReport {
+  id: string
+  type: 'narrative' | 'financial' | 'iptt' | 'audit' | 'other'
+  title: string
+  period?: string
+  dueDate: string
+  reminderDays: number
+  remindedAt?: string
+  status: ReportStatus
+  submittedAt?: string
+  submittedBy?: string
+  submittedByName?: string
+  attachments: Attachment[]
+  notes?: string
+}
+
+export interface ProjectComment { id: string; authorId: string; authorName: string; at: string; text: string; mentions: string[] }
+
+export interface Task {
+  id: string
+  title: string
+  description?: string
+  projectId?: string
+  projectCode?: string
+  assigneeId: string
+  assigneeName: string
+  createdBy: string
+  createdByName: string
+  dueDate?: string
+  priority: 'low' | 'normal' | 'high'
+  status: 'open' | 'in_progress' | 'done'
+  createdAt: string
+  completedAt?: string
+  link?: string
+}
+
+export interface ProposalSection { id: string; title: string; content: string }
+
+export interface Project {
+  id: string
+  code: string                 // = ProjectBudget.donorCode once granted
+  title: string
+  summary: string
+  donorId?: string
+  donorName: string
+  stage: ProjectStage
+  outcome?: 'funded' | 'not_funded'
+  currency: Currency
+  startDate?: string
+  endDate?: string
+  duration?: string
+  locations?: string
+  sectors: string[]
+  managerId?: string
+  managerName?: string
+  teamIds: string[]
+  requestedAmount?: number
+  awardedAmount?: number
+  budgetId?: string
+  proposal: { sections: ProposalSection[]; attachments: Attachment[]; submissionDeadline?: string; submittedTo?: string; reference?: string; version?: string }
+  logframe: LogframeRow[]
+  workplan: WorkplanActivity[]
+  spendingPlan: SpendingPlanEntry[]
+  iptt: IPTTEntry[]
+  ipttGeneratedAt?: string
+  reports: ProjectReport[]
+  comments: ProjectComment[]
+  stageHistory: { stage: ProjectStage; at: string; byName: string; note?: string }[]
+  submittedAt?: string
+  grantedAt?: string
+  activatedAt?: string
+  closedAt?: string
+  closeoutNote?: string
+  agreementEnvelopeId?: string
+  createdBy: string
+  createdByName: string
+  createdAt: string
+  updatedAt: string
+  ownerName: string
+}
+
 export interface Notification {
   id: string
   userId: string
@@ -540,7 +683,7 @@ export interface Notification {
   body: string
   link: string
   read: boolean
-  kind: 'approval' | 'info' | 'success' | 'warning'
+  kind: 'approval' | 'info' | 'success' | 'warning' | 'task' | 'reminder'
 }
 
 export interface OrgSettings {

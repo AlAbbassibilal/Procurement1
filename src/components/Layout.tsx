@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { NavLink, Outlet, useNavigate, Link, useLocation } from 'react-router-dom'
 import {
   LayoutGrid, FileText, CheckSquare, Search, ShoppingCart, FileSignature, Building2, Users, SlidersHorizontal,
-  History, Bell, LogOut, ChevronDown, Menu, Settings, RotateCcw, ChevronsUpDown, PackageCheck, Receipt, Scale, Wallet, Gauge, Lock, PenLine,
+  History, Bell, LogOut, ChevronDown, Menu, Settings, RotateCcw, ChevronsUpDown, PackageCheck, Receipt, Scale, Wallet, Gauge, Lock, PenLine, ListChecks, HandCoins, Building, FolderPlus, Table2,
 } from 'lucide-react'
 import { DEPARTMENTS, deptForPath, canEnter, ACCESS_LABEL, accessOf } from '@/lib/departments'
 import { DEPT_ICON } from '@/pages/Home'
@@ -21,7 +21,7 @@ export default function Layout() {
   const nav = useNavigate()
   const { pathname } = useLocation()
   const dept = deptForPath(pathname)
-  const { logout, prs, pos, contracts, invoices, envelopes, notifications, markRead, markAllRead, users, switchUser, settings, resetDemo } = useStore()
+  const { logout, prs, pos, contracts, invoices, envelopes, tasks, runReminders, notifications, markRead, markAllRead, users, switchUser, settings, resetDemo } = useStore()
   const [open, setOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   const [userOpen, setUserOpen] = useState(false)
@@ -41,6 +41,7 @@ export default function Layout() {
     '/requisitions': <FileText size={17} />, '/sourcing': <Search size={17} />, '/orders': <ShoppingCart size={17} />, '/contracts': <FileSignature size={17} />,
     '/receiving': <PackageCheck size={17} />, '/vendors': <Building2 size={17} />, '/admin/thresholds': <Scale size={17} />, '/invoices': <Receipt size={17} />,
     '/budgets': <Wallet size={17} />, '/admin/approval-matrix': <SlidersHorizontal size={17} />,
+    '/grants/tracker': <Table2 size={17} />, '/grants/new': <FolderPlus size={17} />, '/grants/donors': <Building size={17} />, '/grants': <HandCoins size={17} />,
   }
   const BADGES: Record<string, number> = {
     '/sourcing': sourcingCount, '/receiving': pos.filter((p) => ['issued', 'contracted', 'partially_received'].includes(p.status)).length, '/invoices': invoices.filter((i) => i.status === 'exception').length,
@@ -53,6 +54,7 @@ export default function Layout() {
       { to: '/', label: 'Home', icon: <LayoutGrid size={17} /> },
       { to: '/approvals', label: 'My approvals', icon: <CheckSquare size={17} />, badge: myApprovals },
       { to: '/esign', label: 'E-Signature', icon: <PenLine size={17} />, badge: envelopes.filter((e) => e.status === 'sent' && recipientTurn(e).some((r) => r.userId === user.id)).length },
+      { to: '/tasks', label: 'My tasks', icon: <ListChecks size={17} />, badge: tasks.filter((t) => t.assigneeId === user.id && t.status !== 'done').length },
     ] },
     ...(dept ? [{ title: dept.name, items: deptItems }] : []),
     { title: 'Administration', items: [
@@ -62,6 +64,7 @@ export default function Layout() {
     ] },
   ]
   const [deptOpen, setDeptOpen] = useState(false)
+  useEffect(() => { runReminders(); const t = setInterval(runReminders, 30 * 60 * 1000); return () => clearInterval(t) }, [runReminders])
 
   const Sidebar = (
     <aside className="flex h-full w-sidebar flex-col bg-ink-900 text-white">
@@ -157,7 +160,7 @@ export default function Layout() {
                     {myNotifs.slice(0, 30).map((n) => (
                       <button key={n.id} onClick={() => { markRead(n.id); setNotifOpen(false); nav(n.link) }}
                         className={cx('flex w-full gap-3 border-b border-line px-4 py-3 text-left hover:bg-surface-muted', !n.read && 'bg-brand-50/60')}>
-                        <span className={cx('mt-1.5 h-2 w-2 shrink-0 rounded-full', { approval: 'bg-sun-500', info: 'bg-info-500', success: 'bg-brand-600', warning: 'bg-accent-600' }[n.kind])} />
+                        <span className={cx('mt-1.5 h-2 w-2 shrink-0 rounded-full', { approval: 'bg-sun-500', info: 'bg-info-500', success: 'bg-brand-600', warning: 'bg-accent-600', task: 'bg-brand-800', reminder: 'bg-accent-600' }[n.kind])} />
                         <span className="min-w-0 flex-1">
                           <span className="block text-[13px] font-medium text-ink-900">{n.title}</span>
                           <span className="block truncate text-[12.5px] text-ink-600">{n.body}</span>

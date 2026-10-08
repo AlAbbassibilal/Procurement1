@@ -1,12 +1,12 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight, ClipboardList, Upload } from 'lucide-react'
+import { ArrowRight, ClipboardList } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
-import { Card, PageHeader, Stat, StatusPill, EmptyState } from '@/components/ui'
+import { Card, PageHeader, Stat } from '@/components/ui'
 import { DEPT, ACCESS_LABEL, accessOf } from '@/lib/departments'
 import { DEPT_ICON } from '@/pages/Home'
 import { computeBvA } from '@/lib/budget'
 import { invoiceTotals } from '@/lib/match'
-import { fmtMoney, fmtDate, cx } from '@/lib/format'
+import { fmtMoney, cx } from '@/lib/format'
 import type { Department } from '@/types'
 
 /** Shared workspace landing frame: header, module grid, and a "to be defined" panel. */
@@ -33,33 +33,6 @@ function WorkspaceFrame({ id, children, intro }: { id: Department; children?: Re
         )}
       </div>
     </>
-  )
-}
-
-export function GrantsHome() {
-  const { budgets, prs, pos, invoices, settings } = useStore()
-  const rows = budgets.map((b) => ({ b, t: computeBvA(b, prs, pos, invoices).totals }))
-  const active = rows.filter((r) => r.b.status === 'active')
-  const ccy = settings.defaultCurrency
-  return (
-    <WorkspaceFrame id="grants" intro={
-      <>
-        <div className="mb-6 grid gap-4 sm:grid-cols-3">
-          <Stat label="Active projects / grants" value={active.length} tone="brand" />
-          <Stat label="Approved budgets" value={fmtMoney(active.reduce((s, r) => s + r.t.budget, 0), ccy)} />
-          <Stat label="Spent + committed" value={fmtMoney(active.reduce((s, r) => s + r.t.actual + r.t.commitments, 0), ccy)} tone="sun" />
-        </div>
-        <div className="mb-6"><Card title="Project & grant register" description="Every requisition, payment and report is charged to one of these codes" padded={false}
-          actions={<Link to="/budgets/upload" className="btn-primary btn-sm"><Upload size={13} /> Add project budget</Link>}>
-          {rows.length === 0 ? <div className="p-5"><EmptyState title="No projects yet" /></div> : (
-            <div className="overflow-x-auto scrollbar-thin"><table className="w-full min-w-[720px] text-[13px]">
-              <thead><tr><th className="table-th">Project / grant</th><th className="table-th">Donor</th><th className="table-th">Period</th><th className="table-th text-right">Approved</th><th className="table-th w-44">Burn</th><th className="table-th">Status</th></tr></thead>
-              <tbody>{rows.map(({ b, t }) => <tr key={b.id} className="hover:bg-surface-muted"><td className="table-td"><Link to={`/budgets/${b.id}`} className="font-mono text-[12px] font-semibold text-brand-700 hover:underline">{b.donorCode}</Link><div className="font-medium text-ink-900">{b.name}</div></td><td className="table-td text-ink-600">{b.donor}</td><td className="table-td whitespace-nowrap text-ink-600">{fmtDate(b.startDate)} – {fmtDate(b.endDate)}</td><td className="table-td text-right tabular-nums">{fmtMoney(t.budget, b.currency)}</td><td className="table-td"><div className="flex items-center gap-2"><div className="h-2 flex-1 rounded-pill bg-ink-100"><div className={cx('h-full rounded-pill', t.burnWithCommitPct > 90 ? 'bg-accent-600' : 'bg-brand-600')} style={{ width: `${Math.min(100, t.burnWithCommitPct)}%` }} /></div><span className="w-10 text-right tabular-nums">{t.burnWithCommitPct}%</span></div></td><td className="table-td"><StatusPill status={b.status} /></td></tr>)}</tbody>
-            </table></div>
-          )}
-        </Card></div>
-      </>
-    } />
   )
 }
 

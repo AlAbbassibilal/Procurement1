@@ -2,11 +2,12 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type {
   ApprovalRule, Attachment, AuditEvent, Comment, Contract, ContractMilestone, LineItem, Notification, OrgSettings,
-  PurchaseOrder, PurchaseRequisition, Quotation, User, Vendor, DocType, Role, GoodsReceipt, GoodsReceiptLine, Invoice, InvoiceLine, SourcingRecord, ExceptionType, ProjectBudget, Envelope, EnvelopeRecipient, EnvelopeField,
+  PurchaseOrder, PurchaseRequisition, Quotation, User, Vendor, DocType, Role, GoodsReceipt, GoodsReceiptLine, Invoice, InvoiceLine, SourcingRecord, ExceptionType, ProjectBudget, Envelope, EnvelopeRecipient, EnvelopeField, Project, ProjectStage, Donor, Task, ProjectReport, ProjectComment,
 } from '@/types'
-import { DOC_OWNER, SEED_BUDGETS, SEED_CONTRACTS, SEED_GRNS, SEED_INVOICES, SEED_POS, SEED_PRS, SEED_RULES, SEED_SETTINGS, SEED_USERS, SEED_VENDORS, STANDARD_CLAUSES } from '@/data/seed'
+import { DOC_OWNER, SEED_BUDGETS, SEED_DONORS, SEED_PROJECTS, SEED_TASKS, SEED_CONTRACTS, SEED_GRNS, SEED_INVOICES, SEED_POS, SEED_PRS, SEED_RULES, SEED_SETTINGS, SEED_USERS, SEED_VENDORS, STANDARD_CLAUSES } from '@/data/seed'
 import { hasBlockingIssues, receiptProgress, runMatch, invoiceTotals } from '@/lib/match'
 import { newEvent, recipientTurn } from '@/lib/esign'
+import { generateIPTT, generateReportingCalendar, generateSpendingPlan, monthsOf, parseMentions, reportLiveStatus, allIndicators } from '@/lib/grants'
 import { blockingFailures, emptySourcing, isBidMethod, sourcingRequirements, tierForPR, toUSD, resolveTier } from '@/lib/tiers'
 import { applyDecision, buildChain, currentStep, resetChain, resolveApprover, chainFromSteps } from '@/lib/workflow'
 import { linesSubtotal, nowIso, uid } from '@/lib/format'
@@ -26,6 +27,9 @@ interface State {
   invoices: Invoice[]
   budgets: ProjectBudget[]
   envelopes: Envelope[]
+  projects: Project[]
+  donors: Donor[]
+  tasks: Task[]
   notifications: Notification[]
   audit: AuditEvent[]
   counters: Record<string, number>
@@ -96,6 +100,20 @@ interface Actions {
   deleteBudget: (id: string) => void
   setTemplate: (kind: 'budget' | 'bva', file?: Attachment) => void
 
+  // Grants / PCM
+  createProject: (data: Partial<Project> & { code: string; title: string }) => Project
+  updateProject: (id: string, patch: Partial<Project>) => void
+  advanceProject: (id: string, stage: ProjectStage, opts?: { note?: string; awardedAmount?: number; startDate?: string; endDate?: string; outcome?: 'funded' | 'not_funded' }) => { ok: boolean; error?: string }
+  addProjectComment: (id: string, text: string) => void
+  addReport: (projectId: string, r: Omit<ProjectReport, 'id' | 'status' | 'attachments'>) => void
+  updateReport: (projectId: string, reportId: string, patch: Partial<ProjectReport>) => void
+  submitReport: (projectId: string, reportId: string, attachments: Attachment[], notes?: string) => void
+  runReminders: () => number
+  upsertDonor: (d: Donor) => void
+  deleteDonor: (id: string) => void
+  createTask: (t: Omit<Task, 'id' | 'createdBy' | 'createdByName' | 'createdAt' | 'status'> & { status?: Task['status'] }) => Task
+  updateTask: (id: string, patch: Partial<Task>) => void
+
   // E-Signature
   createEnvelope: (data: Pick<Envelope, 'subject' | 'message' | 'documentName' | 'pageCount' | 'hash' | 'fileKey' | 'signingOrder' | 'recipients' | 'fields' | 'linkedDoc'>) => Envelope
   updateEnvelope: (id: string, patch: Partial<Envelope>) => void
@@ -135,6 +153,9 @@ const initial = (): State => ({
   invoices: SEED_INVOICES,
   budgets: SEED_BUDGETS,
   envelopes: [],
+  projects: SEED_PROJECTS,
+  donors: SEED_DONORS,
+  tasks: SEED_TASKS,
   notifications: [
     { id: 'n5', userId: 'u_rana', at: nowIso(), title: 'Invoice approval required', body: 'INV-2025-0012 · Amman Fleet & Logistics · JOD 742.40', link: '/invoices/inv_1', read: false, kind: 'approval' },
     { id: 'n1', userId: 'u_rana', at: nowIso(), title: 'Approval required', body: 'PR-2025-0042 · Laptops for field coordinators', link: '/requisitions/pr_2', read: false, kind: 'approval' },
@@ -159,6 +180,7 @@ export const useStore = create<State & Actions>()(
           audit: [{ id: uid('a_'), at: nowIso(), actorId: a?.id ?? 'system', actorName: a?.name ?? 'System', docType, docId: doc?.id, docNumber: doc?.number, action, detail }, ...s.audit].slice(0, 500),
         }))
       }
+      const fmtDue = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
       const notify = (userId: string | undefined, n: Omit<Notification, 'id' | 'userId' | 'at' | 'read'>) => {
         if (!userId) return
         set((s) => ({ notifications: [{ id: uid('n_'), userId, at: nowIso(), read: false, ...n }, ...s.notifications] }))
@@ -637,6 +659,94 @@ export const useStore = create<State & Actions>()(
         deleteBudget: (id) => { const b = get().budgets.find((x) => x.id === id); set((s) => ({ budgets: s.budgets.filter((x) => x.id !== id) })); if (b) log('BUDGET', 'Budget removed', { id: b.id, number: b.donorCode }) },
         setTemplate: (kind, file) => { set((s) => ({ settings: { ...s.settings, templates: { ...s.settings.templates, [kind]: file } } })); log('SETTINGS', file ? `${kind === 'bva' ? 'BvA' : 'Budget'} template uploaded` : `${kind === 'bva' ? 'BvA' : 'Budget'} template removed`, undefined, file?.name) },
 
+        // ---- Grants / PCM --------------------------------------------------
+        createProject: (data) => {
+          const a = actor()
+          const budget: ProjectBudget = { id: uid('bud_'), donorCode: data.code, name: data.title, donor: data.donorName ?? '', currency: data.currency ?? get().settings.defaultCurrency, startDate: data.startDate, endDate: data.endDate, duration: data.duration, locations: data.locations, status: 'draft', lines: [], uploadedBy: a.id, uploadedByName: a.name, uploadedAt: nowIso(), ownerName: DOC_OWNER, notes: 'Created with the project — under development' }
+          const p: Project = {
+            id: uid('prj_'), summary: '', donorName: '', stage: 'development', currency: get().settings.defaultCurrency, sectors: [], teamIds: [], managerId: a.id, managerName: a.name,
+            proposal: { sections: [], attachments: [] }, logframe: [], workplan: [], spendingPlan: [], iptt: [], reports: [], comments: [],
+            stageHistory: [{ stage: 'development', at: nowIso(), byName: a.name }], createdBy: a.id, createdByName: a.name, createdAt: nowIso(), updatedAt: nowIso(), ownerName: DOC_OWNER,
+            ...data, budgetId: budget.id,
+          }
+          set((s) => ({ projects: [p, ...s.projects], budgets: [budget, ...s.budgets] }))
+          log('PROJECT', 'Project created', { id: p.id, number: p.code }, p.title)
+          return p
+        },
+        updateProject: (id, patch) => set((s) => ({ projects: s.projects.map((p) => (p.id === id ? { ...p, ...patch, updatedAt: nowIso() } : p)) })),
+        advanceProject: (id, stage, opts = {}) => {
+          const p = get().projects.find((x) => x.id === id); const a = actor()
+          if (!p) return { ok: false, error: 'Not found' }
+          const budget = get().budgets.find((b) => b.id === p.budgetId)
+          let patch: Partial<Project> = { stage, stageHistory: [...p.stageHistory, { stage, at: nowIso(), byName: a.name, note: opts.note }] }
+          if (stage === 'submitted') {
+            if (!allIndicators(p.logframe).length) return { ok: false, error: 'Add the logframe with at least one indicator before submitting — the IPTT is generated from it.' }
+            if (!budget?.lines.length) return { ok: false, error: 'The budget has no lines yet.' }
+            patch = { ...patch, submittedAt: nowIso(), iptt: generateIPTT(p), ipttGeneratedAt: nowIso(), requestedAmount: p.requestedAmount ?? budget.lines.reduce((s2, l) => s2 + l.amount, 0) }
+          }
+          if (stage === 'granted') {
+            if (!['submitted', 'development'].includes(p.stage)) return { ok: false, error: 'Only a submitted proposal can be granted.' }
+            const start = opts.startDate ?? p.startDate, end = opts.endDate ?? p.endDate
+            const months = monthsOf(start, end)
+            patch = { ...patch, grantedAt: nowIso(), outcome: 'funded', awardedAmount: opts.awardedAmount ?? p.requestedAmount ?? budget?.lines.reduce((s2, l) => s2 + l.amount, 0), startDate: start, endDate: end,
+              iptt: generateIPTT(p), ipttGeneratedAt: p.ipttGeneratedAt ?? nowIso(), spendingPlan: p.spendingPlan.length ? p.spendingPlan : generateSpendingPlan(budget?.lines ?? [], months), reports: p.reports.length ? p.reports : generateReportingCalendar({ ...p, startDate: start, endDate: end }) }
+            if (budget) set((s) => ({ budgets: s.budgets.map((b) => (b.id === budget.id ? { ...b, status: 'active', approvedAt: nowIso().slice(0, 10), startDate: start, endDate: end, notes: `Approved budget — granted ${nowIso().slice(0, 10)}` } : b)) }))
+          }
+          if (stage === 'active') { if (p.stage !== 'granted') return { ok: false, error: 'A project is activated after it is granted.' }; patch = { ...patch, activatedAt: nowIso() } }
+          if (stage === 'closed') {
+            patch = { ...patch, closedAt: nowIso(), closeoutNote: opts.note, outcome: opts.outcome ?? (['granted', 'active'].includes(p.stage) ? 'funded' : 'not_funded') }
+            if (budget) set((s) => ({ budgets: s.budgets.map((b) => (b.id === budget.id ? { ...b, status: 'closed' } : b)) }))
+          }
+          if (stage === 'development' && p.stage !== 'submitted') return { ok: false, error: 'Only a submitted proposal can be returned to development.' }
+          get().updateProject(id, patch)
+          log('PROJECT', `Stage → ${stage}`, { id: p.id, number: p.code }, opts.note)
+          const team = new Set([p.managerId, ...p.teamIds].filter(Boolean) as string[])
+          team.forEach((u) => notify(u, { kind: 'info', title: `${p.code} is now ${stage}`, body: p.title, link: `/grants/${p.id}` }))
+          if (stage === 'granted') notifyRole('finance_director', { kind: 'success', title: `Grant approved: ${p.code}`, body: `${p.title} — budget now open to requisitions and BvA`, link: `/budgets/${p.budgetId}` })
+          return { ok: true }
+        },
+        addProjectComment: (id, text) => {
+          const a = actor(); const p = get().projects.find((x) => x.id === id); if (!p) return
+          const mentions = parseMentions(text, get().users).filter((u) => u !== a.id)
+          const c: ProjectComment = { id: uid('c_'), authorId: a.id, authorName: a.name, at: nowIso(), text, mentions }
+          set((s) => ({ projects: s.projects.map((x) => (x.id === id ? { ...x, comments: [...x.comments, c], updatedAt: nowIso() } : x)) }))
+          mentions.forEach((u) => notify(u, { kind: 'info', title: `${a.name} mentioned you on ${p.code}`, body: text.slice(0, 120), link: `/grants/${p.id}?tab=team` }))
+        },
+        addReport: (projectId, r) => set((s) => ({ projects: s.projects.map((p) => (p.id === projectId ? { ...p, reports: [...p.reports, { ...r, id: uid('rep_'), status: 'upcoming', attachments: [] }], updatedAt: nowIso() } : p)) })),
+        updateReport: (projectId, reportId, patch) => set((s) => ({ projects: s.projects.map((p) => (p.id === projectId ? { ...p, reports: p.reports.map((r) => (r.id === reportId ? { ...r, ...patch } : r)), updatedAt: nowIso() } : p)) })),
+        submitReport: (projectId, reportId, attachments, notes) => {
+          const a = actor(); const p = get().projects.find((x) => x.id === projectId); if (!p) return
+          get().updateReport(projectId, reportId, { status: 'submitted', submittedAt: nowIso(), submittedBy: a.id, submittedByName: a.name, attachments, notes })
+          log('PROJECT', 'Report submitted', { id: p.id, number: p.code }, p.reports.find((r) => r.id === reportId)?.title)
+        },
+        runReminders: () => {
+          let n = 0; const now = new Date()
+          for (const p of get().projects.filter((x) => ['granted', 'active'].includes(x.stage))) for (const r of p.reports) {
+            const live = reportLiveStatus(r, now)
+            if ((live === 'due' || live === 'overdue') && (!r.remindedAt || (now.getTime() - new Date(r.remindedAt).getTime()) > 3 * 86400000)) {
+              get().updateReport(p.id, r.id, { remindedAt: nowIso(), status: live })
+              const team = new Set([p.managerId, ...p.teamIds].filter(Boolean) as string[])
+              team.forEach((u) => notify(u, { kind: 'reminder', title: live === 'overdue' ? `OVERDUE: ${r.title}` : `Report due ${fmtDue(r.dueDate)}: ${r.title}`, body: `${p.code} · ${p.donorName}`, link: `/grants/${p.id}?tab=reports` })); n++
+            } else if (live !== r.status && !['submitted', 'approved'].includes(r.status)) get().updateReport(p.id, r.id, { status: live })
+          }
+          return n
+        },
+        upsertDonor: (d) => { const exists = get().donors.some((x) => x.id === d.id); set((s) => ({ donors: exists ? s.donors.map((x) => (x.id === d.id ? d : x)) : [d, ...s.donors] })); log('DONOR', exists ? 'Donor updated' : 'Donor added', { id: d.id, number: d.name }) },
+        deleteDonor: (id) => set((s) => ({ donors: s.donors.filter((d) => d.id !== id) })),
+        createTask: (t) => {
+          const a = actor()
+          const task: Task = { ...t, id: uid('task_'), status: t.status ?? 'open', createdBy: a.id, createdByName: a.name, createdAt: nowIso() }
+          set((s) => ({ tasks: [task, ...s.tasks] }))
+          log('TASK', 'Task assigned', { id: task.id, number: task.projectCode ?? 'TASK' }, `${task.title} → ${task.assigneeName}`)
+          if (task.assigneeId !== a.id) notify(task.assigneeId, { kind: 'task', title: `New task from ${a.name}: ${task.title}`, body: `${task.projectCode ? `${task.projectCode} · ` : ''}${task.dueDate ? `due ${fmtDue(task.dueDate)}` : 'no due date'}`, link: task.link ?? '/tasks' })
+          return task
+        },
+        updateTask: (id, patch) => {
+          const t = get().tasks.find((x) => x.id === id); const a = actor()
+          set((s) => ({ tasks: s.tasks.map((x) => (x.id === id ? { ...x, ...patch, completedAt: patch.status === 'done' ? nowIso() : patch.status ? undefined : x.completedAt } : x)) }))
+          if (t && patch.status === 'done' && t.createdBy !== a.id) notify(t.createdBy, { kind: 'success', title: `Task completed: ${t.title}`, body: `by ${a.name}`, link: t.link ?? '/tasks' })
+        },
+
         // ---- E-Signature ---------------------------------------------------
         createEnvelope: (data) => {
           const a = actor()
@@ -758,7 +868,7 @@ export const useStore = create<State & Actions>()(
         resetDemo: () => set({ ...initial(), currentUserId: get().currentUserId }),
       }
     },
-    { name: 'rhs-platform-v5', version: 5 },
+    { name: 'rhs-platform-v6', version: 6 },
   ),
 )
 

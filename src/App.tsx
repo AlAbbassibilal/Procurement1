@@ -6,7 +6,13 @@ import NoAccess from '@/pages/NoAccess'
 import EnvelopeList from '@/pages/esign/List'
 import EnvelopeNew from '@/pages/esign/New'
 import EnvelopeDetail from '@/pages/esign/Detail'
-import { GrantsHome, FinanceHome, PartnershipsHome, HrHome, MediaHome } from '@/pages/departments'
+import { FinanceHome, PartnershipsHome, HrHome, MediaHome } from '@/pages/departments'
+import GrantsOverview from '@/pages/grants/Overview'
+import GrantsTracker from '@/pages/grants/Tracker'
+import Donors from '@/pages/grants/Donors'
+import ProjectNew from '@/pages/grants/New'
+import ProjectPage from '@/pages/grants/Project'
+import Tasks from '@/pages/Tasks'
 import { useStore } from '@/store/useStore'
 import Layout from '@/components/Layout'
 import Login from '@/pages/Login'
@@ -60,7 +66,12 @@ export default function App() {
          <Route element={<RequireAccess />}>
           <Route index element={<Home />} />
           <Route path="procurement" element={<Dashboard />} />
-          <Route path="grants" element={<GrantsHome />} />
+          <Route path="grants" element={<GrantsOverview />} />
+          <Route path="grants/tracker" element={<GrantsTracker />} />
+          <Route path="grants/donors" element={<Donors />} />
+          <Route path="grants/new" element={<ProjectNew />} />
+          <Route path="grants/:id" element={<ProjectPage />} />
+          <Route path="tasks" element={<Tasks />} />
           <Route path="finance" element={<FinanceHome />} />
           <Route path="partnerships" element={<PartnershipsHome />} />
           <Route path="hr" element={<HrHome />} />

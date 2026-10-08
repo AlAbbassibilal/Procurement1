@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { CheckSquare, Bell, FileText, Lock, ArrowRight, PenLine, HandCoins, Handshake, ShoppingCart, Landmark, Users, Megaphone } from 'lucide-react'
+import { CheckSquare, ListChecks, FileText, Lock, ArrowRight, PenLine, HandCoins, Handshake, ShoppingCart, Landmark, Users, Megaphone } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
 import { PageHeader } from '@/components/ui'
 import { DEPARTMENTS, ACCESS_LABEL, effectiveAccess } from '@/lib/departments'
@@ -16,13 +16,13 @@ export const DEPT_ICON: Record<Department, React.ReactNode> = {
 export default function Home() {
   const user = useCurrentUser()!
   const nav = useNavigate()
-  const { prs, pos, invoices, contracts, budgets, envelopes, notifications, settings } = useStore()
+  const { prs, pos, invoices, contracts, budgets, envelopes, tasks, projects, settings } = useStore()
   const access = effectiveAccess(user)
   const approvals = prs.filter((p) => p.status === 'pending_approval' && canApprove(p.approvalChain, user)).length
     + pos.filter((p) => p.status === 'pending_approval' && canApprove(p.approvalChain, user)).length
     + invoices.filter((i) => i.status === 'pending_approval' && canApprove(i.approvalChain, user)).length
     + (user.role === 'legal' ? contracts.filter((c) => c.status === 'legal_review').length : 0)
-  const unread = notifications.filter((n) => n.userId === user.id && !n.read).length
+  const myTasks = tasks.filter((t) => t.assigneeId === user.id && t.status !== 'done').length
   const toSign = envelopes.filter((e) => e.status === 'sent' && recipientTurn(e).some((r) => r.userId === user.id)).length
   const myOpen = prs.filter((p) => p.requesterId === user.id && !['closed', 'cancelled', 'rejected'].includes(p.status)).length
   const active = budgets.filter((b) => b.status === 'active')
@@ -33,7 +33,7 @@ export default function Home() {
   const greet = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
 
   const stats: Record<Department, { label: string; value: string }[]> = {
-    grants: [{ label: 'Active projects', value: String(active.length) }, { label: 'Approved budgets', value: fmtMoney(approvedTotal, ccy) }, { label: 'Spent + committed', value: approvedTotal ? `${Math.round((spentTotal / approvedTotal) * 100)}%` : '—' }],
+    grants: [{ label: 'Pipeline', value: String(projects.filter((p) => ['development', 'submitted'].includes(p.stage)).length) }, { label: 'Active grants', value: String(projects.filter((p) => ['granted', 'active'].includes(p.stage)).length) }, { label: 'Portfolio burn', value: approvedTotal ? `${Math.round((spentTotal / approvedTotal) * 100)}%` : '—' }],
     partnerships: [{ label: 'Partners', value: '—' }, { label: 'Active MoUs', value: '—' }],
     procurement: [{ label: 'Open requisitions', value: String(prs.filter((p) => ['pending_approval', 'approved', 'sourcing', 'awarded'].includes(p.status)).length) }, { label: 'POs in progress', value: String(pos.filter((p) => ['draft', 'pending_approval', 'approved', 'issued', 'contracted', 'partially_received'].includes(p.status)).length) }, { label: 'Contracts', value: String(contracts.filter((c) => c.status === 'active' || c.status === 'pending_signature').length) }],
     finance: [{ label: 'Invoices awaiting approval', value: String(invoices.filter((i) => i.status === 'pending_approval').length) }, { label: 'Match exceptions', value: String(invoices.filter((i) => i.status === 'exception').length) }, { label: 'Ready to pay', value: fmtMoney(invoices.filter((i) => i.status === 'approved').reduce((s, i) => s + i.lines.reduce((t, l) => t + l.quantity * l.unitPrice, 0) * (1 + i.taxRate / 100), 0), ccy) }],
@@ -52,10 +52,11 @@ export default function Home() {
           <span className="min-w-0 flex-1"><span className="block text-[22px] font-semibold leading-tight text-ink-900">{approvals}</span><span className="block text-[12.5px] text-ink-500">Awaiting my approval</span></span>
           <ArrowRight size={16} className="text-ink-400" />
         </Link>
-        <div className="card flex items-center gap-4 px-5 py-4">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control bg-info-50 text-info-700"><Bell size={20} /></span>
-          <span className="min-w-0 flex-1"><span className="block text-[22px] font-semibold leading-tight text-ink-900">{unread}</span><span className="block text-[12.5px] text-ink-500">Unread notifications</span></span>
-        </div>
+        <Link to="/tasks" className={cx('card flex items-center gap-4 px-5 py-4 hover:shadow-raised', myTasks > 0 && 'border-info-500/40')}>
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control bg-info-50 text-info-700"><ListChecks size={20} /></span>
+          <span className="min-w-0 flex-1"><span className="block text-[22px] font-semibold leading-tight text-ink-900">{myTasks}</span><span className="block text-[12.5px] text-ink-500">My open tasks</span></span>
+          <ArrowRight size={16} className="text-ink-400" />
+        </Link>
         <Link to="/esign" className={cx('card flex items-center gap-4 px-5 py-4 hover:shadow-raised', toSign > 0 && 'border-accent-200')}>
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control bg-accent-50 text-accent-700"><PenLine size={20} /></span>
           <span className="min-w-0 flex-1"><span className="block text-[22px] font-semibold leading-tight text-ink-900">{toSign}</span><span className="block text-[12.5px] text-ink-500">Waiting for my signature</span></span>

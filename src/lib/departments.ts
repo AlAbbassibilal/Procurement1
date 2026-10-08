@@ -22,7 +22,7 @@ export const DEPARTMENTS: DepartmentDef[] = [
     id: 'grants', name: 'Grants', short: 'Projects, donors & budgets', home: '/grants', paths: ['/grants', '/budgets'],
     description: 'The project cycle from proposal to close-out: grant register, approved budgets, donor agreements and reporting obligations. Every other workspace charges its work to a project here.',
     tone: { tile: 'bg-brand-600 text-white', text: 'text-brand-700', ring: 'ring-brand-200' },
-    modules: [{ to: '/grants', label: 'Overview' }, { to: '/budgets', label: 'Projects & budgets' }, { to: '/budgets', label: 'Budget vs Actual' }, { to: '/grants/proposals', label: 'Proposals pipeline', soon: true }, { to: '/grants/agreements', label: 'Donor agreements', soon: true }, { to: '/grants/reporting', label: 'Reporting calendar', soon: true }],
+    modules: [{ to: '/grants', label: 'Overview' }, { to: '/grants/tracker', label: 'Grants tracker' }, { to: '/grants/new', label: 'New project / proposal' }, { to: '/grants/donors', label: 'Donor contacts' }, { to: '/budgets', label: 'Budgets & BvA' }],
   },
   {
     id: 'partnerships', name: 'Partnerships', short: 'Partners, MoUs & due diligence', home: '/partnerships', paths: ['/partnerships'],
@@ -40,7 +40,7 @@ export const DEPARTMENTS: DepartmentDef[] = [
     id: 'finance', name: 'Financial', short: 'Payments, budgets & reporting', home: '/finance', paths: ['/finance', '/invoices', '/admin/approval-matrix'],
     description: 'Invoice matching and payment authorisation, budget control and Budget-vs-Actual, approval authorities and donor financial reporting.',
     tone: { tile: 'bg-sun-500 text-ink-900', text: 'text-sun-700', ring: 'ring-sun-300' },
-    modules: [{ to: '/finance', label: 'Overview' }, { to: '/invoices', label: 'Invoices & payments' }, { to: '/budgets', label: 'Budgets & BvA' }, { to: '/admin/approval-matrix', label: 'Approval matrix' }, { to: '/finance/payments', label: 'Payments register', soon: true }, { to: '/finance/reports', label: 'Donor financial reports', soon: true }],
+    modules: [{ to: '/finance', label: 'Overview' }, { to: '/invoices', label: 'Invoices & payments' }, { to: '/budgets', label: 'Budgets & BvA' }, { to: '/grants/tracker', label: 'Grants tracker' }, { to: '/admin/approval-matrix', label: 'Approval matrix' }, { to: '/finance/payments', label: 'Payments register', soon: true }, { to: '/finance/reports', label: 'Donor financial reports', soon: true }],
   },
   {
     id: 'hr', name: 'HR & Admin', short: 'People, time & office', home: '/hr', paths: ['/hr'],

@@ -1,5 +1,5 @@
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Send, SendHorizontal, FileSignature, Ban, Printer, PackageCheck, Receipt } from 'lucide-react'
+import { ArrowLeft, Send, SendHorizontal, FileSignature, Ban, Printer, PackageCheck, Receipt, PenLine } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
 import { Card, PageHeader, StatusPill, KV, Alert, Field } from '@/components/ui'
 import { ApprovalChain, DecisionPanel, CommentThread, AttachmentList, LineItemsEditor, ProcessTracker } from '@/components/workflow'
@@ -31,6 +31,7 @@ export default function OrderDetail() {
         subtitle={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><StatusPill status={po.status} /><span>{po.vendorName}</span><span>· from <Link to={`/requisitions/${po.prId}`} className="text-brand-700 hover:underline">{po.prNumber}</Link></span><span>· Owner {po.ownerName}</span></span>}
         actions={<>
           <button className="btn-ghost" onClick={() => nav(-1)}><ArrowLeft size={15} /> Back</button>
+          {['approved', 'issued', 'contracted'].includes(po.status) && <Link to={`/esign/new?subject=${encodeURIComponent(`Purchase order ${po.number} — ${po.vendorName}`)}&link=PO&id=${po.id}&number=${po.number}`} className="btn-secondary"><PenLine size={15} /> Send for e-signature</Link>}
           <button className="btn-ghost" onClick={() => window.print()}><Printer size={15} /> Print PO</button>
           {editable && <button className="btn-primary" onClick={() => { const r = submitPO(po.id); if (!r.ok) alert(r.error) }}><Send size={15} /> {po.status === 'returned' ? 'Re-submit' : 'Submit for approval'}</button>}
           {isProc && po.status === 'approved' && <button className="btn-primary" onClick={() => confirm(`Issue ${po.number} to ${po.vendorName}?`) && issuePO(po.id)}><SendHorizontal size={15} /> Issue to vendor</button>}

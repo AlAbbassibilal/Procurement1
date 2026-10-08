@@ -1,9 +1,11 @@
 import { useState, useMemo } from 'react'
-import { NavLink, Outlet, useNavigate, Link } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate, Link, useLocation } from 'react-router-dom'
 import {
-  LayoutDashboard, FileText, CheckSquare, Search, ShoppingCart, FileSignature, Building2, Users, SlidersHorizontal,
-  History, Bell, LogOut, ChevronDown, Menu, Settings, RotateCcw, ChevronsUpDown, PackageCheck, Receipt, Scale, Wallet,
+  LayoutGrid, FileText, CheckSquare, Search, ShoppingCart, FileSignature, Building2, Users, SlidersHorizontal,
+  History, Bell, LogOut, ChevronDown, Menu, Settings, RotateCcw, ChevronsUpDown, PackageCheck, Receipt, Scale, Wallet, Gauge, Lock,
 } from 'lucide-react'
+import { DEPARTMENTS, deptForPath, canEnter, ACCESS_LABEL, accessOf } from '@/lib/departments'
+import { DEPT_ICON } from '@/pages/Home'
 import { useStore, useCurrentUser } from '@/store/useStore'
 import { Logo, SunMark } from './Logo'
 import { Avatar } from './ui'
@@ -11,11 +13,13 @@ import { cx, timeAgo } from '@/lib/format'
 import { ROLE_LABEL, canApprove } from '@/lib/workflow'
 import type { Role } from '@/types'
 
-interface NavItem { to: string; label: string; icon: React.ReactNode; roles?: Role[]; badge?: number }
+interface NavItem { to: string; label: string; icon: React.ReactNode; roles?: Role[]; badge?: number; soon?: boolean }
 
 export default function Layout() {
   const user = useCurrentUser()!
   const nav = useNavigate()
+  const { pathname } = useLocation()
+  const dept = deptForPath(pathname)
   const { logout, prs, pos, contracts, invoices, notifications, markRead, markAllRead, users, switchUser, settings, resetDemo } = useStore()
   const [open, setOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
@@ -32,36 +36,56 @@ export default function Layout() {
   const myNotifs = notifications.filter((n) => n.userId === user.id)
   const unread = myNotifs.filter((n) => !n.read).length
 
+  const ICONS: Record<string, React.ReactNode> = {
+    '/requisitions': <FileText size={17} />, '/sourcing': <Search size={17} />, '/orders': <ShoppingCart size={17} />, '/contracts': <FileSignature size={17} />,
+    '/receiving': <PackageCheck size={17} />, '/vendors': <Building2 size={17} />, '/admin/thresholds': <Scale size={17} />, '/invoices': <Receipt size={17} />,
+    '/budgets': <Wallet size={17} />, '/admin/approval-matrix': <SlidersHorizontal size={17} />,
+  }
+  const BADGES: Record<string, number> = {
+    '/sourcing': sourcingCount, '/receiving': pos.filter((p) => ['issued', 'contracted', 'partially_received'].includes(p.status)).length, '/invoices': invoices.filter((i) => i.status === 'exception').length,
+  }
+  const deptItems: NavItem[] = dept ? dept.modules.filter((m, i, arr) => arr.findIndex((x) => x.to === m.to) === i).map((m) => ({
+    to: m.to, label: m.to === dept.home ? 'Overview' : m.label, icon: m.to === dept.home ? <Gauge size={17} /> : (ICONS[m.to] ?? <FileText size={17} />), badge: BADGES[m.to], soon: m.soon,
+  })) : []
   const groups: { title: string; items: NavItem[] }[] = [
-    { title: 'Overview', items: [
-      { to: '/', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
+    { title: 'Platform', items: [
+      { to: '/', label: 'Home', icon: <LayoutGrid size={17} /> },
       { to: '/approvals', label: 'My approvals', icon: <CheckSquare size={17} />, badge: myApprovals },
     ] },
-    { title: 'Procure-to-pay', items: [
-      { to: '/requisitions', label: 'Requisitions', icon: <FileText size={17} /> },
-      { to: '/sourcing', label: 'Sourcing & quotations', icon: <Search size={17} />, roles: ['procurement_officer', 'procurement_manager', 'admin', 'executive_director', 'finance', 'finance_director', 'programs_director', 'dept_manager'], badge: sourcingCount },
-      { to: '/orders', label: 'Purchase orders', icon: <ShoppingCart size={17} /> },
-      { to: '/contracts', label: 'Contracts', icon: <FileSignature size={17} /> },
-      { to: '/receiving', label: 'Goods receipt', icon: <PackageCheck size={17} />, badge: pos.filter((p) => ['issued', 'contracted', 'partially_received'].includes(p.status)).length },
-      { to: '/invoices', label: 'Invoices & payments', icon: <Receipt size={17} />, roles: ['finance', 'finance_director', 'procurement_officer', 'procurement_manager', 'admin', 'executive_director', 'programs_director'], badge: invoices.filter((i) => i.status === 'exception').length },
-    ] },
-    { title: 'Masters', items: [
-      { to: '/vendors', label: 'Vendors', icon: <Building2 size={17} /> },
-      { to: '/budgets', label: 'Budgets & BvA', icon: <Wallet size={17} /> },
-    ] },
+    ...(dept ? [{ title: dept.name, items: deptItems }] : []),
     { title: 'Administration', items: [
-      { to: '/admin/users', label: 'Users & roles', icon: <Users size={17} />, roles: ['admin'] },
-      { to: '/admin/thresholds', label: 'Procurement thresholds', icon: <Scale size={17} />, roles: ['admin', 'procurement_manager', 'procurement_officer', 'finance', 'finance_director', 'programs_director', 'executive_director'] },
-      { to: '/admin/approval-matrix', label: 'Approval matrix', icon: <SlidersHorizontal size={17} />, roles: ['admin', 'procurement_manager', 'finance', 'finance_director', 'programs_director'] },
+      { to: '/admin/users', label: 'Users & access', icon: <Users size={17} />, roles: ['admin'] },
       { to: '/admin/settings', label: 'Settings', icon: <Settings size={17} />, roles: ['admin'] },
       { to: '/audit', label: 'Audit trail', icon: <History size={17} />, roles: ['admin', 'finance', 'finance_director', 'programs_director', 'procurement_manager', 'executive_director', 'legal'] },
     ] },
   ]
+  const [deptOpen, setDeptOpen] = useState(false)
 
   const Sidebar = (
     <aside className="flex h-full w-sidebar flex-col bg-ink-900 text-white">
       <div className="flex h-topbar items-center border-b border-white/10 px-5">
         <Logo inverse size="sm" />
+      </div>
+      <div className="relative px-3 pt-3">
+        <button className="flex w-full items-center gap-2.5 rounded-control bg-white/8 px-3 py-2 text-left hover:bg-white/12" onClick={() => setDeptOpen((v) => !v)}>
+          <span className={cx('flex h-7 w-7 shrink-0 items-center justify-center rounded-control [&>svg]:h-4 [&>svg]:w-4', dept ? dept.tone.tile : 'bg-white/15 text-white')}>{dept ? DEPT_ICON[dept.id] : <LayoutGrid size={16} />}</span>
+          <span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-semibold text-white">{dept ? dept.name : 'All workspaces'}</span><span className="block truncate text-[11px] text-white/50">{dept ? `Workspace · ${ACCESS_LABEL[accessOf(user, dept.id)]}` : 'Choose a workspace'}</span></span>
+          <ChevronsUpDown size={14} className="text-white/50" />
+        </button>
+        {deptOpen && (
+          <>
+            <div className="fixed inset-0 z-30" onClick={() => setDeptOpen(false)} />
+            <div className="absolute left-3 right-3 z-40 mt-1 rounded-card border border-line bg-surface p-1.5 text-ink-900 shadow-overlay animate-slide-up">
+              {DEPARTMENTS.map((d) => { const ok = canEnter(user, d.id); return (
+                <button key={d.id} disabled={!ok} onClick={() => { setDeptOpen(false); setOpen(false); nav(d.home) }}
+                  className={cx('flex w-full items-center gap-2.5 rounded-control px-2 py-1.5 text-left text-[12.5px]', ok ? 'hover:bg-surface-muted' : 'cursor-not-allowed opacity-50', dept?.id === d.id && 'bg-brand-50')}>
+                  <span className={cx('flex h-6 w-6 shrink-0 items-center justify-center rounded-control [&>svg]:h-3.5 [&>svg]:w-3.5', ok ? d.tone.tile : 'bg-ink-200 text-ink-500')}>{ok ? DEPT_ICON[d.id] : <Lock size={12} />}</span>
+                  <span className="flex-1 truncate font-medium">{d.name}</span>
+                  <span className="text-[10.5px] text-ink-400">{ACCESS_LABEL[accessOf(user, d.id)]}</span>
+                </button>) })}
+            </div>
+          </>
+        )}
       </div>
       <nav className="flex-1 overflow-y-auto px-3 py-4 scrollbar-thin">
         {groups.map((g) => {
@@ -70,7 +94,9 @@ export default function Layout() {
           return (
             <div key={g.title} className="mb-5">
               <div className="mb-1.5 px-3 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/40">{g.title}</div>
-              {items.map((i) => (
+              {items.map((i) => i.soon ? (
+                <div key={i.to} className="mb-0.5 flex items-center gap-2.5 rounded-control px-3 py-2 text-[13.5px] font-medium text-white/35"><span className="opacity-70">{i.icon}</span><span className="flex-1">{i.label}</span><span className="rounded-pill border border-dashed border-white/25 px-1.5 text-[10px]">soon</span></div>
+              ) : (
                 <NavLink key={i.to} to={i.to} end={i.to === '/'} onClick={() => setOpen(false)}
                   className={({ isActive }) => cx('group mb-0.5 flex items-center gap-2.5 rounded-control px-3 py-2 text-[13.5px] font-medium transition-colors',
                     isActive ? 'bg-brand-600 text-white' : 'text-white/75 hover:bg-white/8 hover:text-white')}>
@@ -106,7 +132,7 @@ export default function Layout() {
         <header className="flex h-topbar shrink-0 items-center gap-3 border-b border-line bg-surface px-4 lg:px-6">
           <button className="btn-ghost btn-sm lg:hidden" onClick={() => setOpen(true)} aria-label="Menu"><Menu size={18} /></button>
           <div className="hidden items-center gap-2 text-[13px] text-ink-500 sm:flex">
-            <SunMark size={16} /> <span className="font-medium text-ink-700">Procurement Suite</span>
+            <SunMark size={16} /> <span className="font-medium text-ink-700">PCM & Grants Management Platform</span>{dept && <span className="text-ink-400">/ {dept.name}</span>}
           </div>
           <div className="flex-1" />
 
@@ -190,7 +216,7 @@ export default function Layout() {
             <Outlet />
           </div>
           <footer className="px-6 pb-6 pt-2 text-center text-[11.5px] text-ink-400">
-            {settings.orgName} · Procurement Suite · Documents owned by <Link to="/admin/settings" className="text-ink-600 hover:underline">Bilal Abbassi</Link>
+            {settings.orgName} · PCM & Grants Management Platform · Documents owned by <Link to="/admin/settings" className="text-ink-600 hover:underline">Bilal Abbassi</Link>
           </footer>
         </main>
       </div>

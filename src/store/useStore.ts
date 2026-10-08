@@ -656,7 +656,7 @@ export const useStore = create<State & Actions>()(
         resetDemo: () => set({ ...initial(), currentUserId: get().currentUserId }),
       }
     },
-    { name: 'rhs-procurement-v4', version: 4 },
+    { name: 'rhs-platform-v5', version: 5 },
   ),
 )
 

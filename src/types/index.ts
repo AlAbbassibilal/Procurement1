@@ -16,6 +16,12 @@ export type Role =
   | 'logistics'             // Logistics / Warehouse Officer / Storekeeper
   | 'admin'
 
+// ---------------------------------------------------------------------------
+// Platform workspaces (departments) and per-user access
+// ---------------------------------------------------------------------------
+export type Department = 'grants' | 'partnerships' | 'procurement' | 'finance' | 'hr' | 'media'
+export type AccessLevel = 'none' | 'view' | 'edit' | 'manage'
+
 export interface User {
   id: string
   name: string
@@ -23,6 +29,7 @@ export interface User {
   password: string // demo-only; replace with real auth
   role: Role
   approverRoles?: Role[]   // additional approval capacities this user holds (e.g. admin acting as Director of Programs)
+  access?: Partial<Record<Department, AccessLevel>>   // explicit workspace access; falls back to the role default
   department: string
   title: string
   avatarColor: string

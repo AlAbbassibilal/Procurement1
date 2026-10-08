@@ -30,7 +30,7 @@ export default function Dashboard() {
   return (
     <>
       <PageHeader eyebrow={ROLE_LABEL[user.role]} title={`${greet}, ${user.name.split(' ')[0]}`}
-        subtitle={`Here is what needs your attention across ${settings.orgShort} procurement today.`}
+        subtitle={`Procurement workspace — what needs attention across ${settings.orgShort} procure-to-pay today.`}
         actions={<>
           <Link to="/approvals" className="btn-secondary"><CheckSquare size={15} /> My approvals {queueTotal > 0 && <span className="rounded-pill bg-sun-500 px-1.5 text-[11px] font-bold text-ink-900">{queueTotal}</span>}</Link>
           <button className="btn-primary" onClick={() => nav('/requisitions/new')}><Plus size={15} /> New requisition</button>

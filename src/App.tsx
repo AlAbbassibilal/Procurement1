@@ -1,4 +1,9 @@
-import { Navigate, Route, Routes, Outlet } from 'react-router-dom'
+import { Navigate, Route, Routes, Outlet, useLocation } from 'react-router-dom'
+import { useCurrentUser } from '@/store/useStore'
+import { deptForPath, canEnter } from '@/lib/departments'
+import Home from '@/pages/Home'
+import NoAccess from '@/pages/NoAccess'
+import { GrantsHome, FinanceHome, PartnershipsHome, HrHome, MediaHome } from '@/pages/departments'
 import { useStore } from '@/store/useStore'
 import Layout from '@/components/Layout'
 import Login from '@/pages/Login'
@@ -33,6 +38,15 @@ function RequireAuth() {
   return authed ? <Outlet /> : <Navigate to="/login" replace />
 }
 
+/** Workspace gate: routes owned by a department require access to it. */
+function RequireAccess() {
+  const user = useCurrentUser()
+  const { pathname } = useLocation()
+  const d = deptForPath(pathname)
+  if (user && d && !canEnter(user, d.id)) return <NoAccess />
+  return <Outlet />
+}
+
 export default function App() {
   const authed = useStore((s) => !!s.currentUserId)
   return (
@@ -40,7 +54,14 @@ export default function App() {
       <Route path="/login" element={authed ? <Navigate to="/" replace /> : <Login />} />
       <Route element={<RequireAuth />}>
         <Route element={<Layout />}>
-          <Route index element={<Dashboard />} />
+         <Route element={<RequireAccess />}>
+          <Route index element={<Home />} />
+          <Route path="procurement" element={<Dashboard />} />
+          <Route path="grants" element={<GrantsHome />} />
+          <Route path="finance" element={<FinanceHome />} />
+          <Route path="partnerships" element={<PartnershipsHome />} />
+          <Route path="hr" element={<HrHome />} />
+          <Route path="media" element={<MediaHome />} />
           <Route path="approvals" element={<Approvals />} />
           <Route path="requisitions" element={<RequisitionList />} />
           <Route path="requisitions/new" element={<RequisitionForm />} />
@@ -67,6 +88,7 @@ export default function App() {
           <Route path="admin/settings" element={<Settings />} />
           <Route path="audit" element={<Audit />} />
           <Route path="*" element={<Navigate to="/" replace />} />
+         </Route>
         </Route>
       </Route>
     </Routes>

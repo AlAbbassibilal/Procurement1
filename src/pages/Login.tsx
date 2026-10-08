@@ -34,7 +34,7 @@ export default function Login() {
         <div className="absolute -bottom-32 -left-16 h-96 w-96 rounded-full bg-brand-900/40 blur-3xl" />
         <div className="relative"><Logo inverse size="lg" /></div>
         <div className="relative max-w-md">
-          <div className="mb-3 text-[12px] font-semibold uppercase tracking-[0.14em] text-white/70">Procurement Suite</div>
+          <div className="mb-3 text-[12px] font-semibold uppercase tracking-[0.14em] text-white/70">PCM & Grants Management Platform</div>
           <h1 className="text-[34px] font-semibold leading-[1.15] text-white">Transparent procurement, from request to contract.</h1>
           <p className="mt-4 text-[15px] leading-relaxed text-white/80">
             Raise requisitions, route them through the right approvals, compare three quotations, issue purchase orders and draft

@@ -1,4 +1,4 @@
-# RHS Procurement Suite
+# RHS PCM & Grants Management Platform
 
 A procure-to-contract system for **Restoring Hope Society (RHS)**, modelled on the Unit4 (Agresso) procurement flow and styled to the *RHS Brand Guideline 2025*.
 
@@ -24,6 +24,7 @@ Requisition (PR) → PR approvals → Sourcing (3 quotations) → Purchase order
 | **Goods receipt** | Requester / Operations | Receive against PO lines (ordered / received / outstanding), condition, delivery note, photos; partial receipts; PO becomes *partially received* → *received* |
 | **Invoices** | Procurement / Finance | Register vendor invoice against a PO, **automatic 3-way match** (PO × receipt × invoice: quantity, price tolerance, cumulative total, duplicates), exception handling with Finance override, approval chain, payment recording; PO auto-closes when fully received and paid |
 | **Budgets & BvA** | Finance / Programs | Upload an approved budget (Excel/CSV) — the RHS Project Budget Template (Summary + Direct Cost + Admin Cost) and the Annex 1 donor budget are recognised automatically, other layouts are mapped by column; section headings, sub-totals and the Summary block are read, and sheet sub-totals are reconciled against the lines — save as a project / grant with its budget lines; requisitions pick the project code and budget line from dropdowns; Budget-vs-Actual per line (approved · requested · committed · actual · available · burn %) with Excel export in the RHS BvA layout (Project Budget · BvA with live formulas and monthly forecast columns · Expense Allocation · Commitments); organisation budget and BvA templates stored in the system |
+| **Home hub & workspaces** | All | Six department cards — Grants, Partnerships, Procurement, Financial, HR & Admin, Media & Communication — each with live stats and the user's access level; per-user workspace access (none / view / edit / manage) defaults from the role and is overridable in Users & access; routes owned by a workspace are gated; the sidebar switches to the workspace's modules (`src/lib/departments.ts`) |
 | **Masters / Admin** | Admin, Procurement, Finance | Vendors register, users & roles, editable approval matrix, organisation settings, full audit trail |
 
 ## Run it

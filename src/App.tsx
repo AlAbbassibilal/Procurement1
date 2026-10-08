@@ -3,6 +3,9 @@ import { useCurrentUser } from '@/store/useStore'
 import { deptForPath, canEnter } from '@/lib/departments'
 import Home from '@/pages/Home'
 import NoAccess from '@/pages/NoAccess'
+import EnvelopeList from '@/pages/esign/List'
+import EnvelopeNew from '@/pages/esign/New'
+import EnvelopeDetail from '@/pages/esign/Detail'
 import { GrantsHome, FinanceHome, PartnershipsHome, HrHome, MediaHome } from '@/pages/departments'
 import { useStore } from '@/store/useStore'
 import Layout from '@/components/Layout'
@@ -63,6 +66,9 @@ export default function App() {
           <Route path="hr" element={<HrHome />} />
           <Route path="media" element={<MediaHome />} />
           <Route path="approvals" element={<Approvals />} />
+          <Route path="esign" element={<EnvelopeList />} />
+          <Route path="esign/new" element={<EnvelopeNew />} />
+          <Route path="esign/:id" element={<EnvelopeDetail />} />
           <Route path="requisitions" element={<RequisitionList />} />
           <Route path="requisitions/new" element={<RequisitionForm />} />
           <Route path="requisitions/:id/edit" element={<RequisitionForm />} />

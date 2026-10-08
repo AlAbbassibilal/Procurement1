@@ -2,10 +2,11 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type {
   ApprovalRule, Attachment, AuditEvent, Comment, Contract, ContractMilestone, LineItem, Notification, OrgSettings,
-  PurchaseOrder, PurchaseRequisition, Quotation, User, Vendor, DocType, Role, GoodsReceipt, GoodsReceiptLine, Invoice, InvoiceLine, SourcingRecord, ExceptionType, ProjectBudget,
+  PurchaseOrder, PurchaseRequisition, Quotation, User, Vendor, DocType, Role, GoodsReceipt, GoodsReceiptLine, Invoice, InvoiceLine, SourcingRecord, ExceptionType, ProjectBudget, Envelope, EnvelopeRecipient, EnvelopeField,
 } from '@/types'
 import { DOC_OWNER, SEED_BUDGETS, SEED_CONTRACTS, SEED_GRNS, SEED_INVOICES, SEED_POS, SEED_PRS, SEED_RULES, SEED_SETTINGS, SEED_USERS, SEED_VENDORS, STANDARD_CLAUSES } from '@/data/seed'
 import { hasBlockingIssues, receiptProgress, runMatch, invoiceTotals } from '@/lib/match'
+import { newEvent, recipientTurn } from '@/lib/esign'
 import { blockingFailures, emptySourcing, isBidMethod, sourcingRequirements, tierForPR, toUSD, resolveTier } from '@/lib/tiers'
 import { applyDecision, buildChain, currentStep, resetChain, resolveApprover, chainFromSteps } from '@/lib/workflow'
 import { linesSubtotal, nowIso, uid } from '@/lib/format'
@@ -24,6 +25,7 @@ interface State {
   grns: GoodsReceipt[]
   invoices: Invoice[]
   budgets: ProjectBudget[]
+  envelopes: Envelope[]
   notifications: Notification[]
   audit: AuditEvent[]
   counters: Record<string, number>
@@ -94,6 +96,18 @@ interface Actions {
   deleteBudget: (id: string) => void
   setTemplate: (kind: 'budget' | 'bva', file?: Attachment) => void
 
+  // E-Signature
+  createEnvelope: (data: Pick<Envelope, 'subject' | 'message' | 'documentName' | 'pageCount' | 'hash' | 'fileKey' | 'signingOrder' | 'recipients' | 'fields' | 'linkedDoc'>) => Envelope
+  updateEnvelope: (id: string, patch: Partial<Envelope>) => void
+  sendEnvelope: (id: string) => { ok: boolean; error?: string }
+  markEnvelopeViewed: (id: string, recipientId: string) => void
+  completeRecipient: (id: string, recipientId: string, values: Record<string, string>, method?: 'drawn' | 'typed') => { ok: boolean; error?: string; completed?: boolean }
+  declineEnvelope: (id: string, recipientId: string, reason: string) => { ok: boolean; error?: string }
+  voidEnvelope: (id: string, reason: string) => { ok: boolean; error?: string }
+  deleteEnvelope: (id: string) => void
+  adoptSignature: (dataUrl: string, method: 'drawn' | 'typed') => void
+  setInitials: (text: string) => void
+
   // masters / admin
   upsertVendor: (v: Partial<Vendor> & { id?: string }) => void
   upsertUser: (u: Partial<User> & { id?: string }) => void
@@ -120,6 +134,7 @@ const initial = (): State => ({
   grns: SEED_GRNS,
   invoices: SEED_INVOICES,
   budgets: SEED_BUDGETS,
+  envelopes: [],
   notifications: [
     { id: 'n5', userId: 'u_rana', at: nowIso(), title: 'Invoice approval required', body: 'INV-2025-0012 · Amman Fleet & Logistics · JOD 742.40', link: '/invoices/inv_1', read: false, kind: 'approval' },
     { id: 'n1', userId: 'u_rana', at: nowIso(), title: 'Approval required', body: 'PR-2025-0042 · Laptops for field coordinators', link: '/requisitions/pr_2', read: false, kind: 'approval' },
@@ -130,7 +145,7 @@ const initial = (): State => ({
   audit: [
     { id: 'a1', at: nowIso(), actorId: 'u_bilal', actorName: DOC_OWNER, docType: 'SYSTEM', action: 'System initialised', detail: 'Demo dataset loaded' },
   ],
-  counters: { PR: 44, PO: 17, CT: 6, GRN: 9, INV: 12 },
+  counters: { PR: 44, PO: 17, CT: 6, GRN: 9, INV: 12, ENV: 0 },
 })
 
 export const useStore = create<State & Actions>()(
@@ -151,7 +166,7 @@ export const useStore = create<State & Actions>()(
       const notifyRole = (role: Role, n: Omit<Notification, 'id' | 'userId' | 'at' | 'read'>) => {
         get().users.filter((u) => u.active && u.role === role).forEach((u) => notify(u.id, n))
       }
-      const nextNumber = (t: 'PR' | 'PO' | 'CT' | 'GRN' | 'INV') => {
+      const nextNumber = (t: 'PR' | 'PO' | 'CT' | 'GRN' | 'INV' | 'ENV') => {
         const n = (get().counters[t] ?? 0) + 1
         set((s) => ({ counters: { ...s.counters, [t]: n } }))
         return `${t}-${new Date().getFullYear()}-${String(n).padStart(4, '0')}`
@@ -621,6 +636,93 @@ export const useStore = create<State & Actions>()(
         },
         deleteBudget: (id) => { const b = get().budgets.find((x) => x.id === id); set((s) => ({ budgets: s.budgets.filter((x) => x.id !== id) })); if (b) log('BUDGET', 'Budget removed', { id: b.id, number: b.donorCode }) },
         setTemplate: (kind, file) => { set((s) => ({ settings: { ...s.settings, templates: { ...s.settings.templates, [kind]: file } } })); log('SETTINGS', file ? `${kind === 'bva' ? 'BvA' : 'Budget'} template uploaded` : `${kind === 'bva' ? 'BvA' : 'Budget'} template removed`, undefined, file?.name) },
+
+        // ---- E-Signature ---------------------------------------------------
+        createEnvelope: (data) => {
+          const a = actor()
+          const env: Envelope = { id: uid('env_'), number: nextNumber('ENV'), status: 'draft', events: [newEvent(a.id, a.name, 'Envelope created', data.documentName)], createdBy: a.id, createdByName: a.name, createdAt: nowIso(), ownerName: DOC_OWNER, ...data }
+          set((s) => ({ envelopes: [env, ...s.envelopes] }))
+          log('ESIGN', 'Envelope created', env, data.documentName)
+          return env
+        },
+        updateEnvelope: (id, patch) => set((s) => ({ envelopes: s.envelopes.map((e) => (e.id === id ? { ...e, ...patch } : e)) })),
+        sendEnvelope: (id) => {
+          const env = get().envelopes.find((e) => e.id === id)
+          const a = actor()
+          if (!env) return { ok: false, error: 'Not found' }
+          if (env.status !== 'draft') return { ok: false, error: 'Envelope already sent.' }
+          const actors = env.recipients.filter((r) => r.role !== 'cc')
+          if (!actors.length) return { ok: false, error: 'Add at least one signer or approver.' }
+          for (const r of env.recipients.filter((x) => x.role === 'signer')) if (!env.fields.some((f) => f.recipientId === r.id && f.type === 'signature')) return { ok: false, error: `${r.name} has no signature field — place one on the document.` }
+          const firstOrder = Math.min(...actors.map((r) => r.order))
+          const recipients: EnvelopeRecipient[] = env.recipients.map((r) => {
+            const active = r.role === 'cc' ? false : env.signingOrder === 'parallel' || r.order === firstOrder
+            return { ...r, status: active ? 'sent' : 'pending', sentAt: active ? nowIso() : undefined }
+          })
+          const upd: Envelope = { ...env, status: 'sent', sentAt: nowIso(), recipients, events: [...env.events, newEvent(a.id, a.name, 'Envelope sent', `${actors.length} recipient(s) · ${env.signingOrder}`)] }
+          set((s) => ({ envelopes: s.envelopes.map((e) => (e.id === id ? upd : e)) }))
+          log('ESIGN', 'Envelope sent', env, env.subject)
+          recipients.filter((r) => r.status === 'sent' && r.userId).forEach((r) => notify(r.userId, { kind: 'approval', title: `${r.role === 'approver' ? 'Approval' : 'Signature'} requested: ${env.subject}`, body: `${env.number} · from ${a.name}`, link: `/esign/${env.id}` }))
+          return { ok: true }
+        },
+        markEnvelopeViewed: (id, recipientId) => {
+          const env = get().envelopes.find((e) => e.id === id); const r = env?.recipients.find((x) => x.id === recipientId)
+          if (!env || !r || r.status !== 'sent') return
+          const a = actor()
+          set((s) => ({ envelopes: s.envelopes.map((e) => (e.id === id ? { ...e, recipients: e.recipients.map((x) => (x.id === recipientId ? { ...x, status: 'viewed', viewedAt: nowIso() } : x)), events: [...e.events, newEvent(a.id, a.name, 'Envelope viewed')] } : e)) }))
+        },
+        completeRecipient: (id, recipientId, values, method) => {
+          const env = get().envelopes.find((e) => e.id === id)
+          const a = actor()
+          if (!env) return { ok: false, error: 'Not found' }
+          if (env.status !== 'sent') return { ok: false, error: 'This envelope is not open for signing.' }
+          const r = env.recipients.find((x) => x.id === recipientId)
+          if (!r || !['sent', 'viewed'].includes(r.status)) return { ok: false, error: 'It is not your turn on this envelope.' }
+          if (!recipientTurn(env).some((x) => x.id === recipientId)) return { ok: false, error: 'Waiting for an earlier recipient to sign first.' }
+          const mine = env.fields.filter((f) => f.recipientId === recipientId)
+          const missing = mine.filter((f) => f.required && !(values[f.id] ?? f.value))
+          if (missing.length) return { ok: false, error: `Complete all required fields (${missing.map((f) => f.label ?? f.type).join(', ')}).` }
+          const fields: EnvelopeField[] = env.fields.map((f) => (f.recipientId === recipientId && values[f.id] !== undefined ? { ...f, value: values[f.id] } : f))
+          const done: EnvelopeRecipient['status'] = r.role === 'approver' ? 'approved' : 'signed'
+          let recipients = env.recipients.map((x) => (x.id === recipientId ? { ...x, status: done, signedAt: nowIso(), signatureMethod: method } : x))
+          const events = [...env.events, newEvent(a.id, a.name, r.role === 'approver' ? 'Approved' : 'Signed', `${mine.length} field(s) completed`)]
+          // advance sequential order
+          const remaining = recipients.filter((x) => x.role !== 'cc' && ['pending', 'sent', 'viewed'].includes(x.status))
+          const toNotify: EnvelopeRecipient[] = []
+          if (remaining.length && env.signingOrder === 'sequential') {
+            const next = Math.min(...remaining.map((x) => x.order))
+            recipients = recipients.map((x) => (x.status === 'pending' && x.order === next ? (toNotify.push({ ...x, status: 'sent' }), { ...x, status: 'sent' as const, sentAt: nowIso() }) : x))
+          }
+          const completed = remaining.length === 0
+          const upd: Envelope = { ...env, fields, recipients: completed ? recipients.map((x) => (x.role === 'cc' ? { ...x, status: 'sent', sentAt: nowIso() } : x)) : recipients, status: completed ? 'completed' : env.status, completedAt: completed ? nowIso() : undefined, events: completed ? [...events, newEvent(a.id, a.name, 'Envelope completed', 'All recipients have signed')] : events }
+          set((s) => ({ envelopes: s.envelopes.map((e) => (e.id === id ? upd : e)) }))
+          log('ESIGN', r.role === 'approver' ? 'Envelope approved' : 'Envelope signed', env, `${r.name}${completed ? ' · completed' : ''}`)
+          toNotify.filter((x) => x.userId).forEach((x) => notify(x.userId, { kind: 'approval', title: `${x.role === 'approver' ? 'Approval' : 'Signature'} requested: ${env.subject}`, body: `${env.number} · your turn`, link: `/esign/${env.id}` }))
+          if (completed) { const ids = new Set([env.createdBy, ...env.recipients.map((x) => x.userId).filter(Boolean) as string[]]); ids.forEach((uidv) => notify(uidv, { kind: 'success', title: `Completed: ${env.subject}`, body: `${env.number} · all parties signed`, link: `/esign/${env.id}` })) }
+          return { ok: true, completed }
+        },
+        declineEnvelope: (id, recipientId, reason) => {
+          const env = get().envelopes.find((e) => e.id === id); const a = actor()
+          if (!env) return { ok: false, error: 'Not found' }
+          if (!reason.trim()) return { ok: false, error: 'A reason is required to decline.' }
+          set((s) => ({ envelopes: s.envelopes.map((e) => (e.id === id ? { ...e, status: 'declined', recipients: e.recipients.map((x) => (x.id === recipientId ? { ...x, status: 'declined', declineReason: reason, signedAt: nowIso() } : x)), events: [...e.events, newEvent(a.id, a.name, 'Declined', reason)] } : e)) }))
+          log('ESIGN', 'Envelope declined', env, reason)
+          notify(env.createdBy, { kind: 'warning', title: `Declined: ${env.subject}`, body: `${a.name}: ${reason}`, link: `/esign/${env.id}` })
+          return { ok: true }
+        },
+        voidEnvelope: (id, reason) => {
+          const env = get().envelopes.find((e) => e.id === id); const a = actor()
+          if (!env) return { ok: false, error: 'Not found' }
+          if (env.createdBy !== a.id && a.role !== 'admin') return { ok: false, error: 'Only the sender can void an envelope.' }
+          if (env.status === 'completed') return { ok: false, error: 'Completed envelopes cannot be voided.' }
+          set((s) => ({ envelopes: s.envelopes.map((e) => (e.id === id ? { ...e, status: 'voided', events: [...e.events, newEvent(a.id, a.name, 'Voided', reason)] } : e)) }))
+          log('ESIGN', 'Envelope voided', env, reason)
+          env.recipients.filter((r) => r.userId && ['sent', 'viewed'].includes(r.status)).forEach((r) => notify(r.userId, { kind: 'warning', title: `Voided: ${env.subject}`, body: reason, link: `/esign/${env.id}` }))
+          return { ok: true }
+        },
+        deleteEnvelope: (id) => { const env = get().envelopes.find((e) => e.id === id); set((s) => ({ envelopes: s.envelopes.filter((e) => e.id !== id) })); if (env) log('ESIGN', 'Envelope deleted', env) },
+        adoptSignature: (dataUrl, method) => { const a = actor(); set((s) => ({ users: s.users.map((u) => (u.id === a.id ? { ...u, signature: { dataUrl, method, adoptedAt: nowIso() } } : u)) })); log('ESIGN', `Signature adopted (${method})`) },
+        setInitials: (text) => { const a = actor(); set((s) => ({ users: s.users.map((u) => (u.id === a.id ? { ...u, initials: text } : u)) })) },
 
         // ---- masters -------------------------------------------------------
         upsertVendor: (v) => {

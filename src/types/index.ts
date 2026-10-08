@@ -30,6 +30,8 @@ export interface User {
   role: Role
   approverRoles?: Role[]   // additional approval capacities this user holds (e.g. admin acting as Director of Programs)
   access?: Partial<Record<Department, AccessLevel>>   // explicit workspace access; falls back to the role default
+  signature?: { dataUrl: string; method: 'drawn' | 'typed'; adoptedAt: string }   // adopted e-signature
+  initials?: string
   department: string
   title: string
   avatarColor: string
@@ -189,7 +191,7 @@ export interface AuditEvent {
   at: string
   actorId: string
   actorName: string
-  docType: DocType | 'SYSTEM' | 'VENDOR' | 'USER' | 'BUDGET' | 'SETTINGS'
+  docType: DocType | 'SYSTEM' | 'VENDOR' | 'USER' | 'BUDGET' | 'SETTINGS' | 'ESIGN'
   docId?: string
   docNumber?: string
   action: string
@@ -467,6 +469,67 @@ export interface ProjectBudget {
   uploadedAt: string
   ownerName: string
   notes?: string
+}
+
+// ---------------------------------------------------------------------------
+// E-Signature (DocuSign-style envelopes)
+// ---------------------------------------------------------------------------
+export type EnvelopeStatus = 'draft' | 'sent' | 'completed' | 'declined' | 'voided'
+export type RecipientRole = 'signer' | 'approver' | 'cc'
+export type RecipientStatus = 'pending' | 'sent' | 'viewed' | 'signed' | 'approved' | 'declined'
+
+export interface EnvelopeRecipient {
+  id: string
+  userId?: string           // platform user (external recipients have no userId)
+  name: string
+  email: string
+  title?: string
+  role: RecipientRole
+  order: number             // signing order (1 = first)
+  status: RecipientStatus
+  sentAt?: string
+  viewedAt?: string
+  signedAt?: string
+  declineReason?: string
+  signatureMethod?: 'drawn' | 'typed'
+}
+
+export interface EnvelopeField {
+  id: string
+  recipientId: string
+  type: 'signature' | 'initials' | 'date' | 'name' | 'title' | 'text' | 'checkbox'
+  page: number              // 0-based
+  x: number; y: number; w: number; h: number   // fractions of the page (top-left origin)
+  required: boolean
+  label?: string
+  value?: string            // data URL for signature/initials, text otherwise
+}
+
+export interface SignatureEvent { id: string; at: string; actorId: string; actorName: string; action: string; detail?: string }
+
+export interface Envelope {
+  id: string
+  number: string            // ENV-YYYY-NNNN
+  subject: string
+  message: string
+  documentName: string
+  pageCount: number
+  hash: string              // SHA-256 of the original PDF
+  fileKey: string           // IndexedDB key of the original PDF
+  completedFileKey?: string // IndexedDB key of the finalised PDF
+  signingOrder: 'sequential' | 'parallel'
+  status: EnvelopeStatus
+  recipients: EnvelopeRecipient[]
+  fields: EnvelopeField[]
+  events: SignatureEvent[]
+  createdBy: string
+  createdByName: string
+  createdAt: string
+  sentAt?: string
+  completedAt?: string
+  expiresAt?: string
+  ownerName: string
+  linkedDoc?: { type: DocType; id: string; number: string }
 }
 
 export interface Notification {

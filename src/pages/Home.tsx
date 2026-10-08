@@ -1,10 +1,11 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { CheckSquare, Bell, FileText, Lock, ArrowRight, HandCoins, Handshake, ShoppingCart, Landmark, Users, Megaphone } from 'lucide-react'
+import { CheckSquare, Bell, FileText, Lock, ArrowRight, PenLine, HandCoins, Handshake, ShoppingCart, Landmark, Users, Megaphone } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
 import { PageHeader } from '@/components/ui'
 import { DEPARTMENTS, ACCESS_LABEL, effectiveAccess } from '@/lib/departments'
 import { ROLE_LABEL, canApprove } from '@/lib/workflow'
 import { computeBvA } from '@/lib/budget'
+import { recipientTurn } from '@/lib/esign'
 import { fmtMoney, cx } from '@/lib/format'
 import type { Department } from '@/types'
 
@@ -15,13 +16,14 @@ export const DEPT_ICON: Record<Department, React.ReactNode> = {
 export default function Home() {
   const user = useCurrentUser()!
   const nav = useNavigate()
-  const { prs, pos, invoices, contracts, budgets, notifications, settings } = useStore()
+  const { prs, pos, invoices, contracts, budgets, envelopes, notifications, settings } = useStore()
   const access = effectiveAccess(user)
   const approvals = prs.filter((p) => p.status === 'pending_approval' && canApprove(p.approvalChain, user)).length
     + pos.filter((p) => p.status === 'pending_approval' && canApprove(p.approvalChain, user)).length
     + invoices.filter((i) => i.status === 'pending_approval' && canApprove(i.approvalChain, user)).length
     + (user.role === 'legal' ? contracts.filter((c) => c.status === 'legal_review').length : 0)
   const unread = notifications.filter((n) => n.userId === user.id && !n.read).length
+  const toSign = envelopes.filter((e) => e.status === 'sent' && recipientTurn(e).some((r) => r.userId === user.id)).length
   const myOpen = prs.filter((p) => p.requesterId === user.id && !['closed', 'cancelled', 'rejected'].includes(p.status)).length
   const active = budgets.filter((b) => b.status === 'active')
   const bvas = active.map((b) => computeBvA(b, prs, pos, invoices).totals)
@@ -44,7 +46,7 @@ export default function Home() {
       <PageHeader eyebrow={`${ROLE_LABEL[user.role]} · ${user.department}`} title={`${greet}, ${user.name.split(' ')[0]}`}
         subtitle={`${settings.orgShort} management platform — choose a workspace. Your access to each is set by the administrator.`} />
 
-      <div className="mb-8 grid gap-3 sm:grid-cols-3">
+      <div className="mb-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Link to="/approvals" className={cx('card flex items-center gap-4 px-5 py-4 hover:shadow-raised', approvals > 0 && 'border-sun-300')}>
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control bg-sun-100 text-sun-700"><CheckSquare size={20} /></span>
           <span className="min-w-0 flex-1"><span className="block text-[22px] font-semibold leading-tight text-ink-900">{approvals}</span><span className="block text-[12.5px] text-ink-500">Awaiting my approval</span></span>
@@ -54,6 +56,11 @@ export default function Home() {
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control bg-info-50 text-info-700"><Bell size={20} /></span>
           <span className="min-w-0 flex-1"><span className="block text-[22px] font-semibold leading-tight text-ink-900">{unread}</span><span className="block text-[12.5px] text-ink-500">Unread notifications</span></span>
         </div>
+        <Link to="/esign" className={cx('card flex items-center gap-4 px-5 py-4 hover:shadow-raised', toSign > 0 && 'border-accent-200')}>
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control bg-accent-50 text-accent-700"><PenLine size={20} /></span>
+          <span className="min-w-0 flex-1"><span className="block text-[22px] font-semibold leading-tight text-ink-900">{toSign}</span><span className="block text-[12.5px] text-ink-500">Waiting for my signature</span></span>
+          <ArrowRight size={16} className="text-ink-400" />
+        </Link>
         <Link to="/requisitions" className="card flex items-center gap-4 px-5 py-4 hover:shadow-raised">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control bg-brand-50 text-brand-700"><FileText size={20} /></span>
           <span className="min-w-0 flex-1"><span className="block text-[22px] font-semibold leading-tight text-ink-900">{myOpen}</span><span className="block text-[12.5px] text-ink-500">My open requests</span></span>

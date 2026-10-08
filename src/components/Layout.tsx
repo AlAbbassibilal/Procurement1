@@ -2,10 +2,11 @@ import { useState, useMemo } from 'react'
 import { NavLink, Outlet, useNavigate, Link, useLocation } from 'react-router-dom'
 import {
   LayoutGrid, FileText, CheckSquare, Search, ShoppingCart, FileSignature, Building2, Users, SlidersHorizontal,
-  History, Bell, LogOut, ChevronDown, Menu, Settings, RotateCcw, ChevronsUpDown, PackageCheck, Receipt, Scale, Wallet, Gauge, Lock,
+  History, Bell, LogOut, ChevronDown, Menu, Settings, RotateCcw, ChevronsUpDown, PackageCheck, Receipt, Scale, Wallet, Gauge, Lock, PenLine,
 } from 'lucide-react'
 import { DEPARTMENTS, deptForPath, canEnter, ACCESS_LABEL, accessOf } from '@/lib/departments'
 import { DEPT_ICON } from '@/pages/Home'
+import { recipientTurn } from '@/lib/esign'
 import { useStore, useCurrentUser } from '@/store/useStore'
 import { Logo, SunMark } from './Logo'
 import { Avatar } from './ui'
@@ -20,7 +21,7 @@ export default function Layout() {
   const nav = useNavigate()
   const { pathname } = useLocation()
   const dept = deptForPath(pathname)
-  const { logout, prs, pos, contracts, invoices, notifications, markRead, markAllRead, users, switchUser, settings, resetDemo } = useStore()
+  const { logout, prs, pos, contracts, invoices, envelopes, notifications, markRead, markAllRead, users, switchUser, settings, resetDemo } = useStore()
   const [open, setOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   const [userOpen, setUserOpen] = useState(false)
@@ -51,6 +52,7 @@ export default function Layout() {
     { title: 'Platform', items: [
       { to: '/', label: 'Home', icon: <LayoutGrid size={17} /> },
       { to: '/approvals', label: 'My approvals', icon: <CheckSquare size={17} />, badge: myApprovals },
+      { to: '/esign', label: 'E-Signature', icon: <PenLine size={17} />, badge: envelopes.filter((e) => e.status === 'sent' && recipientTurn(e).some((r) => r.userId === user.id)).length },
     ] },
     ...(dept ? [{ title: dept.name, items: deptItems }] : []),
     { title: 'Administration', items: [

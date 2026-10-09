@@ -6,14 +6,20 @@
 // ---------------------------------------------------------------------------
 import { PDFDocument, StandardFonts, rgb, PDFPage, PDFFont } from 'pdf-lib'
 import * as pdfjs from 'pdfjs-dist'
-import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?raw'
+import workerGz from 'virtual:pdf-worker-gz'
 import type { Envelope, EnvelopeField, EnvelopeRecipient, SignatureEvent } from '@/types'
 
-let workerReady = false
+let workerReady: Promise<void> | undefined
+/** The worker ships gzipped inside the bundle; inflate it once with the browser's DecompressionStream and serve it from a blob URL. */
 function ensureWorker() {
-  if (workerReady) return
-  try { pdfjs.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([workerSrc], { type: 'text/javascript' })) } catch { /* no-op */ }
-  workerReady = true
+  if (!workerReady) workerReady = (async () => {
+    try {
+      const bin = Uint8Array.from(atob(workerGz), (c) => c.charCodeAt(0))
+      const text = await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'))).text()
+      pdfjs.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }))
+    } catch { /* viewer without DecompressionStream — pdf.js falls back to its fake worker */ }
+  })()
+  return workerReady
 }
 
 export async function sha256Hex(bytes: Uint8Array): Promise<string> {
@@ -38,7 +44,7 @@ export interface RenderedPage { index: number; dataUrl: string; width: number; h
 
 /** Render every page to a PNG data URL for on-screen placement / signing. */
 export async function renderPages(bytes: Uint8Array, scale = 1.4): Promise<RenderedPage[]> {
-  ensureWorker()
+  await ensureWorker()
   const doc = await pdfjs.getDocument({ data: bytes.slice() }).promise
   const out: RenderedPage[] = []
   for (let i = 1; i <= doc.numPages; i++) {

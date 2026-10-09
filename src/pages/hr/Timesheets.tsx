@@ -51,7 +51,7 @@ export default function HrTimesheets() {
             <td className="table-td"><div className="flex justify-end gap-1">
               {canActOn(s) && (!t || ['draft', 'returned'].includes(t.status)) && <button className="btn-primary btn-sm" data-testid={`ts-${s.rhsNumber}`} onClick={() => open(s, t)}>{t ? 'Edit' : <><Plus size={13} /> Create</>}</button>}
               {t && !['draft', 'returned'].includes(t.status) && <button className="btn-ghost btn-sm" onClick={() => open(s, t)}>View</button>}
-              {t && t.status === 'acknowledged' && hrManage && <><button className="btn-primary btn-sm" data-testid="ts-approve" onClick={() => setTimesheetStatus(t.id, 'approved')}><Check size={13} /> Approve</button><button className="btn-ghost btn-sm text-accent-700" onClick={() => { setNote(''); setRet(t) }}><Undo2 size={13} /> Return</button></>}
+              {t && t.status === 'acknowledged' && hrManage && <><button className="btn-primary btn-sm" data-testid="ts-ok" onClick={() => setTimesheetStatus(t.id, 'approved')}><Check size={13} /> Approve</button><button className="btn-ghost btn-sm text-accent-700" onClick={() => { setNote(''); setRet(t) }}><Undo2 size={13} /> Return</button></>}
               {t && <button className="btn-ghost btn-sm" onClick={() => exportTimesheet(t, s, settings, projects)} title="Download (Excel)"><Download size={13} /></button>}
             </div></td></tr>))}</tbody></table></div></Card>
 

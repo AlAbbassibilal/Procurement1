@@ -2,9 +2,9 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type {
   ApprovalRule, Attachment, AuditEvent, Comment, Contract, ContractMilestone, LineItem, Notification, OrgSettings,
-  PurchaseOrder, PurchaseRequisition, Quotation, User, Vendor, DocType, Role, GoodsReceipt, GoodsReceiptLine, Invoice, InvoiceLine, SourcingRecord, ExceptionType, ProjectBudget, Envelope, EnvelopeRecipient, EnvelopeField, Project, ProjectStage, Donor, Task, ProjectReport, ProjectComment,
+  PurchaseOrder, PurchaseRequisition, Quotation, User, Vendor, DocType, Role, GoodsReceipt, GoodsReceiptLine, Invoice, InvoiceLine, SourcingRecord, ExceptionType, ProjectBudget, Envelope, EnvelopeRecipient, EnvelopeField, Project, ProjectStage, Donor, Task, ProjectReport, ProjectComment, MasterBudget, MasterLine,
 } from '@/types'
-import { DOC_OWNER, SEED_BUDGETS, SEED_DONORS, SEED_PROJECTS, SEED_TASKS, SEED_CONTRACTS, SEED_GRNS, SEED_INVOICES, SEED_POS, SEED_PRS, SEED_RULES, SEED_SETTINGS, SEED_USERS, SEED_VENDORS, STANDARD_CLAUSES } from '@/data/seed'
+import { DOC_OWNER, SEED_BUDGETS, SEED_DONORS, SEED_PROJECTS, SEED_TASKS, SEED_MASTER, SEED_CONTRACTS, SEED_GRNS, SEED_INVOICES, SEED_POS, SEED_PRS, SEED_RULES, SEED_SETTINGS, SEED_USERS, SEED_VENDORS, STANDARD_CLAUSES } from '@/data/seed'
 import { hasBlockingIssues, receiptProgress, runMatch, invoiceTotals } from '@/lib/match'
 import { newEvent, recipientTurn } from '@/lib/esign'
 import { generateIPTT, generateReportingCalendar, generateSpendingPlan, monthsOf, parseMentions, reportLiveStatus, allIndicators } from '@/lib/grants'
@@ -30,6 +30,8 @@ interface State {
   projects: Project[]
   donors: Donor[]
   tasks: Task[]
+  masterBudgets: MasterBudget[]
+  country: string            // current country context ('all' or a country name)
   notifications: Notification[]
   audit: AuditEvent[]
   counters: Record<string, number>
@@ -100,6 +102,15 @@ interface Actions {
   deleteBudget: (id: string) => void
   setTemplate: (kind: 'budget' | 'bva', file?: Attachment) => void
 
+  // Master budget
+  createMasterBudget: (year: number, copyFromId?: string) => MasterBudget
+  upsertMasterLine: (mbId: string, line: MasterLine) => void
+  deleteMasterLine: (mbId: string, lineId: string) => void
+  approveMasterBudget: (mbId: string) => { ok: boolean; error?: string }
+  reopenMasterBudget: (mbId: string) => void
+  setBudgetLineMaster: (budgetId: string, lineId: string, masterLineId?: string) => void
+  setCountry: (c: string) => void
+
   // Grants / PCM
   createProject: (data: Partial<Project> & { code: string; title: string }) => Project
   updateProject: (id: string, patch: Partial<Project>) => void
@@ -156,6 +167,8 @@ const initial = (): State => ({
   projects: SEED_PROJECTS,
   donors: SEED_DONORS,
   tasks: SEED_TASKS,
+  masterBudgets: SEED_MASTER,
+  country: 'all',
   notifications: [
     { id: 'n5', userId: 'u_rana', at: nowIso(), title: 'Invoice approval required', body: 'INV-2025-0012 · Amman Fleet & Logistics · JOD 742.40', link: '/invoices/inv_1', read: false, kind: 'approval' },
     { id: 'n1', userId: 'u_rana', at: nowIso(), title: 'Approval required', body: 'PR-2025-0042 · Laptops for field coordinators', link: '/requisitions/pr_2', read: false, kind: 'approval' },
@@ -659,12 +672,41 @@ export const useStore = create<State & Actions>()(
         deleteBudget: (id) => { const b = get().budgets.find((x) => x.id === id); set((s) => ({ budgets: s.budgets.filter((x) => x.id !== id) })); if (b) log('BUDGET', 'Budget removed', { id: b.id, number: b.donorCode }) },
         setTemplate: (kind, file) => { set((s) => ({ settings: { ...s.settings, templates: { ...s.settings.templates, [kind]: file } } })); log('SETTINGS', file ? `${kind === 'bva' ? 'BvA' : 'Budget'} template uploaded` : `${kind === 'bva' ? 'BvA' : 'Budget'} template removed`, undefined, file?.name) },
 
+        // ---- Master budget -------------------------------------------------
+        createMasterBudget: (year, copyFromId) => {
+          const a = actor(); const src = copyFromId ? get().masterBudgets.find((m) => m.id === copyFromId) : undefined
+          const mb: MasterBudget = { id: uid('mb_'), year, currency: src?.currency ?? get().settings.defaultCurrency, status: 'draft', createdBy: a.id, createdByName: a.name, createdAt: nowIso(), ownerName: DOC_OWNER,
+            lines: (src?.lines ?? []).map((l, i) => ({ ...l, id: uid('ml_'), code: `MB-${year}-${String(i + 1).padStart(3, '0')}`, filledAt: undefined })) }
+          set((s) => ({ masterBudgets: [mb, ...s.masterBudgets] }))
+          log('MASTER', `Master budget ${year} created`, { id: mb.id, number: `MB-${year}` }, src ? `copied from ${src.year}` : undefined)
+          return mb
+        },
+        upsertMasterLine: (mbId, line) => {
+          const a = actor()
+          set((s) => ({ masterBudgets: s.masterBudgets.map((m) => (m.id === mbId ? { ...m, lines: m.lines.some((l) => l.id === line.id) ? m.lines.map((l) => (l.id === line.id ? { ...line, filledAt: nowIso() } : l)) : [...m.lines, { ...line, filledAt: nowIso() }] } : m)) }))
+          log('MASTER', 'Master line updated', { id: mbId, number: line.code }, `${line.accountName} · ${line.amount} · by ${a.name}`)
+        },
+        deleteMasterLine: (mbId, lineId) => set((s) => ({ masterBudgets: s.masterBudgets.map((m) => (m.id === mbId ? { ...m, lines: m.lines.filter((l) => l.id !== lineId) } : m)), budgets: s.budgets.map((b) => ({ ...b, lines: b.lines.map((l) => (l.masterLineId === lineId ? { ...l, masterLineId: undefined } : l)) })) })),
+        approveMasterBudget: (mbId) => {
+          const a = actor(); const mb = get().masterBudgets.find((m) => m.id === mbId)
+          if (!mb) return { ok: false, error: 'Not found' }
+          if (!['finance_director', 'executive_director', 'admin'].includes(a.role)) return { ok: false, error: 'Only the Director of Finance & Support (or the ED) approves the master budget.' }
+          if (!mb.lines.length) return { ok: false, error: 'Add lines first.' }
+          set((s) => ({ masterBudgets: s.masterBudgets.map((m) => (m.id === mbId ? { ...m, status: 'approved', approvedBy: a.id, approvedByName: a.name, approvedAt: nowIso() } : m)) }))
+          log('MASTER', `Master budget ${mb.year} approved`, { id: mb.id, number: `MB-${mb.year}` }, `${mb.lines.length} lines · ${mb.lines.reduce((t, l) => t + l.amount, 0).toLocaleString()} ${mb.currency}`)
+          notifyRole('programs_director', { kind: 'info', title: `Master budget ${mb.year} approved`, body: 'Project budgets should reference its lines', link: '/finance/master-budget' })
+          return { ok: true }
+        },
+        reopenMasterBudget: (mbId) => set((s) => ({ masterBudgets: s.masterBudgets.map((m) => (m.id === mbId ? { ...m, status: 'draft' } : m)) })),
+        setBudgetLineMaster: (budgetId, lineId, masterLineId) => set((s) => ({ budgets: s.budgets.map((b) => (b.id === budgetId ? { ...b, lines: b.lines.map((l) => (l.id === lineId ? { ...l, masterLineId } : l)) } : b)) })),
+        setCountry: (c) => set({ country: c }),
+
         // ---- Grants / PCM --------------------------------------------------
         createProject: (data) => {
           const a = actor()
           const budget: ProjectBudget = { id: uid('bud_'), donorCode: data.code, name: data.title, donor: data.donorName ?? '', currency: data.currency ?? get().settings.defaultCurrency, startDate: data.startDate, endDate: data.endDate, duration: data.duration, locations: data.locations, status: 'draft', lines: [], uploadedBy: a.id, uploadedByName: a.name, uploadedAt: nowIso(), ownerName: DOC_OWNER, notes: 'Created with the project — under development' }
           const p: Project = {
-            id: uid('prj_'), summary: '', donorName: '', stage: 'development', currency: get().settings.defaultCurrency, sectors: [], teamIds: [], managerId: a.id, managerName: a.name,
+            id: uid('prj_'), summary: '', donorName: '', stage: 'development', currency: get().settings.defaultCurrency, countries: [], sectors: [], teamIds: [], managerId: a.id, managerName: a.name,
             proposal: { sections: [], attachments: [] }, logframe: [], workplan: [], spendingPlan: [], iptt: [], reports: [], comments: [],
             stageHistory: [{ stage: 'development', at: nowIso(), byName: a.name }], createdBy: a.id, createdByName: a.name, createdAt: nowIso(), updatedAt: nowIso(), ownerName: DOC_OWNER,
             ...data, budgetId: budget.id,
@@ -868,7 +910,7 @@ export const useStore = create<State & Actions>()(
         resetDemo: () => set({ ...initial(), currentUserId: get().currentUserId }),
       }
     },
-    { name: 'rhs-platform-v6', version: 6 },
+    { name: 'rhs-platform-v7', version: 7 },
   ),
 )
 

@@ -12,7 +12,8 @@ import type { ProjectStage } from '@/types'
 
 export default function GrantsTracker() {
   const nav = useNavigate()
-  const { projects, budgets, prs, pos, invoices, settings } = useStore()
+  const { projects: allProjects, budgets, prs, pos, invoices, settings, country } = useStore()
+  const projects = allProjects.filter((p) => country === 'all' || p.countries.includes(country))
   const [tab, setTab] = useState<'pipeline' | 'active' | 'closed' | 'all'>('all')
   const ccy = settings.defaultCurrency
   const stages: Record<typeof tab, ProjectStage[]> = { pipeline: ['development', 'submitted'], active: ['granted', 'active'], closed: ['closed'], all: ['development', 'submitted', 'granted', 'active', 'closed'] }

@@ -191,7 +191,7 @@ export interface AuditEvent {
   at: string
   actorId: string
   actorName: string
-  docType: DocType | 'SYSTEM' | 'VENDOR' | 'USER' | 'BUDGET' | 'SETTINGS' | 'ESIGN' | 'PROJECT' | 'TASK' | 'DONOR'
+  docType: DocType | 'SYSTEM' | 'VENDOR' | 'USER' | 'BUDGET' | 'SETTINGS' | 'ESIGN' | 'PROJECT' | 'TASK' | 'DONOR' | 'MASTER'
   docId?: string
   docNumber?: string
   action: string
@@ -446,6 +446,7 @@ export interface BudgetLine {
   frequency?: number
   unitCost?: number
   pct?: number            // LoE % / % allocated / covering percentage (0-1)
+  masterLineId?: string   // which organisation master-budget line this project line funds
 }
 
 export interface ProjectBudget {
@@ -646,6 +647,7 @@ export interface Project {
   endDate?: string
   duration?: string
   locations?: string
+  countries: string[]
   sectors: string[]
   managerId?: string
   managerName?: string
@@ -672,6 +674,38 @@ export interface Project {
   createdByName: string
   createdAt: string
   updatedAt: string
+  ownerName: string
+}
+
+// ---------------------------------------------------------------------------
+// Master budget — the organisation's annual running-cost baseline
+// ---------------------------------------------------------------------------
+export interface MasterLine {
+  id: string
+  code: string              // MB-2026-001
+  accountNo?: string        // chart of accounts (2601 …)
+  accountName: string
+  category: string          // Personnel · Office & operations · Statutory & compliance · Programme support …
+  country: string           // Amman (regional office) · Gaza · …
+  budgetHolderId?: string
+  budgetHolderName?: string
+  amount: number            // annual, master budget currency
+  notes?: string
+  filledAt?: string
+}
+export interface MasterBudget {
+  id: string
+  year: number
+  currency: Currency
+  status: 'draft' | 'approved'
+  lines: MasterLine[]
+  createdBy: string
+  createdByName: string
+  createdAt: string
+  approvedBy?: string
+  approvedByName?: string
+  approvedAt?: string
+  notes?: string
   ownerName: string
 }
 
@@ -703,6 +737,7 @@ export interface OrgSettings {
   soleSourceEdThresholdUSD: number    // sole-source / emergency above this needs ED pre-approval
   dualAuthThresholdUSD: number        // POs above this need dual authorisation
   templates: { budget?: Attachment; bva?: Attachment }   // organisation's approved-budget and BvA templates
+  countries: string[]                                     // operating countries; the first is the regional office
   priceTolerancePct: number      // invoice unit-price variance tolerated vs PO
   paymentTermsDays: number       // default invoice due date offset
   fiscalYearStart: string

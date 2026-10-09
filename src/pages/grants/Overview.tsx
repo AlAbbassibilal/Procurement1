@@ -14,7 +14,8 @@ export const StagePill = ({ stage }: { stage: ProjectStage }) => <span className
 export default function GrantsOverview() {
   const nav = useNavigate()
   const user = useCurrentUser()!
-  const { projects, budgets, prs, pos, invoices, tasks, settings } = useStore()
+  const { projects: allProjects, budgets, prs, pos, invoices, tasks, settings, country } = useStore()
+  const projects = allProjects.filter((p) => country === 'all' || p.countries.includes(country))
   const ccy = settings.defaultCurrency
   const by = (st: ProjectStage[]) => projects.filter((p) => st.includes(p.stage))
   const live = by(['granted', 'active'])

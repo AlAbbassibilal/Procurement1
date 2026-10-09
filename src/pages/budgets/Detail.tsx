@@ -11,7 +11,8 @@ export default function BudgetDetail() {
   const { id } = useParams()
   const nav = useNavigate()
   const user = useCurrentUser()!
-  const { budgets, prs, pos, invoices, settings, upsertBudget } = useStore()
+  const { budgets, prs, pos, invoices, settings, upsertBudget, masterBudgets } = useStore()
+  const masterLines = masterBudgets.flatMap((m) => m.lines)
   const b = budgets.find((x) => x.id === id)
   const [received, setReceived] = useState<string | null>(null)
   if (!b) return <Alert tone="danger">Budget not found. <Link to="/budgets" className="underline">Back</Link></Alert>
@@ -25,7 +26,7 @@ export default function BudgetDetail() {
   const Row = ({ r, total }: { r: BvARow; total?: boolean }) => (
     <tr className={cx(total ? 'bg-surface-muted font-semibold' : !r.line && 'bg-danger-50/50')}>
       <td className="table-td font-mono text-[12px] font-semibold text-brand-700">{total ? '' : r.code}</td>
-      <td className="table-td"><div className={cx('text-ink-900', !total && 'font-medium')}>{r.description}</div>{!total && r.line?.location && <div className="text-[11.5px] text-ink-500">{r.line.location}{r.line.accountNo && ` · acct ${r.line.accountNo}`}{r.line.activityCode && ` · ${r.line.activityCode}`}</div>}</td>
+      <td className="table-td"><div className={cx('text-ink-900', !total && 'font-medium')}>{r.description}</div>{!total && r.line && (r.line.location || r.line.masterLineId) && <div className="text-[11.5px] text-ink-500">{r.line.location}{r.line.accountNo && ` · acct ${r.line.accountNo}`}{r.line.masterLineId && <span className="ml-1 rounded bg-info-50 px-1 text-info-700">{masterLines.find((m) => m.id === r.line!.masterLineId)?.code}</span>}</div>}</td>
       <td className="table-td text-right tabular-nums">{money(r.budget)}</td>
       <td className="table-td text-right tabular-nums">{money(r.actual)}</td>
       <td className={cx('table-td text-right tabular-nums', r.remaining < 0 && 'text-accent-700')}>{money(r.remaining)}</td>

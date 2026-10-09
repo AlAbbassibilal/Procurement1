@@ -5,6 +5,7 @@ import { Card, PageHeader, Stat } from '@/components/ui'
 import { DEPT, ACCESS_LABEL, accessOf } from '@/lib/departments'
 import { DEPT_ICON } from '@/pages/Home'
 import { computeBvA } from '@/lib/budget'
+import { coverageFor } from '@/lib/master'
 import { invoiceTotals } from '@/lib/match'
 import { fmtMoney, cx } from '@/lib/format'
 import type { Department } from '@/types'
@@ -37,17 +38,21 @@ function WorkspaceFrame({ id, children, intro }: { id: Department; children?: Re
 }
 
 export function FinanceHome() {
-  const { invoices, budgets, prs, pos, settings } = useStore()
+  const { invoices, budgets, prs, pos, settings, masterBudgets, projects } = useStore()
   const ccy = settings.defaultCurrency
+  const mb = [...masterBudgets].sort((a, b) => b.year - a.year)[0]
+  const cov = mb ? coverageFor(mb, budgets, projects, settings) : []
+  const mTotal = cov.reduce((s, c) => s + c.line.amount, 0), mCov = cov.reduce((s, c) => s + c.covered, 0)
   const sum = (st: string[]) => invoices.filter((i) => st.includes(i.status)).reduce((s, i) => s + invoiceTotals(i.lines, i.taxRate).total, 0)
   const bv = budgets.filter((b) => b.status === 'active').map((b) => computeBvA(b, prs, pos, invoices).totals)
   return (
     <WorkspaceFrame id="finance" intro={
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <Stat label="Invoices awaiting approval" value={fmtMoney(sum(['pending_approval']), ccy)} tone="sun" />
         <Stat label="Match exceptions" value={invoices.filter((i) => i.status === 'exception').length} tone="accent" />
         <Stat label="Approved — to pay" value={fmtMoney(sum(['approved']), ccy)} tone="brand" />
         <Stat label="Committed across projects" value={fmtMoney(bv.reduce((s, t) => s + t.commitments, 0), ccy)} />
+        {mb && <Stat label={`Master budget ${mb.year} covered by projects`} value={`${mTotal ? Math.round((mCov / mTotal) * 100) : 0}%`} hint={`${fmtMoney(mCov, mb.currency)} of ${fmtMoney(mTotal, mb.currency)} · gap ${fmtMoney(Math.max(0, mTotal - mCov), mb.currency)}`} tone={mTotal && mCov / mTotal < 0.5 ? 'accent' : 'brand'} />}
       </div>
     } />
   )

@@ -13,6 +13,7 @@ import Donors from '@/pages/grants/Donors'
 import ProjectNew from '@/pages/grants/New'
 import ProjectPage from '@/pages/grants/Project'
 import Tasks from '@/pages/Tasks'
+import MasterBudgetPage from '@/pages/finance/MasterBudget'
 import { useStore } from '@/store/useStore'
 import Layout from '@/components/Layout'
 import Login from '@/pages/Login'
@@ -51,8 +52,11 @@ function RequireAuth() {
 function RequireAccess() {
   const user = useCurrentUser()
   const { pathname } = useLocation()
+  const masterBudgets = useStore((s) => s.masterBudgets)
   const d = deptForPath(pathname)
-  if (user && d && !canEnter(user, d.id)) return <NoAccess />
+  // Budget holders may open the master budget to fill their own lines even without Financial workspace access
+  const holder = !!user && masterBudgets.some((m) => m.lines.some((l) => l.budgetHolderId === user.id))
+  if (user && d && !canEnter(user, d.id) && !(holder && pathname.startsWith('/finance/master-budget'))) return <NoAccess />
   return <Outlet />
 }
 
@@ -73,6 +77,7 @@ export default function App() {
           <Route path="grants/:id" element={<ProjectPage />} />
           <Route path="tasks" element={<Tasks />} />
           <Route path="finance" element={<FinanceHome />} />
+          <Route path="finance/master-budget" element={<MasterBudgetPage />} />
           <Route path="partnerships" element={<PartnershipsHome />} />
           <Route path="hr" element={<HrHome />} />
           <Route path="media" element={<MediaHome />} />

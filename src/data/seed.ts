@@ -1,4 +1,4 @@
-import type { ApprovalRule, Contract, OrgSettings, PurchaseOrder, PurchaseRequisition, User, Vendor, ContractClause, GoodsReceipt, Invoice, ProcurementTier, ProjectBudget, Donor, Project, Task } from '@/types'
+import type { ApprovalRule, Contract, OrgSettings, PurchaseOrder, PurchaseRequisition, User, Vendor, ContractClause, GoodsReceipt, Invoice, ProcurementTier, ProjectBudget, Donor, Project, Task, MasterBudget } from '@/types'
 import { generateReportingCalendar, generateSpendingPlan, monthsOf } from '@/lib/grants'
 import { emptySourcing } from '@/lib/tiers'
 import { addDays, toInputDate } from '@/lib/format'
@@ -21,6 +21,7 @@ export const SEED_SETTINGS: OrgSettings = {
   legalReviewThresholdUSD: 10000,
   soleSourceEdThresholdUSD: 2500,
   dualAuthThresholdUSD: 10000,
+  countries: ['Amman (Regional Office)', 'Gaza', 'West Bank', 'Lebanon', 'Syria', 'Sudan', 'Egypt'],
   templates: {
     budget: { id: 'tpl_budget', name: 'RHS_Project_Budget_Template.xlsx', size: 39782, type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', uploadedBy: 'Bilal Abbassi', uploadedAt: '2026-10-04T09:00:00Z', dataUrl: '/templates/RHS_Project_Budget_Template.xlsx' },
     bva: { id: 'tpl_bva', name: 'Annex1_Project_Budget_BvA_Template.xlsx', size: 61299, type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', uploadedBy: 'Bilal Abbassi', uploadedAt: '2026-10-04T09:00:00Z', dataUrl: '/templates/RHS_BvA_Template_Annex1.xlsx' },
@@ -264,8 +265,8 @@ export const SEED_BUDGETS: ProjectBudget[] = [
       { id: 'bl_h3', code: 'D-10', description: 'Prosthetic components & fabrication materials (86 devices)', category: 'B. Prosthetic Fitting (Direct Cost)', amount: 215000, costType: 'direct', activityCode: 'P02', accountNo: '2611', location: 'Cairo', unit: 'Lump', units: 1, frequency: 1, unitCost: 215000, pct: 1 },
       { id: 'bl_h4', code: 'D-11', description: 'Physiotherapy & MHPSS sessions', category: 'B. Prosthetic Fitting (Direct Cost)', amount: 52560, costType: 'direct', activityCode: 'R02', accountNo: '2614', location: 'Cairo', unit: 'Session', units: 1460, frequency: 1, unitCost: 36, pct: 1 },
       { id: 'bl_h5', code: 'D-12', description: 'Patient transport & accommodation', category: 'B. Prosthetic Fitting (Direct Cost)', amount: 32850, costType: 'direct', activityCode: 'S02', accountNo: '2606', location: 'Cairo', unit: 'Person', units: 73, frequency: 1, unitCost: 450, pct: 1 },
-      { id: 'bl_h6', code: 'A-01', description: 'Amman support personnel (allocated)', category: 'A. Amman Support Personnel (Indirect / Admin)', amount: 21600, costType: 'admin', activityCode: 'PM01', accountNo: '2603', location: 'Amman', unit: 'Person', units: 1, frequency: 9, unitCost: 12000, pct: 0.2 },
-      { id: 'bl_h7', code: 'B-01', description: 'Office, IT & communications share', category: 'B. Office, IT & Operational Costs (Indirect / Admin)', amount: 14390, costType: 'admin', activityCode: 'S01', accountNo: '2619', location: 'Amman', unit: 'Months', units: 9, frequency: 1, unitCost: 3997, pct: 0.4 },
+      { id: 'bl_h6', masterLineId: 'ml_02', code: 'A-01', description: 'Amman support personnel (allocated)', category: 'A. Amman Support Personnel (Indirect / Admin)', amount: 21600, costType: 'admin', activityCode: 'PM01', accountNo: '2603', location: 'Amman', unit: 'Person', units: 1, frequency: 9, unitCost: 12000, pct: 0.2 },
+      { id: 'bl_h7', masterLineId: 'ml_11', code: 'B-01', description: 'Office, IT & communications share', category: 'B. Office, IT & Operational Costs (Indirect / Admin)', amount: 14390, costType: 'admin', activityCode: 'S01', accountNo: '2619', location: 'Amman', unit: 'Months', units: 9, frequency: 1, unitCost: 3997, pct: 0.4 },
     ], uploadedBy: 'u_bilal', uploadedByName: 'Bilal Abbassi', uploadedAt: '2026-08-10T09:00:00Z', ownerName: DOC_OWNER, notes: 'Proposal budget — submitted 7 Oct 2026' },
   { id: 'bud_edc', donorCode: 'RH-2026-0009', name: 'Inclusive Early Development Centre — Gaza', donor: 'HDF — Humanitarian Development Foundation', currency: 'USD', startDate: '2026-04-01', endDate: '2027-03-31', duration: '12 Months', status: 'draft',
     lines: [{ id: 'bl_e1', code: 'Prog_1', description: 'Site preparation and centre construction', category: 'A. Centre establishment (Direct Cost)', amount: 180000, costType: 'direct', location: 'Gaza', unit: 'Lump', units: 1, frequency: 1, unitCost: 180000, pct: 1 }, { id: 'bl_e2', code: 'Prog_5', description: 'Integrated service delivery (rehab, education, MHPSS, nutrition)', category: 'B. Services (Direct Cost)', amount: 264000, costType: 'direct', location: 'Gaza', unit: 'Month', units: 12, frequency: 1, unitCost: 22000, pct: 1 }], uploadedBy: 'u_bilal', uploadedByName: 'Bilal Abbassi', uploadedAt: '2026-09-18T09:00:00Z', ownerName: DOC_OWNER, notes: 'Under development' },
@@ -277,7 +278,7 @@ export const SEED_BUDGETS: ProjectBudget[] = [
       { id: 'bl_c1', code: 'BL-01', description: 'Program Delivery', category: 'Programs', amount: 120000 },
       { id: 'bl_c2', code: 'BL-02', description: 'Medical Supplies', category: 'Programs', amount: 85000 },
       { id: 'bl_c3', code: 'BL-03', description: 'Capital Equipment', category: 'Capital', amount: 40000 },
-      { id: 'bl_c4', code: 'BL-04', description: 'Admin & Overheads', category: 'Support', amount: 32000 },
+      { id: 'bl_c4', code: 'BL-04', description: 'Admin & Overheads', category: 'Support', amount: 32000, masterLineId: 'ml_12' },
       { id: 'bl_c5', code: 'BL-05', description: 'Logistics', category: 'Support', amount: 18000 },
       { id: 'bl_c6', code: 'BL-06', description: 'Technology', category: 'Support', amount: 15000 },
     ],
@@ -289,8 +290,8 @@ export const SEED_BUDGETS: ProjectBudget[] = [
       { id: 'bl_i1', code: 'BL-08', description: 'Capital Works — workshop extension', category: 'Capital', amount: 70000 },
       { id: 'bl_i2', code: 'BL-02', description: 'Medical Supplies — prosthetic components', category: 'Programs', amount: 45000 },
       { id: 'bl_i3', code: 'BL-09', description: 'Outreach & transport', category: 'Programs', amount: 12000 },
-      { id: 'bl_i4', code: 'BL-10', description: 'Project staff', category: 'HR', amount: 38000 },
-      { id: 'bl_i5', code: 'BL-11', description: 'Indirect costs (7%)', category: 'Support', amount: 11550 },
+      { id: 'bl_i4', code: 'BL-10', description: 'Project staff', category: 'HR', amount: 38000, masterLineId: 'ml_09' },
+      { id: 'bl_i5', code: 'BL-11', description: 'Indirect costs (7%)', category: 'Support', amount: 11550, masterLineId: 'ml_11' },
     ],
     uploadedBy: 'u_shatha', uploadedByName: 'Shatha Homsi', uploadedAt: '2025-09-22T09:00:00Z', ownerName: DOC_OWNER, notes: 'Approved donor budget, annex B of the grant agreement.',
   },
@@ -310,7 +311,7 @@ const wp = (section: string, title: string, budgetLine: string, status: 'planned
 
 export const SEED_PROJECTS: Project[] = [
   {
-    id: 'prj_irb', code: 'GR-2025-IRB-03', title: 'Irbid Access — prosthetics workshop & outreach', summary: 'Extend the Irbid rehabilitation centre workshop and run outreach fitting camps for amputees in the northern governorates.', donorId: 'don_irb', donorName: 'Irbid Access Grant (bilateral donor)', stage: 'active', outcome: 'funded', currency: 'JOD', startDate: '2025-10-01', endDate: '2026-12-31', duration: '15 Months', locations: 'Irbid, Mafraq', sectors: ['Prosthetics & Orthotics', 'Physical rehabilitation'], managerId: 'u_bilal', managerName: 'Bilal Abbassi', teamIds: ['u_hani', 'u_lina', 'u_rana'], requestedAmount: 176550, awardedAmount: 176550, budgetId: 'bud_irb',
+    id: 'prj_irb', code: 'GR-2025-IRB-03', title: 'Irbid Access — prosthetics workshop & outreach', summary: 'Extend the Irbid rehabilitation centre workshop and run outreach fitting camps for amputees in the northern governorates.', donorId: 'don_irb', donorName: 'Irbid Access Grant (bilateral donor)', stage: 'active', outcome: 'funded', currency: 'JOD', startDate: '2025-10-01', endDate: '2026-12-31', duration: '15 Months', locations: 'Irbid, Mafraq', countries: ['Amman (Regional Office)'], sectors: ['Prosthetics & Orthotics', 'Physical rehabilitation'], managerId: 'u_bilal', managerName: 'Bilal Abbassi', teamIds: ['u_hani', 'u_lina', 'u_rana'], requestedAmount: 176550, awardedAmount: 176550, budgetId: 'bud_irb',
     proposal: { sections: [{ id: 'ps1', title: 'Background & problem statement', content: 'Northern governorates host a growing number of amputees with no local P&O service; travel to Amman is a barrier for most households.' }, { id: 'ps2', title: 'Objectives & expected results', content: 'Establish a functioning P&O workshop in Irbid and fit 180 beneficiaries over 15 months.' }], attachments: [], submittedTo: 'Irbid Access Grant', reference: 'GR-2025-IRB-03', version: '2025_V1.0' },
     logframe: [
       lf('goal', 'Goal', 'People with limb loss in northern Jordan regain mobility and participate fully in community life.', []),
@@ -335,7 +336,7 @@ export const SEED_PROJECTS: Project[] = [
     submittedAt: '2025-08-20T09:00:00Z', grantedAt: '2025-09-20T09:00:00Z', activatedAt: '2025-10-01T09:00:00Z', createdBy: 'u_bilal', createdByName: 'Bilal Abbassi', createdAt: '2025-07-15T09:00:00Z', updatedAt: ago(3), ownerName: DOC_OWNER,
   },
   {
-    id: 'prj_heal', code: 'RH-2026-0032', title: 'Prosthetic and Integrated Rehabilitation Support for Gazan Beneficiaries in Egypt', summary: '86 prosthetic devices fitted for 73 patients evacuated to Egypt, with physiotherapy and MHPSS.', donorId: 'don_heal', donorName: 'HEAL Palestine', stage: 'submitted', currency: 'USD', startDate: '2026-11-01', endDate: '2027-07-31', duration: '9 Months', locations: 'Cairo (Egypt)', sectors: ['Prosthetics & Orthotics', 'Physical rehabilitation', 'MHPSS'], managerId: 'u_bilal', managerName: 'Bilal Abbassi', teamIds: ['u_omar', 'u_lina'], requestedAmount: 412000, budgetId: 'bud_heal',
+    id: 'prj_heal', code: 'RH-2026-0032', title: 'Prosthetic and Integrated Rehabilitation Support for Gazan Beneficiaries in Egypt', summary: '86 prosthetic devices fitted for 73 patients evacuated to Egypt, with physiotherapy and MHPSS.', donorId: 'don_heal', donorName: 'HEAL Palestine', stage: 'submitted', currency: 'USD', startDate: '2026-11-01', endDate: '2027-07-31', duration: '9 Months', locations: 'Cairo (Egypt)', countries: ['Egypt', 'Amman (Regional Office)'], sectors: ['Prosthetics & Orthotics', 'Physical rehabilitation', 'MHPSS'], managerId: 'u_bilal', managerName: 'Bilal Abbassi', teamIds: ['u_omar', 'u_lina'], requestedAmount: 412000, budgetId: 'bud_heal',
     proposal: { sections: [{ id: 'ps1', title: 'Background & problem statement', content: 'Gazan amputees evacuated to Egypt lack access to prosthetic fitting and rehabilitation.' }], attachments: [], submittedTo: 'HEAL Palestine', reference: 'RH-2026-0032', version: '2026_V0.1', submissionDeadline: '2026-10-07' },
     logframe: [
       lf('outcome', 'Outcome 1', 'Gazan persons with limb loss in Egypt regain functional mobility.', [{ code: '1.1', type: 'outcome', text: '% of prosthetic recipients reporting improved functional independence', target: 85, unit: '%', mov: '3-month follow-up satisfaction surveys; functional assessments' }], 'Prosthetic components can be procured and clear customs into Egypt.'),
@@ -349,13 +350,13 @@ export const SEED_PROJECTS: Project[] = [
     submittedAt: '2026-10-07T09:00:00Z', createdBy: 'u_bilal', createdByName: 'Bilal Abbassi', createdAt: '2026-08-10T09:00:00Z', updatedAt: ago(1), ownerName: DOC_OWNER,
   },
   {
-    id: 'prj_edc', code: 'RH-2026-0009', title: 'Inclusive Early Development Centre — Gaza', summary: 'An integrated early-development centre for 100 children with disabilities in Gaza: rehabilitation, adaptive education, MHPSS and caregiver support.', donorId: 'don_hdf', donorName: 'HDF — Humanitarian Development Foundation', stage: 'development', currency: 'USD', startDate: '2026-04-01', endDate: '2027-03-31', duration: '12 Months', locations: 'Gaza', sectors: ['Inclusive education', 'Physical rehabilitation', 'MHPSS', 'Nutrition'], managerId: 'u_bilal', managerName: 'Bilal Abbassi', teamIds: ['u_omar', 'u_nour'], budgetId: 'bud_edc',
+    id: 'prj_edc', code: 'RH-2026-0009', title: 'Inclusive Early Development Centre — Gaza', summary: 'An integrated early-development centre for 100 children with disabilities in Gaza: rehabilitation, adaptive education, MHPSS and caregiver support.', donorId: 'don_hdf', donorName: 'HDF — Humanitarian Development Foundation', stage: 'development', currency: 'USD', startDate: '2026-04-01', endDate: '2027-03-31', duration: '12 Months', locations: 'Gaza', countries: ['Gaza', 'Amman (Regional Office)'], sectors: ['Inclusive education', 'Physical rehabilitation', 'MHPSS', 'Nutrition'], managerId: 'u_bilal', managerName: 'Bilal Abbassi', teamIds: ['u_omar', 'u_nour'], budgetId: 'bud_edc',
     proposal: { sections: [], attachments: [], submissionDeadline: '2026-11-15' }, logframe: [lf('outcome', 'Outcome 1', 'Children with disabilities in Gaza access integrated early-development services.', [{ code: '1.1', type: 'outcome', text: '# of children enrolled and receiving individualized services', target: 100, mov: 'Enrolment register' }])],
     workplan: [wp('SECTION 1: PREPARATORY PHASE', 'Site preparation and centre construction', 'Prog_1', 'planned', monthsOf('2026-04-01', '2026-06-30')), wp('SECTION 1: PREPARATORY PHASE', 'Staff recruitment (28 positions)', 'HR', 'planned', monthsOf('2026-04-01', '2026-05-31')), wp('SECTION 4: INTEGRATED SERVICE DELIVERY', 'Physical rehabilitation services', 'Prog_5', 'planned', monthsOf('2026-07-01', '2027-03-31'))],
     spendingPlan: [], iptt: [], reports: [], comments: [], stageHistory: [{ stage: 'development', at: ago(20), byName: 'Bilal Abbassi' }], createdBy: 'u_bilal', createdByName: 'Bilal Abbassi', createdAt: ago(20), updatedAt: ago(2), ownerName: DOC_OWNER,
   },
   {
-    id: 'prj_qc', code: 'RH-2025-0006', title: 'Prosthetics & assistive devices for Gaza amputees', summary: 'Prosthetic components, physiotherapy and MHPSS sessions for 640 beneficiaries; assistive devices distribution.', donorId: 'don_qc', donorName: 'Qatar Charity', stage: 'closed', outcome: 'funded', currency: 'USD', startDate: '2025-01-01', endDate: '2025-12-31', duration: '12 Months', locations: 'Gaza, Amman', sectors: ['Prosthetics & Orthotics', 'MHPSS'], managerId: 'u_bilal', managerName: 'Bilal Abbassi', teamIds: ['u_omar'], requestedAmount: 921200, awardedAmount: 921200, budgetId: 'bud_qc',
+    id: 'prj_qc', code: 'RH-2025-0006', title: 'Prosthetics & assistive devices for Gaza amputees', summary: 'Prosthetic components, physiotherapy and MHPSS sessions for 640 beneficiaries; assistive devices distribution.', donorId: 'don_qc', donorName: 'Qatar Charity', stage: 'closed', outcome: 'funded', currency: 'USD', startDate: '2025-01-01', endDate: '2025-12-31', duration: '12 Months', locations: 'Gaza, Amman', countries: ['Gaza', 'Amman (Regional Office)'], sectors: ['Prosthetics & Orthotics', 'MHPSS'], managerId: 'u_bilal', managerName: 'Bilal Abbassi', teamIds: ['u_omar'], requestedAmount: 921200, awardedAmount: 921200, budgetId: 'bud_qc',
     proposal: { sections: [], attachments: [], submittedTo: 'Qatar Charity', reference: 'RH-2025-0006' }, logframe: [lf('outcome', 'Outcome 1', 'Beneficiaries regain mobility and psychosocial wellbeing.', [{ code: '1.1', type: 'outcome', text: '% of beneficiaries satisfied with the prosthetic service', target: 90, unit: '%' }, { code: '1.2', type: 'output', text: '# of prosthetic limbs provided', target: 640 }])],
     workplan: [], spendingPlan: [], iptt: [{ indicatorId: 'ind_12', period: '2025-06', male: 220, female: 140, other: 0 }, { indicatorId: 'ind_12', period: '2025-11', male: 170, female: 110, other: 0 }], reports: [], comments: [],
     stageHistory: [{ stage: 'development', at: '2024-10-01T09:00:00Z', byName: 'Bilal Abbassi' }, { stage: 'submitted', at: '2024-11-14T09:00:00Z', byName: 'Bilal Abbassi' }, { stage: 'granted', at: '2024-12-20T09:00:00Z', byName: 'Bilal Abbassi' }, { stage: 'active', at: '2025-01-05T09:00:00Z', byName: 'Bilal Abbassi' }, { stage: 'closed', at: '2026-02-15T09:00:00Z', byName: 'Bilal Abbassi', note: 'Final report accepted; 640 beneficiaries served.' }],
@@ -367,6 +368,31 @@ export const SEED_TASKS: Task[] = [
   { id: 'task_1', title: 'Update civil works progress on the Irbid work plan', description: 'Reflect the contractor\'s August–September progress and attach site photos.', projectId: 'prj_irb', projectCode: 'GR-2025-IRB-03', assigneeId: 'u_hani', assigneeName: 'Hani Odeh', createdBy: 'u_bilal', createdByName: 'Bilal Abbassi', dueDate: toInputDate(addDays(new Date(), 3)), priority: 'high', status: 'open', createdAt: ago(3), link: '/grants/prj_irb?tab=workplan' },
   { id: 'task_2', title: 'Enter September IPTT figures (fittings, physiotherapy)', projectId: 'prj_irb', projectCode: 'GR-2025-IRB-03', assigneeId: 'u_lina', assigneeName: 'Lina Haddad', createdBy: 'u_bilal', createdByName: 'Bilal Abbassi', dueDate: toInputDate(addDays(new Date(), 5)), priority: 'normal', status: 'in_progress', createdAt: ago(4), link: '/grants/prj_irb?tab=iptt' },
   { id: 'task_3', title: 'Draft budget narrative for the EDC proposal', projectId: 'prj_edc', projectCode: 'RH-2026-0009', assigneeId: 'u_bilal', assigneeName: 'Bilal Abbassi', createdBy: 'u_bilal', createdByName: 'Bilal Abbassi', dueDate: toInputDate(addDays(new Date(), 10)), priority: 'normal', status: 'open', createdAt: ago(2), link: '/grants/prj_edc?tab=budget' },
+]
+
+const ML = (n: number, accountNo: string, accountName: string, category: string, country: string, holder: [string, string] | null, amount: number, notes?: string) => ({ id: `ml_${String(n).padStart(2, '0')}`, code: `MB-2026-${String(n).padStart(3, '0')}`, accountNo, accountName, category, country, budgetHolderId: holder?.[0], budgetHolderName: holder?.[1], amount, notes, filledAt: '2025-12-10T09:00:00Z' })
+export const SEED_MASTER: MasterBudget[] = [
+  { id: 'mb_2026', year: 2026, currency: 'USD', status: 'approved', createdBy: 'u_shatha', createdByName: 'Shatha Homsi', createdAt: '2025-11-20T09:00:00Z', approvedBy: 'u_shatha', approvedByName: 'Shatha Homsi', approvedAt: '2025-12-18T09:00:00Z', ownerName: DOC_OWNER, notes: 'Annual running costs of the organisation — reference for all project budgets.',
+    lines: [
+      ML(1, '2603', 'Executive Director', 'Personnel — Amman support', 'Amman (Regional Office)', ['u_fawaz', 'Fawaz Al Shakaa'], 60000),
+      ML(2, '2603', 'Program Director', 'Personnel — Amman support', 'Amman (Regional Office)', ['u_bilal', 'Bilal Abbassi'], 48000),
+      ML(3, '2603', 'Finance & Support Function Director', 'Personnel — Amman support', 'Amman (Regional Office)', ['u_shatha', 'Shatha Homsi'], 48000),
+      ML(4, '2603', 'Grants & Compliance Officer', 'Personnel — Amman support', 'Amman (Regional Office)', ['u_bilal', 'Bilal Abbassi'], 24000),
+      ML(5, '2603', 'Supply Chain / Logistics Officer', 'Personnel — Amman support', 'Amman (Regional Office)', ['u_maha', 'Maha Al-Rawi'], 20400),
+      ML(6, '2603', 'HR & Admin Officer', 'Personnel — Amman support', 'Amman (Regional Office)', ['u_shatha', 'Shatha Homsi'], 18000),
+      ML(7, '2603', 'Communications Team Leader + content', 'Personnel — Amman support', 'Amman (Regional Office)', ['u_bilal', 'Bilal Abbassi'], 30000),
+      ML(8, '2603', 'M&E / Reporting Officer (HQ oversight)', 'Personnel — Amman support', 'Amman (Regional Office)', ['u_bilal', 'Bilal Abbassi'], 21600),
+      ML(9, '2601', 'Field programme staff — Gaza', 'Personnel — field', 'Gaza', ['u_omar', 'Omar Khalil'], 96000, 'Rehabilitation, MHPSS and P&O field teams'),
+      ML(10, '2604', 'Support field staff — Gaza (guards, cleaners, logistics)', 'Personnel — field', 'Gaza', ['u_hani', 'Hani Odeh'], 28800),
+      ML(11, '2619', 'Office running costs — Amman (rent, utilities, IT, comms)', 'Office, IT & operations', 'Amman (Regional Office)', ['u_shatha', 'Shatha Homsi'], 54000),
+      ML(12, '2624', 'Insurance, social security & statutory (Amman)', 'Office, IT & operations', 'Amman (Regional Office)', ['u_shatha', 'Shatha Homsi'], 42000),
+      ML(13, '2619', 'Centre rent — Gaza', 'Office, IT & operations', 'Gaza', ['u_hani', 'Hani Odeh'], 36000),
+      ML(14, '2622', 'Audit, legal & compliance fees', 'Statutory, compliance & risk', 'Amman (Regional Office)', ['u_shatha', 'Shatha Homsi'], 18000),
+      ML(15, '2623', 'Bank charges & transfers', 'Statutory, compliance & risk', 'Amman (Regional Office)', ['u_shatha', 'Shatha Homsi'], 11000),
+      ML(16, '2615', 'Staff training & professional development', 'Programme support', 'Amman (Regional Office)', ['u_bilal', 'Bilal Abbassi'], 7500),
+      ML(17, '2607', 'Vehicles, fuel & transport — regional office', 'Office, IT & operations', 'Amman (Regional Office)', ['u_hani', 'Hani Odeh'], 15000),
+      ML(18, '2628', 'Contingency & reserve', 'Other', 'Amman (Regional Office)', ['u_shatha', 'Shatha Homsi'], 20000),
+    ] },
 ]
 
 export const SEED_GRNS: GoodsReceipt[] = [

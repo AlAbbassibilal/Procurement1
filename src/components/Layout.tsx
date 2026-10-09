@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { NavLink, Outlet, useNavigate, Link, useLocation } from 'react-router-dom'
 import {
   LayoutGrid, FileText, CheckSquare, Search, ShoppingCart, FileSignature, Building2, Users, SlidersHorizontal,
-  History, Bell, LogOut, ChevronDown, Menu, Settings, RotateCcw, ChevronsUpDown, PackageCheck, Receipt, Scale, Wallet, Gauge, Lock, PenLine, ListChecks, HandCoins, Building, FolderPlus, Table2,
+  History, Bell, LogOut, ChevronDown, Menu, Settings, RotateCcw, ChevronsUpDown, PackageCheck, Receipt, Scale, Wallet, Gauge, Lock, PenLine, ListChecks, HandCoins, Building, FolderPlus, Table2, Landmark, Globe2,
 } from 'lucide-react'
 import { DEPARTMENTS, deptForPath, canEnter, ACCESS_LABEL, accessOf } from '@/lib/departments'
 import { DEPT_ICON } from '@/pages/Home'
@@ -21,7 +21,7 @@ export default function Layout() {
   const nav = useNavigate()
   const { pathname } = useLocation()
   const dept = deptForPath(pathname)
-  const { logout, prs, pos, contracts, invoices, envelopes, tasks, runReminders, notifications, markRead, markAllRead, users, switchUser, settings, resetDemo } = useStore()
+  const { logout, prs, pos, contracts, invoices, envelopes, tasks, runReminders, country, setCountry, masterBudgets, notifications, markRead, markAllRead, users, switchUser, settings, resetDemo } = useStore()
   const [open, setOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   const [userOpen, setUserOpen] = useState(false)
@@ -41,7 +41,7 @@ export default function Layout() {
     '/requisitions': <FileText size={17} />, '/sourcing': <Search size={17} />, '/orders': <ShoppingCart size={17} />, '/contracts': <FileSignature size={17} />,
     '/receiving': <PackageCheck size={17} />, '/vendors': <Building2 size={17} />, '/admin/thresholds': <Scale size={17} />, '/invoices': <Receipt size={17} />,
     '/budgets': <Wallet size={17} />, '/admin/approval-matrix': <SlidersHorizontal size={17} />,
-    '/grants/tracker': <Table2 size={17} />, '/grants/new': <FolderPlus size={17} />, '/grants/donors': <Building size={17} />, '/grants': <HandCoins size={17} />,
+    '/finance/master-budget': <Landmark size={17} />, '/grants/tracker': <Table2 size={17} />, '/grants/new': <FolderPlus size={17} />, '/grants/donors': <Building size={17} />, '/grants': <HandCoins size={17} />,
   }
   const BADGES: Record<string, number> = {
     '/sourcing': sourcingCount, '/receiving': pos.filter((p) => ['issued', 'contracted', 'partially_received'].includes(p.status)).length, '/invoices': invoices.filter((i) => i.status === 'exception').length,
@@ -55,6 +55,7 @@ export default function Layout() {
       { to: '/approvals', label: 'My approvals', icon: <CheckSquare size={17} />, badge: myApprovals },
       { to: '/esign', label: 'E-Signature', icon: <PenLine size={17} />, badge: envelopes.filter((e) => e.status === 'sent' && recipientTurn(e).some((r) => r.userId === user.id)).length },
       { to: '/tasks', label: 'My tasks', icon: <ListChecks size={17} />, badge: tasks.filter((t) => t.assigneeId === user.id && t.status !== 'done').length },
+      ...(masterBudgets.some((m) => m.lines.some((l) => l.budgetHolderId === user.id)) && !canEnter(user, 'finance') ? [{ to: '/finance/master-budget', label: 'My budget lines', icon: <Landmark size={17} /> }] : []),
     ] },
     ...(dept ? [{ title: dept.name, items: deptItems }] : []),
     { title: 'Administration', items: [
@@ -140,6 +141,15 @@ export default function Layout() {
             <SunMark size={16} /> <span className="font-medium text-ink-700">PCM & Grants Management Platform</span>{dept && <span className="text-ink-400">/ {dept.name}</span>}
           </div>
           <div className="flex-1" />
+
+          {/* Country context */}
+          <label className="hidden items-center gap-1.5 rounded-control border border-line bg-surface-muted px-2 py-1 text-[12.5px] text-ink-700 md:flex" title="Country context — filters master budget, projects and tracker">
+            <Globe2 size={14} className="text-ink-500" />
+            <select className="bg-transparent text-[12.5px] font-medium outline-none" value={country} onChange={(e) => setCountry(e.target.value)}>
+              <option value="all">All countries</option>
+              {settings.countries.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </label>
 
           {/* Notifications */}
           <div className="relative">

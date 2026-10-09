@@ -14,6 +14,9 @@ import ProjectNew from '@/pages/grants/New'
 import ProjectPage from '@/pages/grants/Project'
 import Tasks from '@/pages/Tasks'
 import MasterBudgetPage from '@/pages/finance/MasterBudget'
+import PartnerList from '@/pages/partnerships/List'
+import PartnerPage from '@/pages/partnerships/Partner'
+import VettingPublic from '@/pages/partnerships/VettingPublic'
 import { useStore } from '@/store/useStore'
 import Layout from '@/components/Layout'
 import { useUiTheme } from '@/lib/ui-theme'
@@ -67,6 +70,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={authed ? <Navigate to="/" replace /> : <Login />} />
+      {/* Partner-facing vetting form — the only page reachable without signing in */}
+      <Route path="/partner-vetting/:token" element={<VettingPublic />} />
       <Route element={<RequireAuth />}>
         <Route element={<Layout />}>
          <Route element={<RequireAccess />}>
@@ -81,6 +86,9 @@ export default function App() {
           <Route path="finance" element={<FinanceHome />} />
           <Route path="finance/master-budget" element={<MasterBudgetPage />} />
           <Route path="partnerships" element={<PartnershipsHome />} />
+          <Route path="partnerships/partners" element={<PartnerList />} />
+          <Route path="partnerships/due-diligence" element={<PartnerList />} />
+          <Route path="partnerships/:id" element={<PartnerPage />} />
           <Route path="hr" element={<HrHome />} />
           <Route path="media" element={<MediaHome />} />
           <Route path="approvals" element={<Approvals />} />

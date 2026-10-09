@@ -28,7 +28,7 @@ export const DEPARTMENTS: DepartmentDef[] = [
     id: 'partnerships', name: 'Partnerships', short: 'Partners, MoUs & due diligence', home: '/partnerships', paths: ['/partnerships'],
     description: 'Implementing partners, government counterparts and institutional relationships: partner register, agreements and MoUs, due-diligence and partner reporting.',
     tone: { tile: 'bg-info-500 text-white', text: 'text-info-700', ring: 'ring-info-500/30' },
-    modules: [{ to: '/partnerships', label: 'Overview' }, { to: '/partnerships/register', label: 'Partner register', soon: true }, { to: '/partnerships/agreements', label: 'Agreements & MoUs', soon: true }, { to: '/partnerships/due-diligence', label: 'Due diligence', soon: true }],
+    modules: [{ to: '/partnerships', label: 'Overview' }, { to: '/partnerships/partners', label: 'Partner register' }, { to: '/partnerships/due-diligence', label: 'Due diligence tracker' }, { to: '/partnerships/agreements', label: 'Agreements & MoUs', soon: true }, { to: '/partnerships/reporting', label: 'Partner reporting', soon: true }],
   },
   {
     id: 'procurement', name: 'Procurement', short: 'Requisition to contract', home: '/procurement', paths: ['/procurement', '/requisitions', '/sourcing', '/orders', '/contracts', '/receiving', '/vendors', '/admin/thresholds'],

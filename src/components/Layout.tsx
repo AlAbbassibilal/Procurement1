@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { NavLink, Outlet, useNavigate, Link, useLocation } from 'react-router-dom'
 import {
   LayoutGrid, FileText, CheckSquare, Search, ShoppingCart, FileSignature, Building2, Users, SlidersHorizontal,
-  History, Bell, LogOut, ChevronDown, Menu, Settings, RotateCcw, ChevronsUpDown, PackageCheck, Receipt, Scale, Wallet, Gauge, Lock, PenLine, ListChecks, HandCoins, Building, FolderPlus, Table2, Landmark, Globe2, PanelLeftClose, PanelLeftOpen, Sparkles, Monitor,
+  History, Bell, LogOut, ChevronDown, Menu, Settings, RotateCcw, ChevronsUpDown, PackageCheck, Receipt, Scale, Wallet, Gauge, Lock, PenLine, ListChecks, HandCoins, Building, FolderPlus, Table2, Landmark, Globe2, PanelLeftClose, PanelLeftOpen, Sparkles, Monitor, Handshake, ShieldCheck,
 } from 'lucide-react'
 import { DEPARTMENTS, deptForPath, canEnter, ACCESS_LABEL, accessOf } from '@/lib/departments'
 import { DEPT_ICON } from '@/pages/Home'
@@ -44,7 +44,7 @@ export default function Layout() {
     '/requisitions': <FileText size={17} />, '/sourcing': <Search size={17} />, '/orders': <ShoppingCart size={17} />, '/contracts': <FileSignature size={17} />,
     '/receiving': <PackageCheck size={17} />, '/vendors': <Building2 size={17} />, '/admin/thresholds': <Scale size={17} />, '/invoices': <Receipt size={17} />,
     '/budgets': <Wallet size={17} />, '/admin/approval-matrix': <SlidersHorizontal size={17} />,
-    '/finance/master-budget': <Landmark size={17} />, '/grants/tracker': <Table2 size={17} />, '/grants/new': <FolderPlus size={17} />, '/grants/donors': <Building size={17} />, '/grants': <HandCoins size={17} />,
+    '/finance/master-budget': <Landmark size={17} />, '/partnerships/partners': <Handshake size={17} />, '/partnerships/due-diligence': <ShieldCheck size={17} />, '/grants/tracker': <Table2 size={17} />, '/grants/new': <FolderPlus size={17} />, '/grants/donors': <Building size={17} />, '/grants': <HandCoins size={17} />,
   }
   const BADGES: Record<string, number> = {
     '/sourcing': sourcingCount, '/receiving': pos.filter((p) => ['issued', 'contracted', 'partially_received'].includes(p.status)).length, '/invoices': invoices.filter((i) => i.status === 'exception').length,

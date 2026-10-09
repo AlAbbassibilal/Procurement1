@@ -1,6 +1,7 @@
-import type { ApprovalRule, Contract, OrgSettings, PurchaseOrder, PurchaseRequisition, User, Vendor, ContractClause, GoodsReceipt, Invoice, ProcurementTier, ProjectBudget, Donor, Project, Task, MasterBudget } from '@/types'
+import type { ApprovalRule, Contract, OrgSettings, PurchaseOrder, PurchaseRequisition, User, Vendor, ContractClause, GoodsReceipt, Invoice, ProcurementTier, ProjectBudget, Donor, Project, Task, MasterBudget, Partner } from '@/types'
 import { generateReportingCalendar, generateSpendingPlan, monthsOf } from '@/lib/grants'
 import { emptySourcing } from '@/lib/tiers'
+import { emptyDueDiligence } from '@/lib/partners'
 import { addDays, toInputDate } from '@/lib/format'
 
 export const DOC_OWNER = 'Bilal Abbassi'
@@ -311,7 +312,7 @@ const wp = (section: string, title: string, budgetLine: string, status: 'planned
 
 export const SEED_PROJECTS: Project[] = [
   {
-    id: 'prj_irb', code: 'GR-2025-IRB-03', title: 'Irbid Access — prosthetics workshop & outreach', summary: 'Extend the Irbid rehabilitation centre workshop and run outreach fitting camps for amputees in the northern governorates.', donorId: 'don_irb', donorName: 'Irbid Access Grant (bilateral donor)', stage: 'active', outcome: 'funded', currency: 'JOD', startDate: '2025-10-01', endDate: '2026-12-31', duration: '15 Months', locations: 'Irbid, Mafraq', countries: ['Amman (Regional Office)'], sectors: ['Prosthetics & Orthotics', 'Physical rehabilitation'], managerId: 'u_bilal', managerName: 'Bilal Abbassi', teamIds: ['u_hani', 'u_lina', 'u_rana'], requestedAmount: 176550, awardedAmount: 176550, budgetId: 'bud_irb',
+    id: 'prj_irb', code: 'GR-2025-IRB-03', title: 'Irbid Access — prosthetics workshop & outreach', summary: 'Extend the Irbid rehabilitation centre workshop and run outreach fitting camps for amputees in the northern governorates.', donorId: 'don_irb', donorName: 'Irbid Access Grant (bilateral donor)', stage: 'active', outcome: 'funded', currency: 'JOD', startDate: '2025-10-01', endDate: '2026-12-31', duration: '15 Months', locations: 'Irbid, Mafraq', countries: ['Amman (Regional Office)'], sectors: ['Prosthetics & Orthotics', 'Physical rehabilitation'], managerId: 'u_bilal', managerName: 'Bilal Abbassi', teamIds: ['u_hani', 'u_lina', 'u_rana'], partnerIds: ['ptn_nrn'], requestedAmount: 176550, awardedAmount: 176550, budgetId: 'bud_irb',
     proposal: { sections: [{ id: 'ps1', title: 'Background & problem statement', content: 'Northern governorates host a growing number of amputees with no local P&O service; travel to Amman is a barrier for most households.' }, { id: 'ps2', title: 'Objectives & expected results', content: 'Establish a functioning P&O workshop in Irbid and fit 180 beneficiaries over 15 months.' }], attachments: [], submittedTo: 'Irbid Access Grant', reference: 'GR-2025-IRB-03', version: '2025_V1.0' },
     logframe: [
       lf('goal', 'Goal', 'People with limb loss in northern Jordan regain mobility and participate fully in community life.', []),
@@ -371,6 +372,70 @@ export const SEED_TASKS: Task[] = [
 ]
 
 const ML = (n: number, accountNo: string, accountName: string, category: string, country: string, holder: [string, string] | null, amount: number, notes?: string) => ({ id: `ml_${String(n).padStart(2, '0')}`, code: `MB-2026-${String(n).padStart(3, '0')}`, accountNo, accountName, category, country, budgetHolderId: holder?.[0], budgetHolderName: holder?.[1], amount, notes, filledAt: '2025-12-10T09:00:00Z' })
+// ---------------------------------------------------------------------------
+// Partners — register + pre-contract due diligence (from the RHS workbook)
+// ---------------------------------------------------------------------------
+const sdiDD = emptyDueDiligence()
+sdiDD.scoping = { ...sdiDD.scoping, newOrExisting: 'new', anticipatedSectors: 'Health', rhsFocalPoints: "Refa'a Mahmoud · Dua'a Mohammad", anticipatedDonors: 'MOU', anticipatedValue: 'MOU',
+  checklist: { ...sdiDD.scoping.checklist, doc_1: 'yes', doc_2: 'yes', doc_3: 'yes', doc_4: 'yes', doc_5: 'yes', doc_6: 'yes', doc_7: 'yes', doc_8: 'yes', doc_9: 'yes', doc_10: 'yes', doc_11: 'yes', doc_12: 'no', doc_13: 'yes', doc_14: 'yes', doc_15: 'yes', doc_16: 'yes', doc_17: 'yes', doc_18: 'yes', doc_19: 'yes', doc_20: 'yes' } }
+sdiDD.vetting = { ...sdiDD.vetting, staffResponsible: "Mohammad Issa, Dua'a Mohammad", level: 'full',
+  keyPersonnel: [
+    { id: 'kp_1', name: 'Mohammed Saadi Sukkaria', title: 'Chairman', countryOfBirth: 'Syria', dob: '', gender: 'Male', verification: 'ATC', atcClear: 'pending', atcIssues: '' },
+    { id: 'kp_2', name: 'Hussam Zaghloul', title: 'Chairman Assistant', countryOfBirth: 'Syria', dob: '', gender: 'Male', verification: 'ATC', atcClear: 'pending', atcIssues: '' },
+    { id: 'kp_3', name: 'Salah Eddin Kouki', title: 'Board Secretary', countryOfBirth: 'Syria', dob: '', gender: 'Male', verification: 'ATC', atcClear: 'pending', atcIssues: '' },
+    { id: 'kp_4', name: 'Mohamad Yasin Alajloni', title: 'Treasurer', countryOfBirth: 'Syria', dob: '', gender: 'Male', verification: 'ATC', atcClear: 'pending', atcIssues: '' },
+    { id: 'kp_5', name: 'Ahmad Obid', title: 'Member', countryOfBirth: 'Syria', dob: '', gender: 'Male', verification: 'ATC', atcClear: 'pending', atcIssues: '' },
+    { id: 'kp_6', name: 'Ahmad Alajlouni', title: 'CEO', countryOfBirth: 'Syria', dob: '', gender: 'Male', verification: 'ATC', atcClear: 'pending', atcIssues: '' },
+    { id: 'kp_7', name: 'Moneer Marai', title: 'Finance Manager', countryOfBirth: 'Syria', dob: '', gender: 'Male', verification: 'ATC', atcClear: 'pending', atcIssues: '' },
+    { id: 'kp_8', name: 'Bilal Bani Almarjeh', title: 'Health & Nutrition Programs Coordinator', countryOfBirth: 'Syria', dob: '', gender: 'Male', verification: 'ATC', atcClear: 'pending', atcIssues: '' },
+    { id: 'kp_9', name: 'Mhd Wasim Ghazal', title: 'Partnerships Coordinator', countryOfBirth: 'Syria', dob: '', gender: 'Male', verification: 'ATC', atcClear: 'pending', atcIssues: '' },
+  ],
+  audit: { done: 'yes', checkedBy: 'Shatha Homsi', firm: '', date: '', issues: '' } }
+
+const nrnDD = emptyDueDiligence()
+nrnDD.scoping = { ...nrnDD.scoping, newOrExisting: 'existing', completionDate: '2025-08-20', partnerSectors: 'Physical rehabilitation, community outreach', anticipatedSectors: 'Prosthetics & Orthotics outreach', partnerReach: 'Irbid, Mafraq, Ajloun', anticipatedScope: 'Northern governorates', rhsFocalPoints: 'Bilal Abbassi · Hani Odeh', anticipatedDonors: 'Irbid Access Grant', anticipatedValue: 'JOD 45,000', checklist: Object.fromEntries(Object.keys(nrnDD.scoping.checklist).map((k) => [k, 'yes'])) }
+nrnDD.vetting = { ...nrnDD.vetting, staffResponsible: 'Dana Qasem, Legal Counsel', level: 'full', keyPersonnel: [{ id: 'kp_n1', name: 'Samar Khasawneh', title: 'Executive Director', countryOfBirth: 'Jordan', dob: '', gender: 'Female', verification: 'ATC', atcClear: 'clear', atcIssues: '' }, { id: 'kp_n2', name: 'Tareq Bataineh', title: 'Finance Officer', countryOfBirth: 'Jordan', dob: '', gender: 'Male', verification: 'ATC', atcClear: 'clear', atcIssues: '' }],
+  atc: { org: { done: 'yes', checkedBy: 'Dana Qasem', date: '2025-08-12', issues: 'None' }, staff: { done: 'yes', checkedBy: 'Dana Qasem', date: '2025-08-12', issues: 'None' } },
+  online: nrnDD.vetting.online.map((o) => ({ ...o, checkedBy: 'Dana Qasem', date: '2025-08-14', issues: 'None found' })),
+  audit: { done: 'yes', checkedBy: 'Shatha Homsi', firm: 'Al-Nimer & Co.', date: '2025-08-15', issues: 'Unqualified opinion 2023 and 2024' },
+  analysis: nrnDD.vetting.analysis.map((a) => ({ ...a, answer: a.key === 'vq_1' ? 'yes' : 'no', basis: a.key === 'vq_1' ? 'MoSD registration certificate no. 1180/2016' : 'Internet search, ATC and references — nothing found' })),
+  completedAt: '2025-08-18T10:00:00Z', completedBy: 'u_dana', completedByName: 'Dana Qasem' }
+nrnDD.pca = { visitDate: '2025-08-25', assessors: 'Bilal Abbassi, Shatha Homsi, Yousef Nasser', completedAt: '2025-08-28T12:00:00Z', answers: Object.fromEntries([
+  ['safe_1', 3], ['safe_2', 3], ['safe_3', 2], ['safe_4', 3], ['safe_5', 2], ['safe_6', 3], ['safe_7', 3], ['safe_8', 2], ['safe_9', 2], ['safe_10', 2], ['safe_11', 2], ['safe_12', 1], ['safe_13', 3], ['safe_14', 2], ['safe_15', 2], ['safe_16', 'na'], ['safe_17', 3], ['safe_18', 3], ['safe_19', 2], ['safe_20', 2], ['safe_21', 2], ['safe_22', 2],
+  ['quality_1', 2], ['quality_2', 3], ['quality_3', 2], ['quality_4', 2], ['quality_5', 3], ['quality_6', 3], ['quality_7', 2], ['quality_8', 3], ['quality_9', 3], ['quality_10', 2], ['quality_11', 2], ['quality_12', 2], ['quality_13', 3], ['quality_14', 2], ['quality_15', 2], ['quality_16', 2], ['quality_17', 2],
+  ['meal_1', 2], ['meal_2', 2], ['meal_3', 2], ['meal_4', 1], ['meal_5', 3], ['meal_6', 2], ['meal_7', 1], ['meal_8', 2],
+  ['grants_1', 2], ['grants_2', 3], ['grants_3', 3], ['grants_4', 2], ['grants_5', 2], ['grants_6', 2],
+  ['finance_1', 3], ['finance_2', 3], ['finance_3', 'na'], ['finance_4', 3], ['finance_5', 2], ['finance_6', 2], ['finance_7', 3], ['finance_8', 2], ['finance_9', 3], ['finance_10', 3], ['finance_11', 3], ['finance_12', 3], ['finance_13', 3], ['finance_14', 2], ['finance_15', 3], ['finance_16', 3], ['finance_17', 3],
+  ['hr_1', 3], ['hr_2', 2], ['hr_3', 2], ['hr_4', 3], ['hr_5', 3], ['hr_6', 2], ['hr_7', 2],
+  ['supply_1', 2], ['supply_2', 2], ['supply_3', 2], ['supply_4', 3], ['supply_5', 1], ['supply_6', 3], ['supply_7', 2], ['supply_8', 2], ['supply_9', 2], ['supply_10', 3], ['supply_11', 2], ['supply_12', 2], ['supply_13', 2], ['supply_14', 2], ['supply_15', 3], ['supply_16', 3], ['supply_17', 2], ['supply_18', 2], ['supply_19', 'na'], ['supply_20', 'na'], ['supply_21', 'na'], ['supply_22', 2], ['supply_23', 2], ['supply_24', 2], ['supply_25', 2], ['supply_26', 2], ['supply_27', 2], ['supply_28', 2], ['supply_29', 3],
+  ['subaward_1', 'na'], ['subaward_2', 'na'], ['subaward_3', 'na'], ['subaward_4', 'na'],
+].map(([k, v]) => [k, { score: v as 1 | 2 | 3 | 'na', notes: '', actions: '' }])) }
+nrnDD.risks = [
+  { id: 'rk_n1', group: 'vetting', description: 'MEAL quality checks are informal — risk of weak outreach data for donor reporting', likelihood: 3, impact: 3, mitigation: 'RHS MEAL officer joins monthly data review; joint Kobo forms; quality-check SOP by month 3', owner: 'Lina Haddad' },
+  { id: 'rk_n2', group: 'vetting', description: 'No procurement plan — risk of late camp supplies', likelihood: 2, impact: 3, mitigation: 'Camps supplied through RHS procurement under the Irbid grant', owner: 'Yousef Nasser' },
+  { id: 'rk_n3', group: 'contextual', description: 'Seasonal access to Mafraq villages during winter', likelihood: 3, impact: 2, mitigation: 'Camp calendar front-loaded to Oct–Nov and Mar–May', owner: 'Hani Odeh' },
+  { id: 'rk_n4', group: 'rhs', description: 'RHS technical supervision capacity for outreach camps while the workshop is under construction', likelihood: 2, impact: 2, mitigation: 'P&O technician rota agreed; second technician from Amman on call', owner: 'Bilal Abbassi' },
+]
+nrnDD.decision = { outcome: 'approved_conditions', conditions: 'Sub-award limited to outreach camps; MEAL SOP and procurement plan in place before the second tranche.', decidedBy: 'u_fawaz', decidedByName: 'Fawaz Mahmoud', decidedAt: '2025-09-02T09:30:00Z' }
+
+export const SEED_PARTNERS: Partner[] = [
+  {
+    id: 'ptn_sdi', code: 'PT-2026-0002', name: 'Sustainable Development and Innovation Organization', acronym: 'SDI', type: 'local_ngo', country: 'Syria',
+    address: 'Damascus city, Eastern Villas Neighborhood, Al Farabi Street, underground floor, real estate No. 2/4187. Cadastral area: Damascus, Mazzeh, Farabi', website: 'https://sdi.ngo/',
+    focalName: 'Ahmad Al Ajlouni', focalTitle: 'CEO', focalEmail: 'ceo@sdi.ngo', focalPhone: '+963 986 77 22 11', sectors: ['Health'],
+    stage: 'due_diligence', stageHistory: [{ stage: 'identified', at: ago(20), byName: 'Bilal Abbassi' }, { stage: 'due_diligence', at: ago(12), byName: 'Bilal Abbassi', note: 'Scoping started — document checklist received' }],
+    dueDiligence: sdiDD, notes: 'Health partnership in Syria under an MoU; vetting shared with the partner for key-personnel confirmation.', ownerName: DOC_OWNER,
+    createdBy: 'u_bilal', createdByName: 'Bilal Abbassi', createdAt: ago(20), updatedAt: ago(1),
+  },
+  {
+    id: 'ptn_nrn', code: 'PT-2025-0001', name: 'Northern Rehabilitation Network', acronym: 'NRN', type: 'cbo', country: 'Amman (Regional Office)',
+    address: 'Irbid, Al-Hashemi Street, Building 14', website: '', focalName: 'Samar Khasawneh', focalTitle: 'Executive Director', focalEmail: 's.khasawneh@nrn.example', focalPhone: '+962 2 7200 000', sectors: ['Physical rehabilitation', 'Community outreach'],
+    stage: 'active', stageHistory: [{ stage: 'identified', at: '2025-07-30T09:00:00Z', byName: 'Bilal Abbassi' }, { stage: 'due_diligence', at: '2025-08-05T09:00:00Z', byName: 'Bilal Abbassi' }, { stage: 'approved', at: '2025-09-02T09:30:00Z', byName: 'Fawaz Mahmoud', note: 'Approved with conditions' }, { stage: 'agreement', at: '2025-09-10T09:00:00Z', byName: 'Dana Qasem', note: 'Sub-award agreement drafted' }, { stage: 'active', at: '2025-10-01T09:00:00Z', byName: 'Bilal Abbassi', note: 'Agreement signed — outreach camps start' }],
+    dueDiligence: nrnDD, agreement: { type: 'subaward', reference: 'SA-2025-001', startDate: '2025-10-01', endDate: '2026-12-31', value: 45000, currency: 'JOD', notes: 'Outreach fitting camps under GR-2025-IRB-03' },
+    notes: '', ownerName: DOC_OWNER, createdBy: 'u_bilal', createdByName: 'Bilal Abbassi', createdAt: '2025-07-30T09:00:00Z', updatedAt: '2025-10-01T09:00:00Z',
+  },
+]
+
 export const SEED_MASTER: MasterBudget[] = [
   { id: 'mb_2026', year: 2026, currency: 'USD', status: 'approved', createdBy: 'u_shatha', createdByName: 'Shatha Homsi', createdAt: '2025-11-20T09:00:00Z', approvedBy: 'u_shatha', approvedByName: 'Shatha Homsi', approvedAt: '2025-12-18T09:00:00Z', ownerName: DOC_OWNER, notes: 'Annual running costs of the organisation — reference for all project budgets.',
     lines: [

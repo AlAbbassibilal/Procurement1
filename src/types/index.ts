@@ -191,7 +191,7 @@ export interface AuditEvent {
   at: string
   actorId: string
   actorName: string
-  docType: DocType | 'SYSTEM' | 'VENDOR' | 'USER' | 'BUDGET' | 'SETTINGS' | 'ESIGN' | 'PROJECT' | 'TASK' | 'DONOR' | 'MASTER'
+  docType: DocType | 'SYSTEM' | 'VENDOR' | 'USER' | 'BUDGET' | 'SETTINGS' | 'ESIGN' | 'PROJECT' | 'TASK' | 'DONOR' | 'MASTER' | 'PARTNER'
   docId?: string
   docNumber?: string
   action: string
@@ -652,6 +652,7 @@ export interface Project {
   managerId?: string
   managerName?: string
   teamIds: string[]
+  partnerIds?: string[]        // implementing partners (Partnerships workspace)
   requestedAmount?: number
   awardedAmount?: number
   budgetId?: string
@@ -745,3 +746,65 @@ export interface OrgSettings {
 
 /** Interface skin — 'classic' is the original RHS interface, 'modern' the lighter redesign. Switchable in Settings → Appearance. */
 export type UiTheme = 'classic' | 'modern'
+
+// ---------------------------------------------------------------------------
+// Partnerships — partner register and pre-contract due diligence
+// ---------------------------------------------------------------------------
+export type PartnerStage = 'identified' | 'due_diligence' | 'approved' | 'agreement' | 'active' | 'closed' | 'declined'
+export const PARTNER_STAGES: PartnerStage[] = ['identified', 'due_diligence', 'approved', 'agreement', 'active', 'closed']
+export type PartnerType = 'local_ngo' | 'ingo' | 'cbo' | 'government' | 'academic' | 'private' | 'un' | 'other'
+export type YesNo = '' | 'yes' | 'no'
+export type YesNoNa = '' | 'yes' | 'no' | 'na'
+
+export interface KeyPerson { id: string; name: string; title: string; countryOfBirth: string; dob: string; gender: string; idNumber?: string; verification?: string; atcClear?: '' | 'clear' | 'flagged' | 'pending'; atcIssues?: string }
+export interface AtcCheck { done: YesNo; checkedBy: string; date: string; issues: string }
+export interface OnlineCheck { platform: string; url: string; checkedBy: string; date: string; issues: string }
+export interface VettingAnswer { key: string; answer: YesNo; basis: string; issues: string; risks: string }
+export interface PartnerDeclaration { key: string; answer: YesNo; explanation: string }
+export interface VettingShare { token: string; sharedAt: string; sharedBy: string; sharedByName: string; status: 'open' | 'submitted' | 'revoked'; message?: string }
+export interface PartnerSubmission {
+  submittedAt: string; byName: string; byTitle: string; byEmail: string; signature: string
+  legalName: string; registrationNo: string; registrationCountry: string; legalForm: string
+  keyPersonnel: KeyPerson[]; online: { platform: string; url: string }[]
+  auditFirm: string; auditYear: string; auditIssues: string
+  declarations: PartnerDeclaration[]; notes: string
+}
+export interface Vetting {
+  staffResponsible: string; level: 'basic' | 'full'
+  keyPersonnel: KeyPerson[]
+  atc: { org: AtcCheck; staff: AtcCheck }
+  online: OnlineCheck[]
+  audit: { done: YesNoNa; checkedBy: string; firm: string; date: string; issues: string }
+  analysis: VettingAnswer[]
+  share?: VettingShare
+  submission?: PartnerSubmission
+  completedAt?: string; completedBy?: string; completedByName?: string
+}
+export type PcaScore = 1 | 2 | 3 | 'na'
+export interface PcaAnswer { score?: PcaScore; notes: string; actions: string }
+export interface Pca { answers: Record<string, PcaAnswer>; visitDate: string; assessors: string; completedAt?: string }
+export type RiskGroup = 'vetting' | 'contextual' | 'rhs'
+export interface PartnerRisk { id: string; group: RiskGroup; description: string; likelihood: number | null; impact: number | null; mitigation: string; owner: string }
+export interface Scoping {
+  newOrExisting: 'new' | 'existing'; completionDate: string
+  partnerSectors: string; anticipatedSectors: string; partnerReach: string; anticipatedScope: string
+  rhsFocalPoints: string; anticipatedDonors: string; anticipatedValue: string
+  checklist: Record<string, YesNoNa>; notes: string
+}
+export interface DueDiligence {
+  scoping: Scoping; vetting: Vetting; pca: Pca; risks: PartnerRisk[]
+  decision: { outcome: '' | 'approved' | 'approved_conditions' | 'declined'; conditions: string; decidedBy?: string; decidedByName?: string; decidedAt?: string }
+  attachments: Attachment[]
+}
+export interface PartnerAgreement { type: 'mou' | 'subaward' | 'teaming' | 'service' | 'other'; reference: string; startDate: string; endDate: string; value?: number; currency: Currency; envelopeId?: string; notes: string }
+export interface Partner {
+  id: string; code: string; name: string; acronym: string; type: PartnerType; country: string; address: string; website: string
+  focalName: string; focalTitle: string; focalEmail: string; focalPhone: string
+  sectors: string[]; stage: PartnerStage
+  stageHistory: { stage: PartnerStage; at: string; byName: string; note?: string }[]
+  dueDiligence: DueDiligence
+  agreement?: PartnerAgreement
+  notes: string
+  ownerName: string
+  createdBy: string; createdByName: string; createdAt: string; updatedAt: string
+}

@@ -7,6 +7,9 @@ import { DEPT_ICON } from '@/pages/Home'
 import { computeBvA } from '@/lib/budget'
 import { coverageFor } from '@/lib/master'
 import { invoiceTotals } from '@/lib/match'
+import { ddProgress, partnerProjects, riskLevel, PARTNER_STAGE_LABEL } from '@/lib/partners'
+import { PartnerStagePill, DdBar, ProjectChips } from '@/pages/partnerships/shared'
+import { PARTNER_STAGES } from '@/types'
 import { fmtMoney, cx } from '@/lib/format'
 import type { Department } from '@/types'
 
@@ -58,6 +61,35 @@ export function FinanceHome() {
   )
 }
 
-export const PartnershipsHome = () => <WorkspaceFrame id="partnerships" />
+export function PartnershipsHome() {
+  const { partners, projects, country } = useStore()
+  const list = partners.filter((p) => country === 'all' || p.country === country)
+  const inDD = list.filter((p) => p.stage === 'due_diligence')
+  const awaiting = list.filter((p) => ddProgress(p.dueDiligence).partnerPending)
+  const received = list.filter((p) => p.dueDiligence.vetting.share?.status === 'submitted' && !p.dueDiligence.vetting.completedAt)
+  const highRisks = list.reduce((n, p) => n + p.dueDiligence.risks.filter((r) => ['High', 'Very High'].includes(riskLevel(r.likelihood, r.impact) ?? '')).length, 0)
+  const active = list.filter((p) => p.stage === 'active')
+  return (
+    <WorkspaceFrame id="partnerships" intro={
+      <>
+        <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <Stat label="Partners on the register" value={list.length} hint={`${active.length} active · ${list.filter((p) => p.stage === 'declined').length} declined`} tone="brand" />
+          <Stat label="In due diligence" value={inDD.length} tone="sun" />
+          <Stat label="Awaiting partner vetting form" value={awaiting.length} hint={received.length ? `${received.length} received — to review` : undefined} tone={received.length ? 'brand' : 'default'} />
+          <Stat label="High / very high risks open" value={highRisks} tone={highRisks ? 'accent' : 'default'} />
+          <Stat label="Projects with partners" value={projects.filter((p) => (p.partnerIds?.length ?? 0) > 0 && ['granted', 'active'].includes(p.stage)).length} />
+        </div>
+        <div className="mb-6 grid gap-6 xl:grid-cols-3">
+          <Card title="Pipeline by stage" padded={false} className="xl:col-span-1">
+            <ul className="divide-y divide-line">{PARTNER_STAGES.concat('declined').map((s) => { const ps = list.filter((p) => p.stage === s); return <li key={s} className="flex items-center justify-between px-5 py-2.5 text-[13px]"><Link to={`/partnerships/partners`} className="flex items-center gap-2 hover:underline"><PartnerStagePill stage={s} /></Link><span className="font-semibold text-ink-900">{ps.length}</span></li> })}</ul>
+          </Card>
+          <Card title="Where we are with each partner" padded={false} className="xl:col-span-2" actions={<Link to="/partnerships/partners" className="btn-secondary btn-sm">Open register <ArrowRight size={13} /></Link>}>
+            <ul className="divide-y divide-line">{list.length === 0 && <li className="px-5 py-6 text-center text-[13px] text-ink-500">No partners yet.</li>}{[...list].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 8).map((p) => <li key={p.id} className="grid gap-2 px-5 py-3 sm:grid-cols-[1fr_auto_200px] sm:items-center"><div><Link to={`/partnerships/${p.id}`} className="text-[13.5px] font-medium text-ink-900 hover:text-brand-700">{p.name}{p.acronym && ` (${p.acronym})`}</Link><div className="text-[12px] text-ink-500">{p.country} · {PARTNER_STAGE_LABEL[p.stage]}{ddProgress(p.dueDiligence).partnerPending && ' · awaiting partner form'}</div><div className="mt-1"><ProjectChips projects={partnerProjects(p, projects)} empty="" /></div></div><PartnerStagePill stage={p.stage} /><DdBar partner={p} /></li>)}</ul>
+          </Card>
+        </div>
+      </>
+    } />
+  )
+}
 export const HrHome = () => <WorkspaceFrame id="hr" />
 export const MediaHome = () => <WorkspaceFrame id="media" />

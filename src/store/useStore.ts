@@ -3,15 +3,16 @@ import { persist } from 'zustand/middleware'
 import type {
   ApprovalRule, Attachment, AuditEvent, Comment, Contract, ContractMilestone, LineItem, Notification, OrgSettings,
   PurchaseOrder, PurchaseRequisition, Quotation, User, Vendor, DocType, Role, GoodsReceipt, GoodsReceiptLine, Invoice, InvoiceLine, SourcingRecord, ExceptionType, ProjectBudget, Envelope, EnvelopeRecipient, EnvelopeField, Project, ProjectStage, Donor, Task, ProjectReport, ProjectComment, MasterBudget, MasterLine,
-  UiTheme,
+  UiTheme, Partner, PartnerStage, DueDiligence, PartnerSubmission, PartnerAgreement,
 } from '@/types'
-import { DOC_OWNER, SEED_BUDGETS, SEED_DONORS, SEED_PROJECTS, SEED_TASKS, SEED_MASTER, SEED_CONTRACTS, SEED_GRNS, SEED_INVOICES, SEED_POS, SEED_PRS, SEED_RULES, SEED_SETTINGS, SEED_USERS, SEED_VENDORS, STANDARD_CLAUSES } from '@/data/seed'
+import { DOC_OWNER, SEED_PARTNERS, SEED_BUDGETS, SEED_DONORS, SEED_PROJECTS, SEED_TASKS, SEED_MASTER, SEED_CONTRACTS, SEED_GRNS, SEED_INVOICES, SEED_POS, SEED_PRS, SEED_RULES, SEED_SETTINGS, SEED_USERS, SEED_VENDORS, STANDARD_CLAUSES } from '@/data/seed'
 import { hasBlockingIssues, receiptProgress, runMatch, invoiceTotals } from '@/lib/match'
 import { newEvent, recipientTurn } from '@/lib/esign'
 import { generateIPTT, generateReportingCalendar, generateSpendingPlan, monthsOf, parseMentions, reportLiveStatus, allIndicators } from '@/lib/grants'
 import { blockingFailures, emptySourcing, isBidMethod, sourcingRequirements, tierForPR, toUSD, resolveTier } from '@/lib/tiers'
 import { applyDecision, buildChain, currentStep, resetChain, resolveApprover, chainFromSteps } from '@/lib/workflow'
 import { linesSubtotal, nowIso, uid } from '@/lib/format'
+import { emptyDueDiligence } from '@/lib/partners'
 
 type Decision = 'approved' | 'rejected' | 'returned' | 'delegated'
 
@@ -32,6 +33,7 @@ interface State {
   donors: Donor[]
   tasks: Task[]
   masterBudgets: MasterBudget[]
+  partners: Partner[]
   country: string            // current country context ('all' or a country name)
   uiTheme: UiTheme           // 'classic' (original interface) | 'modern'
   sidebarCollapsed: boolean  // desktop sidebar shown as an icon rail
@@ -113,6 +115,19 @@ interface Actions {
   reopenMasterBudget: (mbId: string) => void
   setBudgetLineMaster: (budgetId: string, lineId: string, masterLineId?: string) => void
   setCountry: (c: string) => void
+  // Partnerships
+  createPartner: (data: Partial<Partner> & { name: string }) => Partner
+  updatePartner: (id: string, patch: Partial<Partner>) => void
+  deletePartner: (id: string) => void
+  advancePartner: (id: string, stage: PartnerStage, note?: string) => { ok: boolean; error?: string }
+  updateDueDiligence: (id: string, fn: (dd: DueDiligence) => DueDiligence) => void
+  decidePartner: (id: string, outcome: 'approved' | 'approved_conditions' | 'declined', conditions: string) => void
+  shareVetting: (id: string, message?: string) => string
+  revokeVetting: (id: string) => void
+  reopenVetting: (id: string) => void
+  submitPartnerVetting: (token: string, submission: Omit<PartnerSubmission, 'submittedAt'>) => { ok: boolean; error?: string }
+  completeVetting: (id: string) => void
+  setPartnerAgreement: (id: string, a: PartnerAgreement) => void
   // Appearance (per browser)
   setUiTheme: (t: UiTheme) => void
   toggleSidebar: () => void
@@ -175,6 +190,7 @@ const initial = (): State => ({
   donors: SEED_DONORS,
   tasks: SEED_TASKS,
   masterBudgets: SEED_MASTER,
+  partners: SEED_PARTNERS,
   country: 'all',
   uiTheme: 'classic',
   sidebarCollapsed: false,
@@ -188,7 +204,7 @@ const initial = (): State => ({
   audit: [
     { id: 'a1', at: nowIso(), actorId: 'u_bilal', actorName: DOC_OWNER, docType: 'SYSTEM', action: 'System initialised', detail: 'Demo dataset loaded' },
   ],
-  counters: { PR: 44, PO: 17, CT: 6, GRN: 9, INV: 12, ENV: 0 },
+  counters: { PR: 44, PO: 17, CT: 6, GRN: 9, INV: 12, ENV: 0, PT: 2 },
 })
 
 export const useStore = create<State & Actions>()(
@@ -210,7 +226,7 @@ export const useStore = create<State & Actions>()(
       const notifyRole = (role: Role, n: Omit<Notification, 'id' | 'userId' | 'at' | 'read'>) => {
         get().users.filter((u) => u.active && u.role === role).forEach((u) => notify(u.id, n))
       }
-      const nextNumber = (t: 'PR' | 'PO' | 'CT' | 'GRN' | 'INV' | 'ENV') => {
+      const nextNumber = (t: 'PR' | 'PO' | 'CT' | 'GRN' | 'INV' | 'ENV' | 'PT') => {
         const n = (get().counters[t] ?? 0) + 1
         set((s) => ({ counters: { ...s.counters, [t]: n } }))
         return `${t}-${new Date().getFullYear()}-${String(n).padStart(4, '0')}`
@@ -709,6 +725,66 @@ export const useStore = create<State & Actions>()(
         reopenMasterBudget: (mbId) => set((s) => ({ masterBudgets: s.masterBudgets.map((m) => (m.id === mbId ? { ...m, status: 'draft' } : m)) })),
         setBudgetLineMaster: (budgetId, lineId, masterLineId) => set((s) => ({ budgets: s.budgets.map((b) => (b.id === budgetId ? { ...b, lines: b.lines.map((l) => (l.id === lineId ? { ...l, masterLineId } : l)) } : b)) })),
         setCountry: (c) => set({ country: c }),
+        // ---- Partnerships --------------------------------------------------
+        createPartner: (data) => {
+          const a = actor()
+          const p: Partner = {
+            id: uid('ptn_'), code: nextNumber('PT'), acronym: '', type: 'local_ngo', country: get().settings.countries[0], address: '', website: '', focalName: '', focalTitle: '', focalEmail: '', focalPhone: '', sectors: [],
+            stage: 'identified', stageHistory: [{ stage: 'identified', at: nowIso(), byName: a.name }], dueDiligence: emptyDueDiligence(), notes: '', ownerName: DOC_OWNER,
+            createdBy: a.id, createdByName: a.name, createdAt: nowIso(), updatedAt: nowIso(), ...data,
+          }
+          set((s) => ({ partners: [p, ...s.partners] }))
+          log('PARTNER', 'Partner added', { id: p.id, number: p.code }, p.name)
+          return p
+        },
+        updatePartner: (id, patch) => { set((s) => ({ partners: s.partners.map((p) => (p.id === id ? { ...p, ...patch, updatedAt: nowIso() } : p)) })) },
+        deletePartner: (id) => {
+          const p = get().partners.find((x) => x.id === id); if (!p) return
+          set((s) => ({ partners: s.partners.filter((x) => x.id !== id), projects: s.projects.map((pr) => (pr.partnerIds?.includes(id) ? { ...pr, partnerIds: pr.partnerIds.filter((x) => x !== id) } : pr)) }))
+          log('PARTNER', 'Partner removed', { id: p.id, number: p.code }, p.name)
+        },
+        advancePartner: (id, stage, note) => {
+          const p = get().partners.find((x) => x.id === id); if (!p) return { ok: false, error: 'Partner not found' }
+          const a = actor()
+          if (stage === 'approved' && !['approved', 'approved_conditions'].includes(p.dueDiligence.decision.outcome)) return { ok: false, error: 'Record an approval decision on the Risks & decision tab first.' }
+          if (stage === 'active' && !p.agreement?.reference) return { ok: false, error: 'Enter the agreement reference and dates before activating the partnership.' }
+          set((s) => ({ partners: s.partners.map((x) => (x.id === id ? { ...x, stage, stageHistory: [...x.stageHistory, { stage, at: nowIso(), byName: a.name, note }], updatedAt: nowIso() } : x)) }))
+          log('PARTNER', `Partner moved to ${stage.replace('_', ' ')}`, { id: p.id, number: p.code }, note)
+          return { ok: true }
+        },
+        updateDueDiligence: (id, fn) => set((s) => ({ partners: s.partners.map((p) => (p.id === id ? { ...p, dueDiligence: fn(p.dueDiligence), updatedAt: nowIso() } : p)) })),
+        decidePartner: (id, outcome, conditions) => {
+          const a = actor(); const p = get().partners.find((x) => x.id === id); if (!p) return
+          set((s) => ({ partners: s.partners.map((x) => (x.id === id ? { ...x, dueDiligence: { ...x.dueDiligence, decision: { outcome, conditions, decidedBy: a.id, decidedByName: a.name, decidedAt: nowIso() } }, updatedAt: nowIso(), ...(outcome === 'declined' ? { stage: 'declined' as PartnerStage, stageHistory: [...x.stageHistory, { stage: 'declined' as PartnerStage, at: nowIso(), byName: a.name, note: conditions }] } : {}) } : x)) }))
+          log('PARTNER', `Due diligence decision: ${outcome.replace('_', ' ')}`, { id: p.id, number: p.code }, conditions)
+        },
+        shareVetting: (id, message) => {
+          const a = actor(); const token = uid('vt_') + uid('')
+          set((s) => ({ partners: s.partners.map((p) => (p.id === id ? { ...p, dueDiligence: { ...p.dueDiligence, vetting: { ...p.dueDiligence.vetting, share: { token, sharedAt: nowIso(), sharedBy: a.id, sharedByName: a.name, status: 'open', message } } }, updatedAt: nowIso() } : p)) }))
+          const p = get().partners.find((x) => x.id === id)!
+          log('PARTNER', 'Vetting form shared with partner', { id: p.id, number: p.code }, p.focalEmail)
+          return token
+        },
+        revokeVetting: (id) => set((s) => ({ partners: s.partners.map((p) => (p.id === id && p.dueDiligence.vetting.share ? { ...p, dueDiligence: { ...p.dueDiligence, vetting: { ...p.dueDiligence.vetting, share: { ...p.dueDiligence.vetting.share, status: 'revoked' } } } } : p)) })),
+        reopenVetting: (id) => set((s) => ({ partners: s.partners.map((p) => (p.id === id && p.dueDiligence.vetting.share ? { ...p, dueDiligence: { ...p.dueDiligence, vetting: { ...p.dueDiligence.vetting, share: { ...p.dueDiligence.vetting.share, status: 'open' } } } } : p)) })),
+        submitPartnerVetting: (token, sub) => {
+          const p = get().partners.find((x) => x.dueDiligence.vetting.share?.token === token)
+          if (!p || !p.dueDiligence.vetting.share) return { ok: false, error: 'This link is not valid.' }
+          if (p.dueDiligence.vetting.share.status !== 'open') return { ok: false, error: 'This form is no longer open for submission.' }
+          const submission: PartnerSubmission = { ...sub, submittedAt: nowIso() }
+          set((s) => ({ partners: s.partners.map((x) => (x.id === p.id ? { ...x, updatedAt: nowIso(), dueDiligence: { ...x.dueDiligence, vetting: { ...x.dueDiligence.vetting, submission, share: { ...x.dueDiligence.vetting.share!, status: 'submitted' },
+            // partner-provided key personnel and links pre-fill the RHS vetting tables (existing RHS entries are kept)
+            keyPersonnel: [...x.dueDiligence.vetting.keyPersonnel.filter((k) => !submission.keyPersonnel.some((n) => n.name.trim().toLowerCase() === k.name.trim().toLowerCase())), ...submission.keyPersonnel.map((k) => ({ ...k, verification: k.verification || 'ATC', atcClear: 'pending' as const }))],
+            online: x.dueDiligence.vetting.online.map((o) => ({ ...o, url: o.url || (submission.online.find((l) => l.platform === o.platform)?.url ?? '') })),
+          } } } : x)) }))
+          set((s) => ({ audit: [{ id: uid('a_'), at: nowIso(), actorId: 'partner', actorName: `${sub.byName} (${p.name})`, docType: 'PARTNER' as const, docId: p.id, docNumber: p.code, action: 'Partner submitted the vetting form', detail: `${sub.keyPersonnel.length} key personnel · signed ${sub.signature}` }, ...s.audit].slice(0, 500) }))
+          const n = { kind: 'info' as const, title: `${p.acronym || p.name} submitted its vetting form`, body: `${sub.byName} · ${sub.keyPersonnel.length} key personnel listed — ready for ATC and checks`, link: `/partnerships/${p.id}?tab=vetting` }
+          notify(p.dueDiligence.vetting.share.sharedBy, n); notifyRole('legal', n); notifyRole('programs_director', n)
+          return { ok: true }
+        },
+        completeVetting: (id) => { const a = actor(); set((s) => ({ partners: s.partners.map((p) => (p.id === id ? { ...p, dueDiligence: { ...p.dueDiligence, vetting: { ...p.dueDiligence.vetting, completedAt: nowIso(), completedBy: a.id, completedByName: a.name } } } : p)) })); const p = get().partners.find((x) => x.id === id)!; log('PARTNER', 'Vetting completed', { id: p.id, number: p.code }) },
+        setPartnerAgreement: (id, agreement) => { set((s) => ({ partners: s.partners.map((p) => (p.id === id ? { ...p, agreement, updatedAt: nowIso() } : p)) })); const p = get().partners.find((x) => x.id === id)!; log('PARTNER', 'Agreement details updated', { id: p.id, number: p.code }, agreement.reference) },
+
         setUiTheme: (t) => set({ uiTheme: t }),
         toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
         setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),

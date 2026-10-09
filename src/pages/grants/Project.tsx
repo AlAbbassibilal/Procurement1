@@ -11,6 +11,7 @@ import { fmtMoney, fmtDate, fmtDateTime, timeAgo, cx, uid } from '@/lib/format'
 import { StagePill } from './Overview'
 import { LogframeTab, WorkplanTab, BudgetTab, SpendingTab, IPTTTab } from './ProjectPlanning'
 import { TaskModal, TaskList } from '@/pages/Tasks'
+import { PartnerStagePill } from '@/pages/partnerships/shared'
 import type { ProjectStage, ProjectReport, Attachment } from '@/types'
 
 type Tab = 'dashboard' | 'proposal' | 'logframe' | 'workplan' | 'budget' | 'spending' | 'iptt' | 'reports' | 'tasks' | 'team'
@@ -19,7 +20,7 @@ const TABS: { id: Tab; label: string }[] = [{ id: 'dashboard', label: 'Dashboard
 export default function ProjectPage() {
   const { id } = useParams(); const nav = useNavigate(); const [sp, setSp] = useSearchParams()
   const user = useCurrentUser()!
-  const { projects, budgets, prs, pos, invoices, users, tasks, advanceProject, updateProject, addProjectComment, addReport, updateReport, submitReport } = useStore()
+  const { projects, budgets, prs, pos, invoices, users, tasks, advanceProject, updateProject, addProjectComment, addReport, updateReport, submitReport, partners } = useStore()
   const p = projects.find((x) => x.id === id)
   const tab = (sp.get('tab') as Tab) || 'dashboard'
   const setTab = (t: Tab) => setSp({ tab: t })
@@ -98,7 +99,7 @@ export default function ProjectPage() {
               <Card title="Open tasks" actions={<button className="text-[12px] text-brand-700 hover:underline" onClick={() => setTab('tasks')}>All</button>}>
                 {projTasks.filter((t) => t.status !== 'done').length === 0 ? <div className="text-[13px] text-ink-500">None.</div> : <ul className="space-y-1.5">{projTasks.filter((t) => t.status !== 'done').slice(0, 5).map((t) => <li key={t.id} className="text-[12.5px]"><span className="font-medium text-ink-900">{t.title}</span><span className="block text-[11px] text-ink-500">{t.assigneeName}{t.dueDate && ` · due ${fmtDate(t.dueDate)}`}</span></li>)}</ul>}
               </Card>
-              <Card title="Project facts"><KV k="Donor" v={p.donorName} /><KV k="Sectors" v={p.sectors.join(', ') || '—'} /><KV k="Countries" v={p.countries.join(', ') || '—'} /><KV k="Locations" v={p.locations ?? '—'} /><KV k="Team" v={[p.managerName, ...p.teamIds.map((u) => users.find((x) => x.id === u)?.name)].filter(Boolean).join(', ')} /><KV k="Submitted" v={fmtDate(p.submittedAt)} /><KV k="Granted" v={fmtDate(p.grantedAt)} /><KV k="Closed" v={fmtDate(p.closedAt)} />{budget && <KV k="Budget record" v={<Link to={`/budgets/${budget.id}`} className="text-brand-700 hover:underline">{budget.donorCode} · {budget.status}</Link>} />}</Card>
+              <Card title="Project facts"><KV k="Donor" v={p.donorName} /><KV k="Implementing partners" v={(p.partnerIds?.length ?? 0) === 0 ? '—' : <span className="flex flex-wrap justify-end gap-1">{(p.partnerIds ?? []).map((id) => partners.find((x) => x.id === id)).filter(Boolean).map((x) => <Link key={x!.id} to={`/partnerships/${x!.id}`} className="inline-flex items-center gap-1 rounded-pill border border-line px-2 py-0.5 text-[11.5px] font-medium hover:bg-brand-50">{x!.acronym || x!.name}<PartnerStagePill stage={x!.stage} /></Link>)}</span>} /><KV k="Sectors" v={p.sectors.join(', ') || '—'} /><KV k="Countries" v={p.countries.join(', ') || '—'} /><KV k="Locations" v={p.locations ?? '—'} /><KV k="Team" v={[p.managerName, ...p.teamIds.map((u) => users.find((x) => x.id === u)?.name)].filter(Boolean).join(', ')} /><KV k="Submitted" v={fmtDate(p.submittedAt)} /><KV k="Granted" v={fmtDate(p.grantedAt)} /><KV k="Closed" v={fmtDate(p.closedAt)} />{budget && <KV k="Budget record" v={<Link to={`/budgets/${budget.id}`} className="text-brand-700 hover:underline">{budget.donorCode} · {budget.status}</Link>} />}</Card>
             </div>
           </div>
         </div>
@@ -146,6 +147,7 @@ export default function ProjectPage() {
           <Card title={<span className="flex items-center gap-2"><Users size={16} /> Team</span>}>
             <div className="space-y-3"><Field label="Project manager"><select className="input" value={p.managerId ?? ''} disabled={!canStage} onChange={(e) => updateProject(p.id, { managerId: e.target.value, managerName: users.find((u) => u.id === e.target.value)?.name })}>{users.filter((u) => u.active).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></Field>
               <div><div className="label">Members</div><div className="space-y-1">{users.filter((u) => u.active && u.id !== p.managerId).map((u) => <label key={u.id} className="flex items-center gap-2 text-[12.5px]"><input type="checkbox" disabled={!canEdit} checked={p.teamIds.includes(u.id)} onChange={(e) => updateProject(p.id, { teamIds: e.target.checked ? [...p.teamIds, u.id] : p.teamIds.filter((x) => x !== u.id) })} />{u.name} <span className="text-[11px] text-ink-400">{u.title}</span></label>)}</div></div></div>
+            <div className="mt-4 border-t border-line pt-3"><div className="label">Implementing partners</div><div className="space-y-1">{partners.length === 0 && <div className="text-[12px] text-ink-500">No partners on the register yet.</div>}{partners.map((x) => <label key={x.id} className="flex items-center gap-2 text-[12.5px]"><input type="checkbox" disabled={!canEdit} checked={p.partnerIds?.includes(x.id) ?? false} onChange={(e) => updateProject(p.id, { partnerIds: e.target.checked ? [...(p.partnerIds ?? []), x.id] : (p.partnerIds ?? []).filter((i) => i !== x.id) })} /><Link to={`/partnerships/${x.id}`} className="flex-1 truncate hover:underline">{x.name}{x.acronym && ` (${x.acronym})`}</Link><PartnerStagePill stage={x.stage} /></label>)}</div><div className="mt-1 text-[11.5px] text-ink-500">Linked partners appear on the partner register and file, with this project clickable.</div></div>
             <div className="mt-4 border-t border-line pt-3"><div className="label">Stage history</div><ul className="space-y-1 text-[12px] text-ink-600">{p.stageHistory.map((h, i) => <li key={i}><b className="text-ink-800">{STAGE_LABEL[h.stage]}</b> · {fmtDateTime(h.at)} · {h.byName}{h.note && <div className="text-ink-500">{h.note}</div>}</li>)}</ul></div>
           </Card>
         </div>

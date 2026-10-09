@@ -16,7 +16,7 @@ export const DEPT_ICON: Record<Department, React.ReactNode> = {
 export default function Home() {
   const user = useCurrentUser()!
   const nav = useNavigate()
-  const { prs, pos, invoices, contracts, budgets, envelopes, tasks, projects, settings } = useStore()
+  const { prs, pos, invoices, contracts, budgets, envelopes, tasks, projects, settings, partners } = useStore()
   const access = effectiveAccess(user)
   const approvals = prs.filter((p) => p.status === 'pending_approval' && canApprove(p.approvalChain, user)).length
     + pos.filter((p) => p.status === 'pending_approval' && canApprove(p.approvalChain, user)).length
@@ -34,7 +34,7 @@ export default function Home() {
 
   const stats: Record<Department, { label: string; value: string }[]> = {
     grants: [{ label: 'Pipeline', value: String(projects.filter((p) => ['development', 'submitted'].includes(p.stage)).length) }, { label: 'Active grants', value: String(projects.filter((p) => ['granted', 'active'].includes(p.stage)).length) }, { label: 'Portfolio burn', value: approvedTotal ? `${Math.round((spentTotal / approvedTotal) * 100)}%` : '—' }],
-    partnerships: [{ label: 'Partners', value: '—' }, { label: 'Active MoUs', value: '—' }],
+    partnerships: [{ label: 'Partners', value: String(partners.length) }, { label: 'In due diligence', value: String(partners.filter((p) => p.stage === 'due_diligence').length) }, { label: 'Active agreements', value: String(partners.filter((p) => p.stage === 'active').length) }],
     procurement: [{ label: 'Open requisitions', value: String(prs.filter((p) => ['pending_approval', 'approved', 'sourcing', 'awarded'].includes(p.status)).length) }, { label: 'POs in progress', value: String(pos.filter((p) => ['draft', 'pending_approval', 'approved', 'issued', 'contracted', 'partially_received'].includes(p.status)).length) }, { label: 'Contracts', value: String(contracts.filter((c) => c.status === 'active' || c.status === 'pending_signature').length) }],
     finance: [{ label: 'Invoices awaiting approval', value: String(invoices.filter((i) => i.status === 'pending_approval').length) }, { label: 'Match exceptions', value: String(invoices.filter((i) => i.status === 'exception').length) }, { label: 'Ready to pay', value: fmtMoney(invoices.filter((i) => i.status === 'approved').reduce((s, i) => s + i.lines.reduce((t, l) => t + l.quantity * l.unitPrice, 0) * (1 + i.taxRate / 100), 0), ccy) }],
     hr: [{ label: 'Staff', value: '—' }, { label: 'Open requests', value: '—' }],

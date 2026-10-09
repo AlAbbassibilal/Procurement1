@@ -22,5 +22,7 @@ function pdfWorkerGz(): Plugin {
 export default defineConfig({
   plugins: [react(), pdfWorkerGz()],
   resolve: { alias: { '@': path.resolve(__dirname, './src') } },
+  // Single JS file: the hosted demo is one self-contained HTML page, so dynamic imports are inlined
+  build: { rollupOptions: { output: { inlineDynamicImports: true } } },
   server: { port: 5173, host: true },
 })

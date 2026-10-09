@@ -14,6 +14,7 @@ export type Role =
   | 'executive_director'
   | 'legal'
   | 'logistics'             // Logistics / Warehouse Officer / Storekeeper
+  | 'hr'                    // HR & Admin Officer
   | 'admin'
 
 // ---------------------------------------------------------------------------
@@ -191,7 +192,7 @@ export interface AuditEvent {
   at: string
   actorId: string
   actorName: string
-  docType: DocType | 'SYSTEM' | 'VENDOR' | 'USER' | 'BUDGET' | 'SETTINGS' | 'ESIGN' | 'PROJECT' | 'TASK' | 'DONOR' | 'MASTER' | 'PARTNER' | 'STAFF'
+  docType: DocType | 'SYSTEM' | 'VENDOR' | 'USER' | 'BUDGET' | 'SETTINGS' | 'ESIGN' | 'PROJECT' | 'TASK' | 'DONOR' | 'MASTER' | 'PARTNER' | 'STAFF' | 'HR'
   docId?: string
   docNumber?: string
   action: string
@@ -746,7 +747,9 @@ export interface OrgSettings {
   priceTolerancePct: number      // invoice unit-price variance tolerated vs PO
   paymentTermsDays: number       // default invoice due date offset
   fiscalYearStart: string
+  hr?: HrSettings
 }
+export interface HrSettings { annualLeaveDays: number; wfhDays: number; weekend: number[]; socialSecurityPct: number; incomeTaxPct: number; checkInStart: string; checkInEnd: string }
 
 /** Interface skin — 'classic' is the original RHS interface, 'modern' the lighter redesign. Switchable in Settings → Appearance. */
 export type UiTheme = 'classic' | 'modern'
@@ -831,10 +834,47 @@ export interface StaffMember {
   endDate?: string
   status: StaffStatus
   userId?: string             // platform account, if any
+  lineManagerId?: string      // StaffMember id of the line manager (approves leave / WFH, creates timesheets)
+  contractRef?: string        // contract number
+  annualLeaveDays?: number    // entitlement per year (defaults to settings.hr)
+  wfhDays?: number            // work-from-home days per year (defaults to settings.hr)
   sourceProjectId?: string    // planned positions: the approved project that created them
   sourceProjectCode?: string
   sourceLineCode?: string
   notes?: string
   createdAt: string
   updatedAt: string
+}
+
+// ---------------------------------------------------------------------------
+// HR & Admin — leave / WFH requests, timesheets, payslips, attendance
+// ---------------------------------------------------------------------------
+export type LeaveType = 'annual' | 'sick' | 'unpaid' | 'compassionate' | 'maternity' | 'wfh'
+export type LeaveStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
+export interface LeaveRequest {
+  id: string; number: string; staffId: string; staffName: string; type: LeaveType
+  startDate: string; endDate: string; days: number; reason: string
+  status: LeaveStatus; submittedAt: string
+  decidedBy?: string; decidedByName?: string; decidedAt?: string; decisionNote?: string
+}
+export interface TimesheetLine { id: string; projectId?: string; projectCode: string; description: string; days: number }
+export type TimesheetStatus = 'draft' | 'submitted' | 'acknowledged' | 'approved' | 'returned'
+export interface Timesheet {
+  id: string; staffId: string; period: string            // YYYY-MM
+  workingDays: number; leaveDays: number; lines: TimesheetLine[]
+  status: TimesheetStatus; note?: string
+  createdBy: string; createdByName: string; createdAt: string; updatedAt: string
+  submittedAt?: string; acknowledgedAt?: string; approvedBy?: string; approvedByName?: string; approvedAt?: string; returnNote?: string
+}
+export interface Payslip {
+  id: string; number: string; staffId: string; period: string; currency: Currency
+  gross: number; allowances: number; socialSecurity: number; tax: number; unpaidDeduction: number; otherDeductions: number; net: number
+  workingDays: number; leaveDays: number; unpaidDays: number
+  paidAt: string; generatedBy: string; generatedByName: string
+}
+export type AttendanceMode = 'office' | 'wfh' | 'field'
+export interface AttendanceRecord {
+  id: string; staffId: string; date: string; mode: AttendanceMode
+  checkInAt: string; lat?: number; lng?: number; accuracy?: number; locationStatus: 'captured' | 'denied' | 'unavailable'; note?: string
+  checkOutAt?: string; outLat?: number; outLng?: number
 }

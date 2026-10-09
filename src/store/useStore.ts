@@ -3,9 +3,9 @@ import { persist } from 'zustand/middleware'
 import type {
   ApprovalRule, Attachment, AuditEvent, Comment, Contract, ContractMilestone, LineItem, Notification, OrgSettings,
   PurchaseOrder, PurchaseRequisition, Quotation, User, Vendor, DocType, Role, GoodsReceipt, GoodsReceiptLine, Invoice, InvoiceLine, SourcingRecord, ExceptionType, ProjectBudget, Envelope, EnvelopeRecipient, EnvelopeField, Project, ProjectStage, Donor, Task, ProjectReport, ProjectComment, MasterBudget, MasterLine,
-  UiTheme, Partner, PartnerStage, DueDiligence, PartnerSubmission, PartnerAgreement, StaffMember,
+  UiTheme, Partner, PartnerStage, DueDiligence, PartnerSubmission, PartnerAgreement, StaffMember, LeaveRequest, LeaveType, Timesheet, Payslip, AttendanceRecord, AttendanceMode,
 } from '@/types'
-import { DOC_OWNER, SEED_PARTNERS, SEED_STAFF, SEED_BUDGETS, SEED_DONORS, SEED_PROJECTS, SEED_TASKS, SEED_MASTER, SEED_CONTRACTS, SEED_GRNS, SEED_INVOICES, SEED_POS, SEED_PRS, SEED_RULES, SEED_SETTINGS, SEED_USERS, SEED_VENDORS, STANDARD_CLAUSES } from '@/data/seed'
+import { DOC_OWNER, SEED_PARTNERS, SEED_STAFF, SEED_LEAVE, SEED_TIMESHEETS, SEED_PAYSLIPS, SEED_ATTENDANCE, SEED_BUDGETS, SEED_DONORS, SEED_PROJECTS, SEED_TASKS, SEED_MASTER, SEED_CONTRACTS, SEED_GRNS, SEED_INVOICES, SEED_POS, SEED_PRS, SEED_RULES, SEED_SETTINGS, SEED_USERS, SEED_VENDORS, STANDARD_CLAUSES } from '@/data/seed'
 import { hasBlockingIssues, receiptProgress, runMatch, invoiceTotals } from '@/lib/match'
 import { newEvent, recipientTurn } from '@/lib/esign'
 import { generateIPTT, generateReportingCalendar, generateSpendingPlan, monthsOf, parseMentions, reportLiveStatus, allIndicators } from '@/lib/grants'
@@ -14,6 +14,7 @@ import { applyDecision, buildChain, currentStep, resetChain, resolveApprover, ch
 import { linesSubtotal, nowIso, uid } from '@/lib/format'
 import { emptyDueDiligence } from '@/lib/partners'
 import { unassignedSalaryLines, isSalaryLine, headcount, nextRhsNumber } from '@/lib/salary'
+import { balances, computePayslip, hrSettings, workingDaysBetween, workingDaysInMonth, today as todayIso } from '@/lib/hr'
 
 type Decision = 'approved' | 'rejected' | 'returned' | 'delegated'
 
@@ -36,6 +37,10 @@ interface State {
   masterBudgets: MasterBudget[]
   partners: Partner[]
   staff: StaffMember[]
+  leaveRequests: LeaveRequest[]
+  timesheets: Timesheet[]
+  payslips: Payslip[]
+  attendance: AttendanceRecord[]
   country: string            // current country context ('all' or a country name)
   uiTheme: UiTheme           // 'classic' (original interface) | 'modern'
   homeLayout: 'dashboard' | 'launcher'   // original dashboard home, or the app-launcher home
@@ -136,6 +141,15 @@ interface Actions {
   upsertStaff: (st: Partial<StaffMember> & { position: string }) => StaffMember
   deleteStaff: (id: string) => void
   confirmRecruitment: (id: string, name: string, startDate: string) => void
+  // HR & Admin
+  submitLeave: (data: { type: LeaveType; startDate: string; endDate: string; reason: string; staffId?: string }) => { ok: boolean; error?: string; request?: LeaveRequest }
+  decideLeave: (id: string, approve: boolean, note?: string) => void
+  cancelLeave: (id: string) => void
+  upsertTimesheet: (t: Partial<Timesheet> & { staffId: string; period: string }) => Timesheet
+  setTimesheetStatus: (id: string, status: Timesheet['status'], note?: string) => void
+  runPayroll: (period: string) => { created: number }
+  checkIn: (data: { mode: AttendanceMode; lat?: number; lng?: number; accuracy?: number; locationStatus: AttendanceRecord['locationStatus']; note?: string }) => { ok: boolean; error?: string }
+  checkOut: (pos?: { lat?: number; lng?: number }) => void
   // Appearance (per browser)
   setUiTheme: (t: UiTheme) => void
   setHomeLayout: (l: 'dashboard' | 'launcher') => void
@@ -202,6 +216,10 @@ const initial = (): State => ({
   masterBudgets: SEED_MASTER,
   partners: SEED_PARTNERS,
   staff: SEED_STAFF,
+  leaveRequests: SEED_LEAVE,
+  timesheets: SEED_TIMESHEETS,
+  payslips: SEED_PAYSLIPS,
+  attendance: SEED_ATTENDANCE,
   country: 'all',
   uiTheme: 'classic',
   homeLayout: 'dashboard',
@@ -217,7 +235,7 @@ const initial = (): State => ({
   audit: [
     { id: 'a1', at: nowIso(), actorId: 'u_bilal', actorName: DOC_OWNER, docType: 'SYSTEM', action: 'System initialised', detail: 'Demo dataset loaded' },
   ],
-  counters: { PR: 44, PO: 17, CT: 6, GRN: 9, INV: 12, ENV: 0, PT: 2 },
+  counters: { PR: 44, PO: 17, CT: 6, GRN: 9, INV: 12, ENV: 0, PT: 2, LR: 3, WFH: 2, PS: 3 },
 })
 
 export const useStore = create<State & Actions>()(
@@ -239,7 +257,7 @@ export const useStore = create<State & Actions>()(
       const notifyRole = (role: Role, n: Omit<Notification, 'id' | 'userId' | 'at' | 'read'>) => {
         get().users.filter((u) => u.active && u.role === role).forEach((u) => notify(u.id, n))
       }
-      const nextNumber = (t: 'PR' | 'PO' | 'CT' | 'GRN' | 'INV' | 'ENV' | 'PT') => {
+      const nextNumber = (t: 'PR' | 'PO' | 'CT' | 'GRN' | 'INV' | 'ENV' | 'PT' | 'LR' | 'WFH' | 'PS') => {
         const n = (get().counters[t] ?? 0) + 1
         set((s) => ({ counters: { ...s.counters, [t]: n } }))
         return `${t}-${new Date().getFullYear()}-${String(n).padStart(4, '0')}`
@@ -814,6 +832,79 @@ export const useStore = create<State & Actions>()(
         confirmRecruitment: (id, name, startDate) => {
           set((s) => ({ staff: s.staff.map((x) => (x.id === id ? { ...x, name, startDate, status: 'active', updatedAt: nowIso() } : x)) }))
           const st = get().staff.find((x) => x.id === id)!; log('STAFF', 'Position filled', { id: st.id, number: st.rhsNumber }, `${name} · ${st.position}`)
+        },
+
+        // ---- HR & Admin ----------------------------------------------------------
+        submitLeave: ({ type, startDate, endDate, reason, staffId }) => {
+          const a = actor(); const st = get().staff.find((x) => staffId ? x.id === staffId : x.userId === a.id)
+          if (!st) return { ok: false, error: 'No HR record is linked to your account — ask HR & Admin.' }
+          if (!startDate || !endDate || endDate < startDate) return { ok: false, error: 'Choose a valid date range.' }
+          const hr = hrSettings(get().settings); const days = workingDaysBetween(startDate, endDate, hr.weekend)
+          if (!days) return { ok: false, error: 'The range has no working days (weekend is ' + hr.weekend.map((d) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d]).join('/') + ').' }
+          const bal = balances(st, get().leaveRequests, get().settings, Number(startDate.slice(0, 4)))
+          if (type === 'annual' && days > bal.annual.remaining - bal.annual.pending) return { ok: false, error: `Only ${Math.max(0, bal.annual.remaining - bal.annual.pending)} annual leave day(s) left this year (${bal.annual.pending} pending).` }
+          if (type === 'wfh' && days > bal.wfh.remaining - bal.wfh.pending) return { ok: false, error: `Only ${Math.max(0, bal.wfh.remaining - bal.wfh.pending)} work-from-home day(s) left this year (${bal.wfh.pending} pending) — the yearly balance is ${bal.wfh.entitlement}.` }
+          const overlap = get().leaveRequests.find((r) => r.staffId === st.id && r.status !== 'rejected' && r.status !== 'cancelled' && r.startDate <= endDate && r.endDate >= startDate)
+          if (overlap) return { ok: false, error: `Overlaps ${overlap.number} (${overlap.startDate} – ${overlap.endDate}).` }
+          const r: LeaveRequest = { id: uid('lr_'), number: nextNumber(type === 'wfh' ? 'WFH' : 'LR'), staffId: st.id, staffName: st.name, type, startDate, endDate, days, reason, status: 'pending', submittedAt: nowIso() }
+          set((s) => ({ leaveRequests: [r, ...s.leaveRequests] }))
+          log('HR', `${type === 'wfh' ? 'Work-from-home' : 'Leave'} request submitted`, { id: r.id, number: r.number }, `${st.name} · ${days} day(s) ${startDate} – ${endDate}`)
+          const mgr = get().staff.find((x) => x.id === st.lineManagerId)
+          const n = { kind: 'approval' as const, title: `${type === 'wfh' ? 'WFH' : 'Leave'} request — ${st.name}`, body: `${r.number} · ${days} day(s) · ${startDate} – ${endDate} · ${reason}`, link: '/hr/requests' }
+          if (mgr?.userId) notify(mgr.userId, n); else notifyRole('hr', n)
+          return { ok: true, request: r }
+        },
+        decideLeave: (id, approve, note) => {
+          const a = actor(); const r = get().leaveRequests.find((x) => x.id === id); if (!r) return
+          set((s) => ({ leaveRequests: s.leaveRequests.map((x) => (x.id === id ? { ...x, status: approve ? 'approved' : 'rejected', decidedBy: a.id, decidedByName: a.name, decidedAt: nowIso(), decisionNote: note } : x)) }))
+          log('HR', `${r.type === 'wfh' ? 'WFH' : 'Leave'} request ${approve ? 'approved' : 'rejected'}`, { id: r.id, number: r.number }, note)
+          const st = get().staff.find((x) => x.id === r.staffId)
+          notify(st?.userId, { kind: approve ? 'success' : 'warning', title: `${r.number} ${approve ? 'approved' : 'rejected'}`, body: `${r.days} day(s) ${r.startDate} – ${r.endDate}${note ? ' · ' + note : ''}`, link: '/hr/me' })
+        },
+        cancelLeave: (id) => set((s) => ({ leaveRequests: s.leaveRequests.map((x) => (x.id === id && x.status !== 'rejected' ? { ...x, status: 'cancelled' } : x)) })),
+        upsertTimesheet: (data) => {
+          const a = actor(); const exists = data.id ? get().timesheets.find((x) => x.id === data.id) : get().timesheets.find((x) => x.staffId === data.staffId && x.period === data.period)
+          const hr = hrSettings(get().settings)
+          const t: Timesheet = exists ? { ...exists, ...data, updatedAt: nowIso() } : { id: uid('ts_'), workingDays: workingDaysInMonth(data.period, hr.weekend), leaveDays: 0, lines: [], status: 'draft', createdBy: a.id, createdByName: a.name, createdAt: nowIso(), updatedAt: nowIso(), ...data }
+          set((s) => ({ timesheets: exists ? s.timesheets.map((x) => (x.id === t.id ? t : x)) : [t, ...s.timesheets] }))
+          return t
+        },
+        setTimesheetStatus: (id, status, note) => {
+          const a = actor(); const t = get().timesheets.find((x) => x.id === id); if (!t) return
+          const st = get().staff.find((x) => x.id === t.staffId)
+          set((s) => ({ timesheets: s.timesheets.map((x) => (x.id === id ? { ...x, status, updatedAt: nowIso(), ...(status === 'submitted' ? { submittedAt: nowIso(), returnNote: undefined } : {}), ...(status === 'acknowledged' ? { acknowledgedAt: nowIso() } : {}), ...(status === 'approved' ? { approvedBy: a.id, approvedByName: a.name, approvedAt: nowIso() } : {}), ...(status === 'returned' ? { returnNote: note } : {}) } : x)) }))
+          log('HR', `Timesheet ${t.period} ${status}`, { id: t.id, number: `TS-${st?.rhsNumber}-${t.period}` }, note)
+          if (status === 'submitted') notify(st?.userId, { kind: 'task', title: `Timesheet ${t.period} ready for your acknowledgement`, body: `Prepared by ${a.name} — review and acknowledge`, link: '/hr/me' })
+          if (status === 'acknowledged') notifyRole('hr', { kind: 'approval', title: `Timesheet ${t.period} — ${st?.name}`, body: 'Acknowledged by the staff member — ready for approval', link: '/hr/timesheets' })
+          if (status === 'returned') notify(get().users.find((u) => u.id === t.createdBy)?.id, { kind: 'warning', title: `Timesheet ${t.period} returned — ${st?.name}`, body: note ?? '', link: '/hr/timesheets' })
+        },
+        runPayroll: (period) => {
+          const a = actor(); const created: Payslip[] = []
+          for (const st of get().staff.filter((x) => x.status === 'active' && x.monthlySalary > 0)) {
+            if (get().payslips.some((p) => p.staffId === st.id && p.period === period) || created.some((p) => p.staffId === st.id)) continue
+            if (st.startDate && st.startDate.slice(0, 7) > period) continue
+            if (st.endDate && st.endDate.slice(0, 7) < period) continue
+            created.push({ id: uid('ps_'), number: nextNumber('PS').replace(/^PS-\d{4}/, `PS-${period}`), paidAt: nowIso(), generatedBy: a.id, generatedByName: a.name, ...computePayslip(st, period, get().leaveRequests, get().settings) })
+          }
+          set((s) => ({ payslips: [...created, ...s.payslips] }))
+          if (created.length) { log('HR', `Payroll ${period} run — ${created.length} payslip(s)`, undefined, `${created.reduce((s2, p) => s2 + p.net, 0).toLocaleString()} net`); for (const p of created) { const st = get().staff.find((x) => x.id === p.staffId); notify(st?.userId, { kind: 'success', title: `Salary ${period} paid`, body: `Net ${p.currency} ${p.net.toLocaleString()} — your payslip is ready to download`, link: '/hr/me' }) } }
+          return { created: created.length }
+        },
+        checkIn: ({ mode, lat, lng, accuracy, locationStatus, note }) => {
+          const a = actor(); const st = get().staff.find((x) => x.userId === a.id)
+          if (!st) return { ok: false, error: 'No HR record is linked to your account.' }
+          const day = todayIso()
+          if (get().attendance.some((x) => x.staffId === st.id && x.date === day)) return { ok: false, error: 'You already checked in today.' }
+          const rec: AttendanceRecord = { id: uid('at_'), staffId: st.id, date: day, mode, checkInAt: nowIso(), lat, lng, accuracy, locationStatus, note }
+          set((s) => ({ attendance: [rec, ...s.attendance] }))
+          log('HR', 'Checked in', { id: rec.id, number: st.rhsNumber }, `${mode}${lat !== undefined ? ` · ${lat}, ${lng} (±${accuracy} m)` : ` · location ${locationStatus}`}`)
+          return { ok: true }
+        },
+        checkOut: (pos) => {
+          const a = actor(); const st = get().staff.find((x) => x.userId === a.id); if (!st) return
+          const day = todayIso()
+          set((s) => ({ attendance: s.attendance.map((x) => (x.staffId === st.id && x.date === day && !x.checkOutAt ? { ...x, checkOutAt: nowIso(), outLat: pos?.lat, outLng: pos?.lng } : x)) }))
+          log('HR', 'Checked out', { id: st.id, number: st.rhsNumber })
         },
 
         setUiTheme: (t) => set({ uiTheme: t }),

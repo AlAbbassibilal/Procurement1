@@ -15,6 +15,12 @@ import ProjectPage from '@/pages/grants/Project'
 import Tasks from '@/pages/Tasks'
 import MasterBudgetPage from '@/pages/finance/MasterBudget'
 import SalaryPlanPage from '@/pages/finance/SalaryPlan'
+import MyHR from '@/pages/hr/MyHR'
+import HrStaff from '@/pages/hr/Staff'
+import HrRequests from '@/pages/hr/Requests'
+import HrTimesheets from '@/pages/hr/Timesheets'
+import HrAttendance from '@/pages/hr/Attendance'
+import HrPayroll from '@/pages/hr/Payroll'
 import PartnerList from '@/pages/partnerships/List'
 import PartnerPage from '@/pages/partnerships/Partner'
 import VettingPublic from '@/pages/partnerships/VettingPublic'
@@ -63,7 +69,12 @@ function RequireAccess() {
   const holder = !!user && masterBudgets.some((m) => m.lines.some((l) => l.budgetHolderId === user.id))
   // The salary plan is shared with HR & Admin
   const hrPlan = !!user && pathname.startsWith('/finance/salary-plan') && canEnter(user, 'hr')
-  if (user && d && !canEnter(user, d.id) && !(holder && pathname.startsWith('/finance/master-budget')) && !hrPlan) return <NoAccess />
+  // Every staff member reaches My HR; line managers reach requests, timesheets and attendance for their reports
+  const staff = useStore((s) => s.staff)
+  const myStaff = user ? staff.find((x) => x.userId === user.id) : undefined
+  const lineManager = !!myStaff && staff.some((x) => x.lineManagerId === myStaff.id)
+  const hrSelf = pathname === '/hr/me' || (lineManager && /^\/hr\/(requests|timesheets|attendance)/.test(pathname))
+  if (user && d && !canEnter(user, d.id) && !(holder && pathname.startsWith('/finance/master-budget')) && !hrPlan && !hrSelf) return <NoAccess />
   return <Outlet />
 }
 
@@ -94,6 +105,12 @@ export default function App() {
           <Route path="partnerships/due-diligence" element={<PartnerList />} />
           <Route path="partnerships/:id" element={<PartnerPage />} />
           <Route path="hr" element={<HrHome />} />
+          <Route path="hr/me" element={<MyHR />} />
+          <Route path="hr/staff" element={<HrStaff />} />
+          <Route path="hr/requests" element={<HrRequests />} />
+          <Route path="hr/timesheets" element={<HrTimesheets />} />
+          <Route path="hr/attendance" element={<HrAttendance />} />
+          <Route path="hr/payroll" element={<HrPayroll />} />
           <Route path="media" element={<MediaHome />} />
           <Route path="approvals" element={<Approvals />} />
           <Route path="esign" element={<EnvelopeList />} />

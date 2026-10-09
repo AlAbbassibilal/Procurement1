@@ -17,6 +17,7 @@ export const ROLE_LABEL: Record<Role, string> = {
   executive_director: 'Executive Director',
   legal: 'Legal Counsel',
   logistics: 'Logistics / Warehouse Officer',
+  hr: 'HR & Admin Officer',
   admin: 'System Administrator',
 }
 

@@ -1,4 +1,4 @@
-import type { ApprovalRule, Contract, OrgSettings, PurchaseOrder, PurchaseRequisition, User, Vendor, ContractClause, GoodsReceipt, Invoice, ProcurementTier, ProjectBudget, Donor, Project, Task, MasterBudget, Partner, StaffMember } from '@/types'
+import type { ApprovalRule, Contract, OrgSettings, PurchaseOrder, PurchaseRequisition, User, Vendor, ContractClause, GoodsReceipt, Invoice, ProcurementTier, ProjectBudget, Donor, Project, Task, MasterBudget, Partner, StaffMember, LeaveRequest, Timesheet, Payslip, AttendanceRecord } from '@/types'
 import { generateReportingCalendar, generateSpendingPlan, monthsOf } from '@/lib/grants'
 import { emptySourcing } from '@/lib/tiers'
 import { emptyDueDiligence } from '@/lib/partners'
@@ -30,6 +30,7 @@ export const SEED_SETTINGS: OrgSettings = {
   priceTolerancePct: 2,
   paymentTermsDays: 30,
   fiscalYearStart: '01-01',
+  hr: { annualLeaveDays: 14, wfhDays: 14, weekend: [5, 6], socialSecurityPct: 7.5, incomeTaxPct: 0, checkInStart: '08:00', checkInEnd: '10:00' },
 }
 
 /** Procurement SOPs §3 — thresholds apply to the total value of a single transaction and must not be split. */
@@ -65,6 +66,7 @@ export const SEED_USERS: User[] = [
   { id: 'u_fawaz',  name: 'Fawaz Al Shakaa', email: 'fawaz.alshakaa@rhs.jo',     password: 'rhs2025', role: 'executive_director',  department: 'Executive Office',  title: 'Executive Director / Board Chairperson', avatarColor: 'bg-ink-900', active: true },
   { id: 'u_dana',   name: 'Dana Qasem',      email: 'dana.qasem@rhs.jo',         password: 'rhs2025', role: 'legal',               department: 'Legal',             title: 'Legal Counsel',                 avatarColor: 'bg-accent-700', active: true },
   { id: 'u_hani',   name: 'Hani Odeh',       email: 'hani.odeh@rhs.jo',          password: 'rhs2025', role: 'dept_manager',        department: 'Operations',        title: 'Operations Manager',            avatarColor: 'bg-ink-600',    active: true },
+  { id: 'u_reem',   name: 'Reem Nasser',     email: 'reem.nasser@rhs.jo',        password: 'rhs2025', role: 'hr',                  department: 'HR & Admin',        title: 'HR & Admin Officer',            avatarColor: 'bg-info-500',   active: true },
   { id: 'u_nour',   name: 'Nour Saleh',      email: 'nour.saleh@rhs.jo',         password: 'rhs2025', role: 'requester',           department: 'Field Services',    title: 'Field Coordinator',             avatarColor: 'bg-brand-500',  active: true },
 ]
 
@@ -426,18 +428,42 @@ const ST = (n: number, name: string, position: string, department: string, count
 })
 export const SEED_STAFF: StaffMember[] = [
   ST(1, 'Fawaz Al Shakaa', 'Executive Director', 'Executive Office', 'Amman (Regional Office)', 5000, '2018-01-01', { userId: 'u_fawaz' }),
-  ST(2, 'Bilal Abbassi', 'Director of Programs', 'Programs', 'Amman (Regional Office)', 4000, '2019-03-01', { userId: 'u_bilal' }),
-  ST(3, 'Shatha Homsi', 'Director of Finance & Support', 'Finance', 'Amman (Regional Office)', 4000, '2019-06-01', { userId: 'u_shatha' }),
-  ST(4, 'Rana Suleiman', 'Finance Manager', 'Finance', 'Amman (Regional Office)', 2200, '2021-02-01', { userId: 'u_rana' }),
-  ST(5, 'Yousef Nasser', 'Procurement Officer', 'Procurement', 'Amman (Regional Office)', 1500, '2022-04-01', { userId: 'u_yousef' }),
-  ST(6, 'Maha Al-Rawi', 'Procurement & Logistics Manager', 'Procurement', 'Amman (Regional Office)', 1700, '2020-09-01', { userId: 'u_maha' }),
-  ST(7, 'Hani Odeh', 'Operations Manager', 'Operations', 'Amman (Regional Office)', 1900, '2020-01-15', { userId: 'u_hani' }),
-  ST(8, 'Lina Haddad', 'MEAL Officer', 'Programs', 'Amman (Regional Office)', 1300, '2023-01-01', { userId: 'u_lina' }),
-  ST(9, 'Omar Khalil', 'Medical Programs Manager', 'Medical Programs', 'Gaza', 2000, '2021-05-01', { userId: 'u_omar' }),
-  ST(10, 'Nour Saleh', 'Field Services Coordinator', 'Field Services', 'Amman (Regional Office)', 1200, '2024-02-01', { userId: 'u_nour' }),
-  ST(11, 'Khalid Mansour', 'Logistics / Warehouse Officer', 'Logistics', 'Amman (Regional Office)', 1100, '2022-08-01', { userId: 'u_khalid' }),
-  ST(12, 'Samer Al-Zoubi', 'P&O Technician — Irbid', 'Field Services', 'Amman (Regional Office)', 1150, '2025-10-01', { sourceProjectId: 'prj_irb', sourceProjectCode: 'GR-2025-IRB-03', sourceLineCode: 'BL-10', notes: 'Recruited for the Irbid workshop' }),
-  ST(13, 'Rawan Khasawneh', 'Outreach Officer — Irbid', 'Field Services', 'Amman (Regional Office)', 950, '2025-10-01', { sourceProjectId: 'prj_irb', sourceProjectCode: 'GR-2025-IRB-03', sourceLineCode: 'BL-10' }),
+  ST(2, 'Bilal Abbassi', 'Director of Programs', 'Programs', 'Amman (Regional Office)', 4000, '2019-03-01', { userId: 'u_bilal', lineManagerId: 'stf_1', contractRef: 'HR-C-2019-004' }),
+  ST(3, 'Shatha Homsi', 'Director of Finance & Support', 'Finance', 'Amman (Regional Office)', 4000, '2019-06-01', { userId: 'u_shatha', lineManagerId: 'stf_1' }),
+  ST(4, 'Rana Suleiman', 'Finance Manager', 'Finance', 'Amman (Regional Office)', 2200, '2021-02-01', { userId: 'u_rana', lineManagerId: 'stf_3' }),
+  ST(5, 'Yousef Nasser', 'Procurement Officer', 'Procurement', 'Amman (Regional Office)', 1500, '2022-04-01', { userId: 'u_yousef', lineManagerId: 'stf_6' }),
+  ST(6, 'Maha Al-Rawi', 'Procurement & Logistics Manager', 'Procurement', 'Amman (Regional Office)', 1700, '2020-09-01', { userId: 'u_maha', lineManagerId: 'stf_3' }),
+  ST(7, 'Hani Odeh', 'Operations Manager', 'Operations', 'Amman (Regional Office)', 1900, '2020-01-15', { userId: 'u_hani', lineManagerId: 'stf_2' }),
+  ST(8, 'Lina Haddad', 'MEAL Officer', 'Programs', 'Amman (Regional Office)', 1300, '2023-01-01', { userId: 'u_lina', lineManagerId: 'stf_2', endDate: '2026-12-31', contractRef: 'HR-C-2023-002' }),
+  ST(9, 'Omar Khalil', 'Medical Programs Manager', 'Medical Programs', 'Gaza', 2000, '2021-05-01', { userId: 'u_omar', lineManagerId: 'stf_2' }),
+  ST(10, 'Nour Saleh', 'Field Services Coordinator', 'Field Services', 'Amman (Regional Office)', 1200, '2024-02-01', { userId: 'u_nour', lineManagerId: 'stf_7', endDate: '2026-11-15', contractRef: 'HR-C-2024-001' }),
+  ST(11, 'Khalid Mansour', 'Logistics / Warehouse Officer', 'Logistics', 'Amman (Regional Office)', 1100, '2022-08-01', { userId: 'u_khalid', lineManagerId: 'stf_6' }),
+  ST(12, 'Samer Al-Zoubi', 'P&O Technician — Irbid', 'Field Services', 'Amman (Regional Office)', 1150, '2025-10-01', { sourceProjectId: 'prj_irb', sourceProjectCode: 'GR-2025-IRB-03', sourceLineCode: 'BL-10', notes: 'Recruited for the Irbid workshop', lineManagerId: 'stf_7', endDate: '2026-12-31' }),
+  ST(13, 'Rawan Khasawneh', 'Outreach Officer — Irbid', 'Field Services', 'Amman (Regional Office)', 950, '2025-10-01', { sourceProjectId: 'prj_irb', sourceProjectCode: 'GR-2025-IRB-03', sourceLineCode: 'BL-10', lineManagerId: 'stf_7', endDate: '2026-12-31' }),
+  ST(14, 'Reem Nasser', 'HR & Admin Officer', 'HR & Admin', 'Amman (Regional Office)', 1400, '2022-03-01', { userId: 'u_reem', lineManagerId: 'stf_3' }),
+]
+
+// ---------------------------------------------------------------------------
+// HR & Admin — leave / WFH requests, timesheets, payslips, attendance
+// ---------------------------------------------------------------------------
+const ym = (offset = 0) => { const x = new Date(); x.setMonth(x.getMonth() + offset); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}` }
+const Y = new Date().getFullYear()
+export const SEED_LEAVE: LeaveRequest[] = [
+  { id: 'lr_1', number: `LR-${Y}-0001`, staffId: 'stf_8', staffName: 'Lina Haddad', type: 'annual', startDate: `${Y}-03-09`, endDate: `${Y}-03-11`, days: 3, reason: 'Family travel', status: 'approved', submittedAt: `${Y}-02-20T09:00:00Z`, decidedBy: 'u_bilal', decidedByName: 'Bilal Abbassi', decidedAt: `${Y}-02-21T10:00:00Z` },
+  { id: 'lr_2', number: `WFH-${Y}-0001`, staffId: 'stf_8', staffName: 'Lina Haddad', type: 'wfh', startDate: `${Y}-05-04`, endDate: `${Y}-05-05`, days: 2, reason: 'Report writing', status: 'approved', submittedAt: `${Y}-04-28T09:00:00Z`, decidedBy: 'u_bilal', decidedByName: 'Bilal Abbassi', decidedAt: `${Y}-04-28T12:00:00Z` },
+  { id: 'lr_3', number: `LR-${Y}-0002`, staffId: 'stf_9', staffName: 'Omar Khalil', type: 'annual', startDate: toInputDate(addDays(new Date(), 12)), endDate: toInputDate(addDays(new Date(), 16)), days: 4, reason: 'Eid family visit', status: 'pending', submittedAt: ago(1) },
+  { id: 'lr_4', number: `WFH-${Y}-0002`, staffId: 'stf_10', staffName: 'Nour Saleh', type: 'wfh', startDate: toInputDate(addDays(new Date(), 3)), endDate: toInputDate(addDays(new Date(), 3)), days: 1, reason: 'Home internet installation', status: 'pending', submittedAt: ago(0) },
+  { id: 'lr_5', number: `LR-${Y}-0003`, staffId: 'stf_4', staffName: 'Rana Suleiman', type: 'sick', startDate: `${Y}-06-15`, endDate: `${Y}-06-16`, days: 2, reason: 'Medical certificate attached', status: 'approved', submittedAt: `${Y}-06-15T07:30:00Z`, decidedBy: 'u_shatha', decidedByName: 'Shatha Homsi', decidedAt: `${Y}-06-15T09:00:00Z` },
+]
+export const SEED_TIMESHEETS: Timesheet[] = [
+  { id: 'ts_1', staffId: 'stf_8', period: ym(-1), workingDays: 22, leaveDays: 0, lines: [{ id: 'tl_1', projectId: 'prj_irb', projectCode: 'GR-2025-IRB-03', description: 'MEAL — outreach data review', days: 18 }, { id: 'tl_2', projectCode: 'CORE', description: 'Core / unrestricted', days: 4 }], status: 'submitted', createdBy: 'u_bilal', createdByName: 'Bilal Abbassi', createdAt: ago(3), updatedAt: ago(3), submittedAt: ago(3) },
+  { id: 'ts_2', staffId: 'stf_12', period: ym(-1), workingDays: 22, leaveDays: 0, lines: [{ id: 'tl_3', projectId: 'prj_irb', projectCode: 'GR-2025-IRB-03', description: 'BL-10 · P&O technician', days: 22 }], status: 'approved', createdBy: 'u_hani', createdByName: 'Hani Odeh', createdAt: ago(5), updatedAt: ago(2), submittedAt: ago(5), acknowledgedAt: ago(4), approvedBy: 'u_reem', approvedByName: 'Reem Nasser', approvedAt: ago(2) },
+]
+export const SEED_PAYSLIPS: Payslip[] = ['stf_2', 'stf_8', 'stf_10'].map((id, i) => { const gross = { stf_2: 4000, stf_8: 1300, stf_10: 1200 }[id]!; const ss = Math.round(gross * 7.5) / 100; return { id: `ps_${i + 1}`, number: `PS-${ym(-1)}-${String(i + 1).padStart(3, '0')}`, staffId: id, period: ym(-1), currency: 'JOD' as const, gross, allowances: 0, socialSecurity: ss, tax: 0, unpaidDeduction: 0, otherDeductions: 0, net: gross - ss, workingDays: 22, leaveDays: 0, unpaidDays: 0, paidAt: ago(2), generatedBy: 'u_shatha', generatedByName: 'Shatha Homsi' } })
+export const SEED_ATTENDANCE: AttendanceRecord[] = [
+  { id: 'at_1', staffId: 'stf_4', date: toInputDate(new Date()), mode: 'office', checkInAt: new Date(new Date().setHours(8, 12, 0, 0)).toISOString(), lat: 31.9539, lng: 35.9106, accuracy: 25, locationStatus: 'captured' },
+  { id: 'at_2', staffId: 'stf_14', date: toInputDate(new Date()), mode: 'office', checkInAt: new Date(new Date().setHours(8, 31, 0, 0)).toISOString(), lat: 31.9541, lng: 35.9102, accuracy: 18, locationStatus: 'captured' },
+  { id: 'at_3', staffId: 'stf_8', date: toInputDate(addDays(new Date(), -1)), mode: 'office', checkInAt: new Date(addDays(new Date(), -1).setHours(8, 5, 0, 0)).toISOString(), checkOutAt: new Date(addDays(new Date(), -1).setHours(16, 40, 0, 0)).toISOString(), lat: 31.9538, lng: 35.9109, accuracy: 30, locationStatus: 'captured' },
 ]
 
 export const SEED_PARTNERS: Partner[] = [

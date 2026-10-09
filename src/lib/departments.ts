@@ -46,7 +46,7 @@ export const DEPARTMENTS: DepartmentDef[] = [
     id: 'hr', name: 'HR & Admin', short: 'People, time & office', home: '/hr', paths: ['/hr'],
     description: 'Staff register and contracts, leave and attendance, timesheets and level-of-effort against projects, and administrative requests.',
     tone: { tile: 'bg-ink-700 text-white', text: 'text-ink-700', ring: 'ring-ink-300' },
-    modules: [{ to: '/hr', label: 'Overview' }, { to: '/finance/salary-plan', label: 'Staff register & salary plan' }, { to: '/hr/leave', label: 'Leave & attendance', soon: true }, { to: '/hr/timesheets', label: 'Timesheets & LoE', soon: true }, { to: '/hr/requests', label: 'Admin requests', soon: true }],
+    modules: [{ to: '/hr', label: 'Overview' }, { to: '/hr/me', label: 'My HR' }, { to: '/hr/staff', label: 'Staff register' }, { to: '/hr/requests', label: 'Leave & WFH requests' }, { to: '/hr/timesheets', label: 'Timesheets' }, { to: '/hr/attendance', label: 'Attendance' }, { to: '/hr/payroll', label: 'Payroll & payslips' }, { to: '/finance/salary-plan', label: 'Master salary plan' }],
   },
   {
     id: 'media', name: 'Media & Communication', short: 'Visibility & content', home: '/media', paths: ['/media'],
@@ -72,6 +72,7 @@ const ROLE_DEFAULTS: Record<Role, Partial<Record<Department, AccessLevel>>> = {
   requester:           { grants: 'view', procurement: 'edit' },
   legal:               { grants: 'view', partnerships: 'edit', procurement: 'view' },
   logistics:           { procurement: 'edit' },
+  hr:                  { grants: 'view', procurement: 'edit', finance: 'view', hr: 'manage' },
 }
 
 export const defaultAccess = (role: Role): Record<Department, AccessLevel> =>

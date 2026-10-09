@@ -7,6 +7,7 @@ import { DEPT_ICON } from '@/pages/Home'
 import { computeBvA } from '@/lib/budget'
 import { coverageFor } from '@/lib/master'
 import { staffCoverage } from '@/lib/salary'
+import { contractDaysLeft, onLeaveToday, today as todayIso } from '@/lib/hr'
 import { invoiceTotals } from '@/lib/match'
 import { ddProgress, partnerProjects, riskLevel, PARTNER_STAGE_LABEL } from '@/lib/partners'
 import { PartnerStagePill, DdBar, ProjectChips } from '@/pages/partnerships/shared'
@@ -94,5 +95,21 @@ export function PartnershipsHome() {
     } />
   )
 }
-export const HrHome = () => <WorkspaceFrame id="hr" />
+export function HrHome() {
+  const { staff, leaveRequests, timesheets, attendance } = useStore()
+  const active = staff.filter((s) => s.status === 'active')
+  const ending = active.filter((s) => { const d = contractDaysLeft(s); return d !== null && d >= 0 && d <= 60 })
+  const ym = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
+  return (
+    <WorkspaceFrame id="hr" intro={
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <Stat label="Active staff" value={active.length} hint={`${staff.filter((s) => s.status === 'planned').length} to recruit`} tone="brand" />
+        <Stat label="Checked in today" value={attendance.filter((a) => a.date === todayIso()).length} hint={`${leaveRequests.filter((r) => onLeaveToday(r)).length} on leave / WFH`} />
+        <Stat label="Requests pending" value={leaveRequests.filter((r) => r.status === 'pending').length} tone={leaveRequests.some((r) => r.status === 'pending') ? 'sun' : 'default'} />
+        <Stat label="Timesheets awaiting" value={timesheets.filter((t) => ['submitted', 'acknowledged'].includes(t.status)).length} hint={`${active.length - timesheets.filter((t) => t.period === ym).length} not started for ${ym}`} />
+        <Stat label="Contracts ending ≤ 60 days" value={ending.length} hint={ending.map((s) => s.name).join(', ') || undefined} tone={ending.length ? 'accent' : 'default'} />
+      </div>
+    } />
+  )
+}
 export const MediaHome = () => <WorkspaceFrame id="media" />

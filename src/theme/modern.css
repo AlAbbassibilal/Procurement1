@@ -1,0 +1,75 @@
+/* ============================================================================
+   MODERN INTERFACE — optional skin on top of the RHS brand tokens
+   ----------------------------------------------------------------------------
+   Activated with <html data-ui="modern"> (Settings → Appearance). The original
+   interface ("Classic") is the default and needs no attribute. Colours stay
+   on the brand palette (guideline §6); what changes is the surface language:
+   lighter chrome, larger radii, softer elevation, a tinted canvas and
+   gradient primary actions. Nothing here is referenced from components —
+   they keep using the same token classes.
+   ============================================================================ */
+
+:root[data-ui="modern"] {
+  --surface-muted:  247 249 252;
+  --surface-sunken: 241 244 249;
+  --border:         229 234 240;
+
+  --radius-card: 16px;
+  --radius-control: 10px;
+
+  --shadow-card:    0 1px 2px rgb(21 43 56 / 0.04), 0 10px 30px -18px rgb(21 43 56 / 0.18);
+  --shadow-raised:  0 2px 6px rgb(21 43 56 / 0.05), 0 18px 40px -16px rgb(21 43 56 / 0.22);
+  --shadow-overlay: 0 32px 64px -12px rgb(21 43 56 / 0.30);
+
+  --sidebar-width: 264px;
+  --topbar-height: 64px;
+}
+
+/* Tinted canvas: a soft brand-green glow top-right and an amber glow bottom-left */
+:root[data-ui="modern"] body {
+  background-color: rgb(var(--surface-sunken));
+  background-image:
+    radial-gradient(1100px 520px at 100% -8%, rgb(var(--brand-100) / 0.9) 0%, transparent 60%),
+    radial-gradient(800px 480px at -10% 110%, rgb(var(--sun-100) / 0.8) 0%, transparent 55%);
+  background-attachment: fixed;
+}
+
+/* Cards: hairline border, hover lift */
+:root[data-ui="modern"] .card {
+  border-color: rgb(var(--border) / 0.9);
+  transition: box-shadow .18s ease, transform .18s ease;
+}
+
+/* Controls */
+:root[data-ui="modern"] .input { border-color: rgb(var(--ink-200)); }
+:root[data-ui="modern"] .input:focus { box-shadow: 0 0 0 4px rgb(var(--brand-600) / 0.12); }
+:root[data-ui="modern"] .btn { font-weight: 600; }
+:root[data-ui="modern"] .btn-primary {
+  background-image: linear-gradient(135deg, rgb(var(--brand-500)) 0%, rgb(var(--brand-700)) 100%);
+  box-shadow: 0 8px 18px -8px rgb(var(--brand-700) / 0.7);
+}
+:root[data-ui="modern"] .btn-primary:hover { background-image: linear-gradient(135deg, rgb(var(--brand-600)) 0%, rgb(var(--brand-800)) 100%); }
+:root[data-ui="modern"] .btn-secondary { border-color: rgb(var(--ink-200)); box-shadow: 0 1px 2px rgb(21 43 56 / 0.04); }
+:root[data-ui="modern"] .btn-danger {
+  background-image: linear-gradient(135deg, rgb(var(--accent-500)) 0%, rgb(var(--accent-700)) 100%);
+  box-shadow: 0 8px 18px -8px rgb(var(--accent-700) / 0.6);
+}
+
+/* Tables: quiet header row, rounded first/last header cells */
+:root[data-ui="modern"] .table-th { background: rgb(var(--surface-muted) / 0.7); letter-spacing: 0.08em; }
+:root[data-ui="modern"] .table-td { border-color: rgb(var(--border) / 0.7); }
+
+/* Top bar: frosted glass */
+:root[data-ui="modern"] header[data-topbar] {
+  background: rgb(var(--surface) / 0.82);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+}
+
+/* Sidebar rail: white, with a faint brand wash at the top */
+:root[data-ui="modern"] aside[data-sidebar] {
+  background-image: linear-gradient(180deg, rgb(var(--brand-50)) 0%, rgb(var(--surface)) 180px);
+}
+
+/* Headings get a touch more weight in the modern skin */
+:root[data-ui="modern"] h1, :root[data-ui="modern"] h2 { letter-spacing: -0.02em; }

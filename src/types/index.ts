@@ -742,3 +742,6 @@ export interface OrgSettings {
   paymentTermsDays: number       // default invoice due date offset
   fiscalYearStart: string
 }
+
+/** Interface skin — 'classic' is the original RHS interface, 'modern' the lighter redesign. Switchable in Settings → Appearance. */
+export type UiTheme = 'classic' | 'modern'

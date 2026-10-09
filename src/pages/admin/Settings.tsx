@@ -1,19 +1,20 @@
 import { useState } from 'react'
-import { Save } from 'lucide-react'
+import { Save, Check, Monitor, Sparkles, PanelLeftClose } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useStore } from '@/store/useStore'
 import { Card, PageHeader, Field, Alert } from '@/components/ui'
 import { Logo } from '@/components/Logo'
-import type { OrgSettings } from '@/types'
+import { cx } from '@/lib/format'
+import type { OrgSettings, UiTheme } from '@/types'
 
 export default function Settings() {
-  const { settings, updateSettings } = useStore()
+  const { settings, updateSettings, uiTheme, setUiTheme, sidebarCollapsed, setSidebarCollapsed } = useStore()
   const [s, setS] = useState<OrgSettings>(settings)
   const [saved, setSaved] = useState(false)
   const set = (p: Partial<OrgSettings>) => setS((x) => ({ ...x, ...p }))
   return (
     <>
-      <PageHeader title="Settings" subtitle="Organisation identity, procurement policy thresholds and document defaults."
+      <PageHeader title="Settings" subtitle="Organisation identity, procurement policy thresholds, appearance and document defaults."
         actions={<button className="btn-primary" onClick={() => { updateSettings(s); setSaved(true); setTimeout(() => setSaved(false), 2000) }}><Save size={15} /> Save</button>} />
       {saved && <div className="mb-4"><Alert tone="success">Settings saved.</Alert></div>}
       <div className="grid gap-6 xl:grid-cols-3">
@@ -27,6 +28,27 @@ export default function Settings() {
               <Field label="Email"><input className="input" value={s.email} onChange={(e) => set({ email: e.target.value })} /></Field>
               <Field label="Phone"><input className="input" value={s.phone} onChange={(e) => set({ phone: e.target.value })} /></Field>
               <Field label="Website"><input className="input" value={s.website} onChange={(e) => set({ website: e.target.value })} /></Field>
+            </div>
+          </Card>
+          <Card title="Appearance" description="Choose the interface you prefer. Applies immediately and is remembered on this device — every user can also switch from their account menu.">
+            <div className="grid gap-4 sm:grid-cols-2">
+              {THEMES.map((t) => { const on = uiTheme === t.id; return (
+                <button key={t.id} type="button" data-testid={`theme-${t.id}`} onClick={() => setUiTheme(t.id)} aria-pressed={on}
+                  className={cx('group rounded-card border-2 p-3 text-left transition-all', on ? 'border-brand-600 bg-brand-50/50 shadow-card' : 'border-line hover:border-ink-300 hover:bg-surface-muted')}>
+                  <ThemePreview id={t.id} />
+                  <div className="mt-3 flex items-center gap-2">
+                    <span className={cx('flex h-7 w-7 items-center justify-center rounded-control', on ? 'bg-brand-600 text-white' : 'bg-ink-100 text-ink-600')}>{t.icon}</span>
+                    <span className="flex-1">
+                      <span className="block text-[13.5px] font-semibold text-ink-900">{t.name}{on && <span className="ml-2 rounded-pill bg-brand-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">Active</span>}</span>
+                      <span className="block text-[12px] text-ink-500">{t.blurb}</span>
+                    </span>
+                    {on && <Check size={16} className="text-brand-700" />}
+                  </div>
+                </button>) })}
+              <label className="flex items-start gap-3 rounded-control border border-line bg-surface-muted px-3 py-2.5 text-[13px] text-ink-700 sm:col-span-2">
+                <input type="checkbox" className="mt-0.5" checked={sidebarCollapsed} onChange={(e) => setSidebarCollapsed(e.target.checked)} />
+                <span><span className="flex items-center gap-1.5 font-medium text-ink-900"><PanelLeftClose size={14} /> Keep the sidebar hidden</span>Shows an icon rail instead of the full menu, leaving more room for what you are working on. Toggle any time with the sidebar button or <span className="kbd">Ctrl</span> + <span className="kbd">B</span>.</span>
+              </label>
             </div>
           </Card>
           <Card title="Procurement policy">
@@ -52,5 +74,33 @@ export default function Settings() {
         </div>
       </div>
     </>
+  )
+}
+
+const THEMES: { id: UiTheme; name: string; blurb: string; icon: React.ReactNode }[] = [
+  { id: 'classic', name: 'Classic', blurb: 'The original interface — navy sidebar, compact cards, square corners.', icon: <Monitor size={15} /> },
+  { id: 'modern', name: 'Modern', blurb: 'Light sidebar, rounded cards, tinted canvas and gradient actions.', icon: <Sparkles size={15} /> },
+]
+
+/** Miniature of each skin, drawn with brand tokens so it stays in sync with the palette. */
+function ThemePreview({ id }: { id: UiTheme }) {
+  const modern = id === 'modern'
+  return (
+    <div className={cx('flex h-28 overflow-hidden border', modern ? 'rounded-2xl border-ink-200 bg-gradient-to-br from-brand-50 via-surface-sunken to-sun-50' : 'rounded-md border-ink-300 bg-surface-sunken')} aria-hidden>
+      <div className={cx('flex w-[26%] flex-col gap-1 p-1.5', modern ? 'border-r border-line bg-surface' : 'bg-ink-900')}>
+        <div className={cx('mb-1 h-1.5 w-8 rounded-pill', modern ? 'bg-accent-600' : 'bg-white/70')} />
+        {[0, 1, 2, 3].map((i) => <div key={i} className={cx('h-2 rounded-sm', i === 1 ? 'bg-brand-600' : modern ? 'bg-ink-100' : 'bg-white/15', modern && i === 1 && 'rounded-md', i === 3 ? 'w-2/3' : 'w-full')} />)}
+      </div>
+      <div className="flex-1 p-2">
+        <div className={cx('mb-1.5 flex items-center justify-between', modern ? 'rounded-lg bg-surface/80 px-1.5 py-1' : 'border-b border-line pb-1')}>
+          <div className="h-1.5 w-10 rounded-pill bg-ink-300" />
+          <div className={cx('h-2.5 w-6', modern ? 'rounded-md bg-gradient-to-r from-brand-500 to-brand-700' : 'rounded-sm bg-brand-600')} />
+        </div>
+        <div className="grid grid-cols-3 gap-1.5">
+          {[0, 1, 2].map((i) => <div key={i} className={cx('h-7 bg-surface', modern ? 'rounded-lg border border-line/70 shadow-raised' : 'rounded-sm border border-line')} />)}
+          <div className={cx('col-span-3 h-6 bg-surface', modern ? 'rounded-lg border border-line/70' : 'rounded-sm border border-line')} />
+        </div>
+      </div>
+    </div>
   )
 }

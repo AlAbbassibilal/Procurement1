@@ -16,6 +16,7 @@ import Tasks from '@/pages/Tasks'
 import MasterBudgetPage from '@/pages/finance/MasterBudget'
 import { useStore } from '@/store/useStore'
 import Layout from '@/components/Layout'
+import { useUiTheme } from '@/lib/ui-theme'
 import Login from '@/pages/Login'
 import Dashboard from '@/pages/Dashboard'
 import Approvals from '@/pages/Approvals'
@@ -62,6 +63,7 @@ function RequireAccess() {
 
 export default function App() {
   const authed = useStore((s) => !!s.currentUserId)
+  useUiTheme()
   return (
     <Routes>
       <Route path="/login" element={authed ? <Navigate to="/" replace /> : <Login />} />

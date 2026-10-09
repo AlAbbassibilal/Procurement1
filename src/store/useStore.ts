@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import type {
   ApprovalRule, Attachment, AuditEvent, Comment, Contract, ContractMilestone, LineItem, Notification, OrgSettings,
   PurchaseOrder, PurchaseRequisition, Quotation, User, Vendor, DocType, Role, GoodsReceipt, GoodsReceiptLine, Invoice, InvoiceLine, SourcingRecord, ExceptionType, ProjectBudget, Envelope, EnvelopeRecipient, EnvelopeField, Project, ProjectStage, Donor, Task, ProjectReport, ProjectComment, MasterBudget, MasterLine,
+  UiTheme,
 } from '@/types'
 import { DOC_OWNER, SEED_BUDGETS, SEED_DONORS, SEED_PROJECTS, SEED_TASKS, SEED_MASTER, SEED_CONTRACTS, SEED_GRNS, SEED_INVOICES, SEED_POS, SEED_PRS, SEED_RULES, SEED_SETTINGS, SEED_USERS, SEED_VENDORS, STANDARD_CLAUSES } from '@/data/seed'
 import { hasBlockingIssues, receiptProgress, runMatch, invoiceTotals } from '@/lib/match'
@@ -32,6 +33,8 @@ interface State {
   tasks: Task[]
   masterBudgets: MasterBudget[]
   country: string            // current country context ('all' or a country name)
+  uiTheme: UiTheme           // 'classic' (original interface) | 'modern'
+  sidebarCollapsed: boolean  // desktop sidebar shown as an icon rail
   notifications: Notification[]
   audit: AuditEvent[]
   counters: Record<string, number>
@@ -110,6 +113,10 @@ interface Actions {
   reopenMasterBudget: (mbId: string) => void
   setBudgetLineMaster: (budgetId: string, lineId: string, masterLineId?: string) => void
   setCountry: (c: string) => void
+  // Appearance (per browser)
+  setUiTheme: (t: UiTheme) => void
+  toggleSidebar: () => void
+  setSidebarCollapsed: (v: boolean) => void
 
   // Grants / PCM
   createProject: (data: Partial<Project> & { code: string; title: string }) => Project
@@ -169,6 +176,8 @@ const initial = (): State => ({
   tasks: SEED_TASKS,
   masterBudgets: SEED_MASTER,
   country: 'all',
+  uiTheme: 'classic',
+  sidebarCollapsed: false,
   notifications: [
     { id: 'n5', userId: 'u_rana', at: nowIso(), title: 'Invoice approval required', body: 'INV-2025-0012 · Amman Fleet & Logistics · JOD 742.40', link: '/invoices/inv_1', read: false, kind: 'approval' },
     { id: 'n1', userId: 'u_rana', at: nowIso(), title: 'Approval required', body: 'PR-2025-0042 · Laptops for field coordinators', link: '/requisitions/pr_2', read: false, kind: 'approval' },
@@ -700,6 +709,9 @@ export const useStore = create<State & Actions>()(
         reopenMasterBudget: (mbId) => set((s) => ({ masterBudgets: s.masterBudgets.map((m) => (m.id === mbId ? { ...m, status: 'draft' } : m)) })),
         setBudgetLineMaster: (budgetId, lineId, masterLineId) => set((s) => ({ budgets: s.budgets.map((b) => (b.id === budgetId ? { ...b, lines: b.lines.map((l) => (l.id === lineId ? { ...l, masterLineId } : l)) } : b)) })),
         setCountry: (c) => set({ country: c }),
+        setUiTheme: (t) => set({ uiTheme: t }),
+        toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+        setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
 
         // ---- Grants / PCM --------------------------------------------------
         createProject: (data) => {
@@ -907,7 +919,7 @@ export const useStore = create<State & Actions>()(
         markRead: (id) => set((s) => ({ notifications: s.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)) })),
         markAllRead: () => { const me = get().currentUserId; set((s) => ({ notifications: s.notifications.map((n) => (n.userId === me ? { ...n, read: true } : n)) })) },
 
-        resetDemo: () => set({ ...initial(), currentUserId: get().currentUserId }),
+        resetDemo: () => set({ ...initial(), currentUserId: get().currentUserId, uiTheme: get().uiTheme, sidebarCollapsed: get().sidebarCollapsed }),
       }
     },
     { name: 'rhs-platform-v7', version: 7 },

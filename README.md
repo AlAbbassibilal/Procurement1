@@ -42,6 +42,12 @@ npm run build      # production bundle in dist/
 
 Sign in with any demo account (password `rhs2025`), e.g. `AlAbbassi.bilal@icloud.com` (administrator). The user menu lets you switch account to walk a document through every role, and reset the demo data.
 
+## Interface: Classic / Modern, and the sidebar
+
+Two skins ship on the same brand palette. **Classic** is the original interface (navy sidebar, compact cards). **Modern** is a lighter redesign — white sidebar with a brand wash, 16 px cards, tinted canvas, frosted top bar and gradient primary actions. Switch between them under **Settings → Appearance** (admin) or from the account menu (any user); the choice is remembered per device and applies to the login page too. The skin lives in `src/theme/modern.css` as token overrides under `html[data-ui="modern"]`; components keep using the same Tailwind token classes.
+
+The sidebar can be hidden to an icon rail (sidebar button, header button or **Ctrl/⌘ + B**) and restored the same way; the state is remembered. The mobile drawer always shows the full menu.
+
 ## Branding
 
 Everything visual is driven from **`src/theme/brand.css`** — the only file with literal brand values (RHS green `#00853f`, crimson `#d21e47`, amber `#ffb32c`, navy `#152b38`, Helvetica Neue / Myriad Pro / Helvetica Neue W23). Components consume tokens via Tailwind (`bg-brand-600`, `text-ink-500`, …). Licensed web-font files can be added there with `@font-face`.
@@ -57,6 +63,7 @@ State, approvals, numbering and notifications live in `src/store/useStore.ts`; t
 ```
 src/
   theme/brand.css        brand tokens (single source of truth)
+  theme/modern.css       optional 'Modern' interface skin (Settings → Appearance)
   types/                 domain model (PR, PO, Contract, Quotation, ApprovalRule, …)
   data/seed.ts           users, vendors, approval matrix, clause library, sample documents
   lib/workflow.ts        approval engine

@@ -1,4 +1,5 @@
 @import './theme/brand.css';
+@import './theme/modern.css';
 
 @tailwind base;
 @tailwind components;

@@ -2,13 +2,14 @@ import { useState, useMemo, useEffect } from 'react'
 import { NavLink, Outlet, useNavigate, Link, useLocation } from 'react-router-dom'
 import {
   LayoutGrid, FileText, CheckSquare, Search, ShoppingCart, FileSignature, Building2, Users, SlidersHorizontal,
-  History, Bell, LogOut, ChevronDown, Menu, Settings, RotateCcw, ChevronsUpDown, PackageCheck, Receipt, Scale, Wallet, Gauge, Lock, PenLine, ListChecks, HandCoins, Building, FolderPlus, Table2, Landmark, Globe2,
+  History, Bell, LogOut, ChevronDown, Menu, Settings, RotateCcw, ChevronsUpDown, PackageCheck, Receipt, Scale, Wallet, Gauge, Lock, PenLine, ListChecks, HandCoins, Building, FolderPlus, Table2, Landmark, Globe2, PanelLeftClose, PanelLeftOpen, Sparkles, Monitor,
 } from 'lucide-react'
 import { DEPARTMENTS, deptForPath, canEnter, ACCESS_LABEL, accessOf } from '@/lib/departments'
 import { DEPT_ICON } from '@/pages/Home'
 import { recipientTurn } from '@/lib/esign'
 import { useStore, useCurrentUser } from '@/store/useStore'
 import { Logo, SunMark } from './Logo'
+import { useUiTheme } from '@/lib/ui-theme'
 import { Avatar } from './ui'
 import { cx, timeAgo } from '@/lib/format'
 import { ROLE_LABEL, canApprove } from '@/lib/workflow'
@@ -21,7 +22,9 @@ export default function Layout() {
   const nav = useNavigate()
   const { pathname } = useLocation()
   const dept = deptForPath(pathname)
-  const { logout, prs, pos, contracts, invoices, envelopes, tasks, runReminders, country, setCountry, masterBudgets, notifications, markRead, markAllRead, users, switchUser, settings, resetDemo } = useStore()
+  const { logout, prs, pos, contracts, invoices, envelopes, tasks, runReminders, country, setCountry, masterBudgets, notifications, markRead, markAllRead, users, switchUser, settings, resetDemo, uiTheme, setUiTheme, sidebarCollapsed, toggleSidebar } = useStore()
+  useUiTheme()
+  const modern = uiTheme === 'modern'
   const [open, setOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   const [userOpen, setUserOpen] = useState(false)
@@ -67,21 +70,48 @@ export default function Layout() {
   const [deptOpen, setDeptOpen] = useState(false)
   useEffect(() => { runReminders(); const t = setInterval(runReminders, 30 * 60 * 1000); return () => clearInterval(t) }, [runReminders])
 
-  const Sidebar = (
-    <aside className="flex h-full w-sidebar flex-col bg-ink-900 text-white">
-      <div className="flex h-topbar items-center border-b border-white/10 px-5">
-        <Logo inverse size="sm" />
+  // Ctrl/⌘ + B toggles the sidebar (desktop)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b' && !(t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable))) { e.preventDefault(); toggleSidebar() }
+    }
+    window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey)
+  }, [toggleSidebar])
+
+  // Skin-specific classes for the sidebar chrome. Classic = dark navy rail (original), Modern = light rail.
+  const S = modern ? {
+    aside: 'bg-surface text-ink-800 border-r border-line', logoInverse: false, logoBar: 'border-b border-line',
+    switcher: 'bg-surface-muted hover:bg-ink-100', switcherTitle: 'text-ink-900', switcherSub: 'text-ink-500', chevron: 'text-ink-400', neutralTile: 'bg-ink-100 text-ink-700',
+    group: 'text-ink-400', divider: 'border-line', soon: 'text-ink-400', soonPill: 'border-ink-300',
+    active: 'bg-brand-600 text-white shadow-raised', idle: 'text-ink-600 hover:bg-brand-50 hover:text-ink-900',
+    foot: 'border-t border-line', footBox: 'bg-surface-muted text-ink-500', footTitle: 'text-ink-700', collapse: 'text-ink-500 hover:bg-ink-100 hover:text-ink-900',
+  } : {
+    aside: 'bg-ink-900 text-white', logoInverse: true, logoBar: 'border-b border-white/10',
+    switcher: 'bg-white/8 hover:bg-white/12', switcherTitle: 'text-white', switcherSub: 'text-white/50', chevron: 'text-white/50', neutralTile: 'bg-white/15 text-white',
+    group: 'text-white/40', divider: 'border-white/10', soon: 'text-white/35', soonPill: 'border-white/25',
+    active: 'bg-brand-600 text-white', idle: 'text-white/75 hover:bg-white/8 hover:text-white',
+    foot: 'border-t border-white/10', footBox: 'bg-white/5 text-white/60', footTitle: 'text-white/80', collapse: 'text-white/60 hover:bg-white/10 hover:text-white',
+  }
+
+  const renderSidebar = (collapsed: boolean) => (
+    <aside data-sidebar className={cx('flex h-full flex-col transition-[width] duration-200', collapsed ? 'w-[68px]' : 'w-sidebar', S.aside)}>
+      <div className={cx('flex h-topbar shrink-0 items-center', S.logoBar, collapsed ? 'justify-center' : 'px-5')}>
+        {collapsed ? <SunMark size={24} /> : <Logo inverse={S.logoInverse} size="sm" />}
       </div>
-      <div className="relative px-3 pt-3">
-        <button className="flex w-full items-center gap-2.5 rounded-control bg-white/8 px-3 py-2 text-left hover:bg-white/12" onClick={() => setDeptOpen((v) => !v)}>
-          <span className={cx('flex h-7 w-7 shrink-0 items-center justify-center rounded-control [&>svg]:h-4 [&>svg]:w-4', dept ? dept.tone.tile : 'bg-white/15 text-white')}>{dept ? DEPT_ICON[dept.id] : <LayoutGrid size={16} />}</span>
-          <span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-semibold text-white">{dept ? dept.name : 'All workspaces'}</span><span className="block truncate text-[11px] text-white/50">{dept ? `Workspace · ${ACCESS_LABEL[accessOf(user, dept.id)]}` : 'Choose a workspace'}</span></span>
-          <ChevronsUpDown size={14} className="text-white/50" />
+      <div className={cx('relative pt-3', collapsed ? 'px-2.5' : 'px-3')}>
+        <button className={cx('flex w-full items-center gap-2.5 rounded-control text-left', S.switcher, collapsed ? 'justify-center px-0 py-2' : 'px-3 py-2')} onClick={() => setDeptOpen((v) => !v)}
+          title={collapsed ? (dept ? `${dept.name} — switch workspace` : 'Choose a workspace') : undefined} aria-label="Switch workspace">
+          <span className={cx('flex h-7 w-7 shrink-0 items-center justify-center rounded-control [&>svg]:h-4 [&>svg]:w-4', dept ? dept.tone.tile : S.neutralTile)}>{dept ? DEPT_ICON[dept.id] : <LayoutGrid size={16} />}</span>
+          {!collapsed && <>
+            <span className="min-w-0 flex-1"><span className={cx('block truncate text-[13px] font-semibold', S.switcherTitle)}>{dept ? dept.name : 'All workspaces'}</span><span className={cx('block truncate text-[11px]', S.switcherSub)}>{dept ? `Workspace · ${ACCESS_LABEL[accessOf(user, dept.id)]}` : 'Choose a workspace'}</span></span>
+            <ChevronsUpDown size={14} className={S.chevron} />
+          </>}
         </button>
         {deptOpen && (
           <>
             <div className="fixed inset-0 z-30" onClick={() => setDeptOpen(false)} />
-            <div className="absolute left-3 right-3 z-40 mt-1 rounded-card border border-line bg-surface p-1.5 text-ink-900 shadow-overlay animate-slide-up">
+            <div className={cx('absolute z-40 mt-1 rounded-card border border-line bg-surface p-1.5 text-ink-900 shadow-overlay animate-slide-up', collapsed ? 'left-2 w-64' : 'left-3 right-3')}>
               {DEPARTMENTS.map((d) => { const ok = canEnter(user, d.id); return (
                 <button key={d.id} disabled={!ok} onClick={() => { setDeptOpen(false); setOpen(false); nav(d.home) }}
                   className={cx('flex w-full items-center gap-2.5 rounded-control px-2 py-1.5 text-left text-[12.5px]', ok ? 'hover:bg-surface-muted' : 'cursor-not-allowed opacity-50', dept?.id === d.id && 'bg-brand-50')}>
@@ -93,50 +123,63 @@ export default function Layout() {
           </>
         )}
       </div>
-      <nav className="flex-1 overflow-y-auto px-3 py-4 scrollbar-thin">
-        {groups.map((g) => {
+      <nav className={cx('flex-1 overflow-y-auto py-4 scrollbar-thin', collapsed ? 'px-2.5' : 'px-3')}>
+        {groups.map((g, gi) => {
           const items = g.items.filter((i) => !i.roles || i.roles.includes(user.role))
           if (!items.length) return null
           return (
-            <div key={g.title} className="mb-5">
-              <div className="mb-1.5 px-3 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/40">{g.title}</div>
+            <div key={g.title} className={collapsed ? 'mb-3' : 'mb-5'}>
+              {collapsed
+                ? gi > 0 && <div className={cx('mx-2 mb-3 border-t', S.divider)} />
+                : <div className={cx('mb-1.5 px-3 text-[10.5px] font-semibold uppercase tracking-[0.12em]', S.group)}>{g.title}</div>}
               {items.map((i) => i.soon ? (
-                <div key={i.to} className="mb-0.5 flex items-center gap-2.5 rounded-control px-3 py-2 text-[13.5px] font-medium text-white/35"><span className="opacity-70">{i.icon}</span><span className="flex-1">{i.label}</span><span className="rounded-pill border border-dashed border-white/25 px-1.5 text-[10px]">soon</span></div>
+                <div key={i.to} title={collapsed ? `${i.label} (soon)` : undefined} className={cx('mb-0.5 flex items-center rounded-control font-medium', S.soon, collapsed ? 'h-10 justify-center' : 'gap-2.5 px-3 py-2 text-[13.5px]')}>
+                  <span className="opacity-70">{i.icon}</span>
+                  {!collapsed && <><span className="flex-1">{i.label}</span><span className={cx('rounded-pill border border-dashed px-1.5 text-[10px]', S.soonPill)}>soon</span></>}
+                </div>
               ) : (
-                <NavLink key={i.to} to={i.to} end={i.to === '/'} onClick={() => setOpen(false)}
-                  className={({ isActive }) => cx('group mb-0.5 flex items-center gap-2.5 rounded-control px-3 py-2 text-[13.5px] font-medium transition-colors',
-                    isActive ? 'bg-brand-600 text-white' : 'text-white/75 hover:bg-white/8 hover:text-white')}>
+                <NavLink key={i.to} to={i.to} end={i.to === '/'} onClick={() => setOpen(false)} title={collapsed ? i.label : undefined} aria-label={i.label}
+                  className={({ isActive }) => cx('group relative mb-0.5 flex items-center rounded-control font-medium transition-colors', collapsed ? 'h-10 justify-center' : 'gap-2.5 px-3 py-2 text-[13.5px]', isActive ? S.active : S.idle)}>
                   <span className="opacity-90">{i.icon}</span>
-                  <span className="flex-1">{i.label}</span>
-                  {!!i.badge && <span className="rounded-pill bg-sun-500 px-1.5 py-0.5 text-[10.5px] font-bold text-ink-900">{i.badge}</span>}
+                  {!collapsed && <span className="flex-1">{i.label}</span>}
+                  {!!i.badge && <span className={cx('rounded-pill bg-sun-500 font-bold text-ink-900', collapsed ? 'absolute right-1 top-1 min-w-[16px] px-1 text-center text-[9.5px] leading-4' : 'px-1.5 py-0.5 text-[10.5px]')}>{i.badge}</span>}
                 </NavLink>
               ))}
             </div>
           )
         })}
       </nav>
-      <div className="border-t border-white/10 p-3">
-        <div className="rounded-control bg-white/5 px-3 py-2.5 text-[11.5px] text-white/60">
-          <div className="font-semibold text-white/80">{settings.orgName}</div>
-          <div>{settings.website}</div>
-        </div>
+      <div className={cx('p-3', S.foot)}>
+        {!collapsed && (
+          <div className={cx('mb-2 rounded-control px-3 py-2.5 text-[11.5px]', S.footBox)}>
+            <div className={cx('font-semibold', S.footTitle)}>{settings.orgName}</div>
+            <div>{settings.website}</div>
+          </div>
+        )}
+        <button onClick={toggleSidebar} data-testid="sidebar-toggle" title={`${collapsed ? 'Show' : 'Hide'} sidebar (Ctrl+B)`} aria-label={collapsed ? 'Show sidebar' : 'Hide sidebar'}
+          className={cx('hidden w-full items-center rounded-control text-[12.5px] font-medium transition-colors lg:flex', S.collapse, collapsed ? 'h-9 justify-center' : 'gap-2 px-3 py-2')}>
+          {collapsed ? <PanelLeftOpen size={17} /> : <><PanelLeftClose size={17} /><span className="flex-1 text-left">Hide sidebar</span><span className="text-[10.5px] opacity-60">Ctrl+B</span></>}
+        </button>
       </div>
     </aside>
   )
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <div className="hidden lg:block shrink-0">{Sidebar}</div>
+      <div className="hidden lg:block shrink-0">{renderSidebar(sidebarCollapsed)}</div>
       {open && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div className="absolute inset-0 bg-ink-900/50" onClick={() => setOpen(false)} />
-          <div className="absolute inset-y-0 left-0">{Sidebar}</div>
+          <div className="absolute inset-y-0 left-0">{renderSidebar(false)}</div>
         </div>
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-topbar shrink-0 items-center gap-3 border-b border-line bg-surface px-4 lg:px-6">
+        <header data-topbar className="flex h-topbar shrink-0 items-center gap-3 border-b border-line bg-surface px-4 lg:px-6">
           <button className="btn-ghost btn-sm lg:hidden" onClick={() => setOpen(true)} aria-label="Menu"><Menu size={18} /></button>
+          <button className="btn-ghost btn-sm hidden lg:inline-flex" onClick={toggleSidebar} title={`${sidebarCollapsed ? 'Show' : 'Hide'} sidebar (Ctrl+B)`} aria-label={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}>
+            {sidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+          </button>
           <div className="hidden items-center gap-2 text-[13px] text-ink-500 sm:flex">
             <SunMark size={16} /> <span className="font-medium text-ink-700">PCM & Grants Management Platform</span>{dept && <span className="text-ink-400">/ {dept.name}</span>}
           </div>
@@ -212,6 +255,17 @@ export default function Layout() {
                           <Avatar name={u.name} color={u.avatarColor} size="sm" />
                           <span className="flex-1 truncate">{u.name}</span>
                           <span className="text-[11px] text-ink-400">{ROLE_LABEL[u.role]}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="border-b border-line px-4 py-2.5">
+                    <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-ink-400">Interface</div>
+                    <div className="grid grid-cols-2 gap-1 rounded-control bg-surface-muted p-1" role="radiogroup" aria-label="Interface">
+                      {(['classic', 'modern'] as const).map((t) => (
+                        <button key={t} role="radio" aria-checked={uiTheme === t} onClick={() => setUiTheme(t)}
+                          className={cx('flex items-center justify-center gap-1.5 rounded-control px-2 py-1.5 text-[12px] font-medium transition-colors', uiTheme === t ? 'bg-surface text-ink-900 shadow-card' : 'text-ink-500 hover:text-ink-800')}>
+                          {t === 'classic' ? <Monitor size={13} /> : <Sparkles size={13} />}{t === 'classic' ? 'Classic' : 'Modern'}
                         </button>
                       ))}
                     </div>

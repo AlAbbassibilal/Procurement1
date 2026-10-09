@@ -191,7 +191,7 @@ export interface AuditEvent {
   at: string
   actorId: string
   actorName: string
-  docType: DocType | 'SYSTEM' | 'VENDOR' | 'USER' | 'BUDGET' | 'SETTINGS' | 'ESIGN' | 'PROJECT' | 'TASK' | 'DONOR' | 'MASTER' | 'PARTNER'
+  docType: DocType | 'SYSTEM' | 'VENDOR' | 'USER' | 'BUDGET' | 'SETTINGS' | 'ESIGN' | 'PROJECT' | 'TASK' | 'DONOR' | 'MASTER' | 'PARTNER' | 'STAFF'
   docId?: string
   docNumber?: string
   action: string
@@ -447,6 +447,10 @@ export interface BudgetLine {
   unitCost?: number
   pct?: number            // LoE % / % allocated / covering percentage (0-1)
   masterLineId?: string   // which organisation master-budget line this project line funds
+  // Salary lines — linked to the master salary plan
+  kind?: 'salary' | 'other'   // explicit; when absent the line is auto-detected (personnel section / "Person" unit / 26xx account)
+  staffIds?: string[]         // StaffMember ids (RHS numbers) this line pays, one per unit
+  newStaff?: boolean          // position to be recruited — added to the master salary plan when the project is granted
 }
 
 export interface ProjectBudget {
@@ -807,4 +811,30 @@ export interface Partner {
   notes: string
   ownerName: string
   createdBy: string; createdByName: string; createdAt: string; updatedAt: string
+}
+
+// ---------------------------------------------------------------------------
+// Master salary plan — staff register with RHS numbers, covered by project budgets
+// ---------------------------------------------------------------------------
+export type StaffStatus = 'active' | 'planned' | 'left'
+export interface StaffMember {
+  id: string
+  rhsNumber: string           // RHS-0001
+  name: string                // blank while a planned position is unfilled
+  position: string
+  department: string
+  country: string
+  contractType: 'full_time' | 'part_time' | 'consultant' | 'volunteer'
+  monthlySalary: number       // gross monthly cost to the organisation
+  currency: Currency
+  startDate: string
+  endDate?: string
+  status: StaffStatus
+  userId?: string             // platform account, if any
+  sourceProjectId?: string    // planned positions: the approved project that created them
+  sourceProjectCode?: string
+  sourceLineCode?: string
+  notes?: string
+  createdAt: string
+  updatedAt: string
 }

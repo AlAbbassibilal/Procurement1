@@ -14,6 +14,7 @@ import ProjectNew from '@/pages/grants/New'
 import ProjectPage from '@/pages/grants/Project'
 import Tasks from '@/pages/Tasks'
 import MasterBudgetPage from '@/pages/finance/MasterBudget'
+import SalaryPlanPage from '@/pages/finance/SalaryPlan'
 import PartnerList from '@/pages/partnerships/List'
 import PartnerPage from '@/pages/partnerships/Partner'
 import VettingPublic from '@/pages/partnerships/VettingPublic'
@@ -60,7 +61,9 @@ function RequireAccess() {
   const d = deptForPath(pathname)
   // Budget holders may open the master budget to fill their own lines even without Financial workspace access
   const holder = !!user && masterBudgets.some((m) => m.lines.some((l) => l.budgetHolderId === user.id))
-  if (user && d && !canEnter(user, d.id) && !(holder && pathname.startsWith('/finance/master-budget'))) return <NoAccess />
+  // The salary plan is shared with HR & Admin
+  const hrPlan = !!user && pathname.startsWith('/finance/salary-plan') && canEnter(user, 'hr')
+  if (user && d && !canEnter(user, d.id) && !(holder && pathname.startsWith('/finance/master-budget')) && !hrPlan) return <NoAccess />
   return <Outlet />
 }
 
@@ -85,6 +88,7 @@ export default function App() {
           <Route path="tasks" element={<Tasks />} />
           <Route path="finance" element={<FinanceHome />} />
           <Route path="finance/master-budget" element={<MasterBudgetPage />} />
+          <Route path="finance/salary-plan" element={<SalaryPlanPage />} />
           <Route path="partnerships" element={<PartnershipsHome />} />
           <Route path="partnerships/partners" element={<PartnerList />} />
           <Route path="partnerships/due-diligence" element={<PartnerList />} />

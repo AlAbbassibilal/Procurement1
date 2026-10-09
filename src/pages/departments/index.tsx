@@ -6,6 +6,7 @@ import { DEPT, ACCESS_LABEL, accessOf } from '@/lib/departments'
 import { DEPT_ICON } from '@/pages/Home'
 import { computeBvA } from '@/lib/budget'
 import { coverageFor } from '@/lib/master'
+import { staffCoverage } from '@/lib/salary'
 import { invoiceTotals } from '@/lib/match'
 import { ddProgress, partnerProjects, riskLevel, PARTNER_STAGE_LABEL } from '@/lib/partners'
 import { PartnerStagePill, DdBar, ProjectChips } from '@/pages/partnerships/shared'
@@ -41,8 +42,9 @@ function WorkspaceFrame({ id, children, intro }: { id: Department; children?: Re
 }
 
 export function FinanceHome() {
-  const { invoices, budgets, prs, pos, settings, masterBudgets, projects } = useStore()
+  const { invoices, budgets, prs, pos, settings, masterBudgets, projects, staff } = useStore()
   const ccy = settings.defaultCurrency
+  const sc = staffCoverage(staff.filter((s) => s.status !== 'left'), budgets, projects, new Date().getFullYear(), settings); const sAnnual = sc.reduce((s, c) => s + c.annual, 0), sCov = sc.reduce((s, c) => s + c.covered, 0)
   const mb = [...masterBudgets].sort((a, b) => b.year - a.year)[0]
   const cov = mb ? coverageFor(mb, budgets, projects, settings) : []
   const mTotal = cov.reduce((s, c) => s + c.line.amount, 0), mCov = cov.reduce((s, c) => s + c.covered, 0)
@@ -50,11 +52,12 @@ export function FinanceHome() {
   const bv = budgets.filter((b) => b.status === 'active').map((b) => computeBvA(b, prs, pos, invoices).totals)
   return (
     <WorkspaceFrame id="finance" intro={
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
         <Stat label="Invoices awaiting approval" value={fmtMoney(sum(['pending_approval']), ccy)} tone="sun" />
         <Stat label="Match exceptions" value={invoices.filter((i) => i.status === 'exception').length} tone="accent" />
         <Stat label="Approved — to pay" value={fmtMoney(sum(['approved']), ccy)} tone="brand" />
         <Stat label="Committed across projects" value={fmtMoney(bv.reduce((s, t) => s + t.commitments, 0), ccy)} />
+        <Stat label={`Salaries ${new Date().getFullYear()} covered by projects`} value={`${sAnnual ? Math.round((sCov / sAnnual) * 100) : 0}%`} hint={`${staff.filter((s) => s.status === 'planned').length} position(s) to recruit · gap ${fmtMoney(Math.max(0, sAnnual - sCov), ccy)}`} tone={sAnnual && sCov / sAnnual < 0.7 ? 'accent' : 'brand'} />
         {mb && <Stat label={`Master budget ${mb.year} covered by projects`} value={`${mTotal ? Math.round((mCov / mTotal) * 100) : 0}%`} hint={`${fmtMoney(mCov, mb.currency)} of ${fmtMoney(mTotal, mb.currency)} · gap ${fmtMoney(Math.max(0, mTotal - mCov), mb.currency)}`} tone={mTotal && mCov / mTotal < 0.5 ? 'accent' : 'brand'} />}
       </div>
     } />

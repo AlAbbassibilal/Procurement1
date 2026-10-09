@@ -40,13 +40,13 @@ export const DEPARTMENTS: DepartmentDef[] = [
     id: 'finance', name: 'Financial', short: 'Payments, budgets & reporting', home: '/finance', paths: ['/finance', '/invoices', '/admin/approval-matrix'],
     description: 'Invoice matching and payment authorisation, budget control and Budget-vs-Actual, approval authorities and donor financial reporting.',
     tone: { tile: 'bg-sun-500 text-ink-900', text: 'text-sun-700', ring: 'ring-sun-300' },
-    modules: [{ to: '/finance', label: 'Overview' }, { to: '/finance/master-budget', label: 'Master budget' }, { to: '/invoices', label: 'Invoices & payments' }, { to: '/budgets', label: 'Budgets & BvA' }, { to: '/grants/tracker', label: 'Grants tracker' }, { to: '/admin/approval-matrix', label: 'Approval matrix' }, { to: '/finance/payments', label: 'Payments register', soon: true }, { to: '/finance/reports', label: 'Donor financial reports', soon: true }],
+    modules: [{ to: '/finance', label: 'Overview' }, { to: '/finance/master-budget', label: 'Master budget' }, { to: '/finance/salary-plan', label: 'Master salary plan' }, { to: '/invoices', label: 'Invoices & payments' }, { to: '/budgets', label: 'Budgets & BvA' }, { to: '/grants/tracker', label: 'Grants tracker' }, { to: '/admin/approval-matrix', label: 'Approval matrix' }, { to: '/finance/payments', label: 'Payments register', soon: true }, { to: '/finance/reports', label: 'Donor financial reports', soon: true }],
   },
   {
     id: 'hr', name: 'HR & Admin', short: 'People, time & office', home: '/hr', paths: ['/hr'],
     description: 'Staff register and contracts, leave and attendance, timesheets and level-of-effort against projects, and administrative requests.',
     tone: { tile: 'bg-ink-700 text-white', text: 'text-ink-700', ring: 'ring-ink-300' },
-    modules: [{ to: '/hr', label: 'Overview' }, { to: '/hr/staff', label: 'Staff register', soon: true }, { to: '/hr/leave', label: 'Leave & attendance', soon: true }, { to: '/hr/timesheets', label: 'Timesheets & LoE', soon: true }, { to: '/hr/requests', label: 'Admin requests', soon: true }],
+    modules: [{ to: '/hr', label: 'Overview' }, { to: '/finance/salary-plan', label: 'Staff register & salary plan' }, { to: '/hr/leave', label: 'Leave & attendance', soon: true }, { to: '/hr/timesheets', label: 'Timesheets & LoE', soon: true }, { to: '/hr/requests', label: 'Admin requests', soon: true }],
   },
   {
     id: 'media', name: 'Media & Communication', short: 'Visibility & content', home: '/media', paths: ['/media'],

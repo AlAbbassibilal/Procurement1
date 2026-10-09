@@ -1,4 +1,4 @@
-import type { ApprovalRule, Contract, OrgSettings, PurchaseOrder, PurchaseRequisition, User, Vendor, ContractClause, GoodsReceipt, Invoice, ProcurementTier, ProjectBudget, Donor, Project, Task, MasterBudget, Partner } from '@/types'
+import type { ApprovalRule, Contract, OrgSettings, PurchaseOrder, PurchaseRequisition, User, Vendor, ContractClause, GoodsReceipt, Invoice, ProcurementTier, ProjectBudget, Donor, Project, Task, MasterBudget, Partner, StaffMember } from '@/types'
 import { generateReportingCalendar, generateSpendingPlan, monthsOf } from '@/lib/grants'
 import { emptySourcing } from '@/lib/tiers'
 import { emptyDueDiligence } from '@/lib/partners'
@@ -261,12 +261,12 @@ export const SEED_CONTRACTS: Contract[] = [
 export const SEED_BUDGETS: ProjectBudget[] = [
   { id: 'bud_heal', donorCode: 'RH-2026-0032', name: 'Prosthetic and Integrated Rehabilitation Support for Gazan Beneficiaries in Egypt', donor: 'HEAL Palestine', currency: 'USD', startDate: '2026-11-01', endDate: '2027-07-31', duration: '9 Months', status: 'draft',
     lines: [
-      { id: 'bl_h1', code: 'D-01', description: 'Project Manager (Cairo)', category: 'A. Personnel — Field Team (Direct Cost)', amount: 27000, costType: 'direct', activityCode: 'PM02', accountNo: '2602', location: 'Cairo', unit: 'Person', units: 1, frequency: 9, unitCost: 3000, pct: 1 },
-      { id: 'bl_h2', code: 'D-02', description: 'P&O technicians (x3)', category: 'A. Personnel — Field Team (Direct Cost)', amount: 48600, costType: 'direct', activityCode: 'P02', accountNo: '2601', location: 'Cairo', unit: 'Person', units: 3, frequency: 9, unitCost: 1800, pct: 1 },
+      { id: 'bl_h1', code: 'D-01', description: 'Project Manager (Cairo)', category: 'A. Personnel — Field Team (Direct Cost)', amount: 27000, costType: 'direct', kind: 'salary', newStaff: true, activityCode: 'PM02', accountNo: '2602', location: 'Cairo', unit: 'Person', units: 1, frequency: 9, unitCost: 3000, pct: 1 },
+      { id: 'bl_h2', code: 'D-02', description: 'P&O technicians (x3)', category: 'A. Personnel — Field Team (Direct Cost)', amount: 48600, costType: 'direct', kind: 'salary', newStaff: true, activityCode: 'P02', accountNo: '2601', location: 'Cairo', unit: 'Person', units: 3, frequency: 9, unitCost: 1800, pct: 1 },
       { id: 'bl_h3', code: 'D-10', description: 'Prosthetic components & fabrication materials (86 devices)', category: 'B. Prosthetic Fitting (Direct Cost)', amount: 215000, costType: 'direct', activityCode: 'P02', accountNo: '2611', location: 'Cairo', unit: 'Lump', units: 1, frequency: 1, unitCost: 215000, pct: 1 },
       { id: 'bl_h4', code: 'D-11', description: 'Physiotherapy & MHPSS sessions', category: 'B. Prosthetic Fitting (Direct Cost)', amount: 52560, costType: 'direct', activityCode: 'R02', accountNo: '2614', location: 'Cairo', unit: 'Session', units: 1460, frequency: 1, unitCost: 36, pct: 1 },
       { id: 'bl_h5', code: 'D-12', description: 'Patient transport & accommodation', category: 'B. Prosthetic Fitting (Direct Cost)', amount: 32850, costType: 'direct', activityCode: 'S02', accountNo: '2606', location: 'Cairo', unit: 'Person', units: 73, frequency: 1, unitCost: 450, pct: 1 },
-      { id: 'bl_h6', masterLineId: 'ml_02', code: 'A-01', description: 'Amman support personnel (allocated)', category: 'A. Amman Support Personnel (Indirect / Admin)', amount: 21600, costType: 'admin', activityCode: 'PM01', accountNo: '2603', location: 'Amman', unit: 'Person', units: 1, frequency: 9, unitCost: 12000, pct: 0.2 },
+      { id: 'bl_h6', masterLineId: 'ml_02', code: 'A-01', description: 'Amman support personnel (allocated)', category: 'A. Amman Support Personnel (Indirect / Admin)', amount: 21600, costType: 'admin', kind: 'salary', staffIds: ['stf_2'], activityCode: 'PM01', accountNo: '2603', location: 'Amman', unit: 'Person', units: 1, frequency: 9, unitCost: 12000, pct: 0.2 },
       { id: 'bl_h7', masterLineId: 'ml_11', code: 'B-01', description: 'Office, IT & communications share', category: 'B. Office, IT & Operational Costs (Indirect / Admin)', amount: 14390, costType: 'admin', activityCode: 'S01', accountNo: '2619', location: 'Amman', unit: 'Months', units: 9, frequency: 1, unitCost: 3997, pct: 0.4 },
     ], uploadedBy: 'u_bilal', uploadedByName: 'Bilal Abbassi', uploadedAt: '2026-08-10T09:00:00Z', ownerName: DOC_OWNER, notes: 'Proposal budget — submitted 7 Oct 2026' },
   { id: 'bud_edc', donorCode: 'RH-2026-0009', name: 'Inclusive Early Development Centre — Gaza', donor: 'HDF — Humanitarian Development Foundation', currency: 'USD', startDate: '2026-04-01', endDate: '2027-03-31', duration: '12 Months', status: 'draft',
@@ -291,7 +291,7 @@ export const SEED_BUDGETS: ProjectBudget[] = [
       { id: 'bl_i1', code: 'BL-08', description: 'Capital Works — workshop extension', category: 'Capital', amount: 70000 },
       { id: 'bl_i2', code: 'BL-02', description: 'Medical Supplies — prosthetic components', category: 'Programs', amount: 45000 },
       { id: 'bl_i3', code: 'BL-09', description: 'Outreach & transport', category: 'Programs', amount: 12000 },
-      { id: 'bl_i4', code: 'BL-10', description: 'Project staff', category: 'HR', amount: 38000, masterLineId: 'ml_09' },
+      { id: 'bl_i4', code: 'BL-10', description: 'Project staff — P&O technician & outreach officer', category: 'HR — Personnel', amount: 38000, masterLineId: 'ml_09', kind: 'salary', unit: 'Person', units: 2, staffIds: ['stf_12', 'stf_13'] },
       { id: 'bl_i5', code: 'BL-11', description: 'Indirect costs (7%)', category: 'Support', amount: 11550, masterLineId: 'ml_11' },
     ],
     uploadedBy: 'u_shatha', uploadedByName: 'Shatha Homsi', uploadedAt: '2025-09-22T09:00:00Z', ownerName: DOC_OWNER, notes: 'Approved donor budget, annex B of the grant agreement.',
@@ -417,6 +417,28 @@ nrnDD.risks = [
   { id: 'rk_n4', group: 'rhs', description: 'RHS technical supervision capacity for outreach camps while the workshop is under construction', likelihood: 2, impact: 2, mitigation: 'P&O technician rota agreed; second technician from Amman on call', owner: 'Bilal Abbassi' },
 ]
 nrnDD.decision = { outcome: 'approved_conditions', conditions: 'Sub-award limited to outreach camps; MEAL SOP and procurement plan in place before the second tranche.', decidedBy: 'u_fawaz', decidedByName: 'Fawaz Mahmoud', decidedAt: '2025-09-02T09:30:00Z' }
+
+// ---------------------------------------------------------------------------
+// Staff — master salary plan (RHS numbers). Salaries are illustrative.
+// ---------------------------------------------------------------------------
+const ST = (n: number, name: string, position: string, department: string, country: string, monthlySalary: number, startDate: string, extra: Partial<StaffMember> = {}): StaffMember => ({
+  id: `stf_${n}`, rhsNumber: `RHS-${String(n).padStart(4, '0')}`, name, position, department, country, contractType: 'full_time', monthlySalary, currency: 'JOD', startDate, status: 'active', createdAt: '2025-01-05T09:00:00Z', updatedAt: '2025-01-05T09:00:00Z', ...extra,
+})
+export const SEED_STAFF: StaffMember[] = [
+  ST(1, 'Fawaz Al Shakaa', 'Executive Director', 'Executive Office', 'Amman (Regional Office)', 5000, '2018-01-01', { userId: 'u_fawaz' }),
+  ST(2, 'Bilal Abbassi', 'Director of Programs', 'Programs', 'Amman (Regional Office)', 4000, '2019-03-01', { userId: 'u_bilal' }),
+  ST(3, 'Shatha Homsi', 'Director of Finance & Support', 'Finance', 'Amman (Regional Office)', 4000, '2019-06-01', { userId: 'u_shatha' }),
+  ST(4, 'Rana Suleiman', 'Finance Manager', 'Finance', 'Amman (Regional Office)', 2200, '2021-02-01', { userId: 'u_rana' }),
+  ST(5, 'Yousef Nasser', 'Procurement Officer', 'Procurement', 'Amman (Regional Office)', 1500, '2022-04-01', { userId: 'u_yousef' }),
+  ST(6, 'Maha Al-Rawi', 'Procurement & Logistics Manager', 'Procurement', 'Amman (Regional Office)', 1700, '2020-09-01', { userId: 'u_maha' }),
+  ST(7, 'Hani Odeh', 'Operations Manager', 'Operations', 'Amman (Regional Office)', 1900, '2020-01-15', { userId: 'u_hani' }),
+  ST(8, 'Lina Haddad', 'MEAL Officer', 'Programs', 'Amman (Regional Office)', 1300, '2023-01-01', { userId: 'u_lina' }),
+  ST(9, 'Omar Khalil', 'Medical Programs Manager', 'Medical Programs', 'Gaza', 2000, '2021-05-01', { userId: 'u_omar' }),
+  ST(10, 'Nour Saleh', 'Field Services Coordinator', 'Field Services', 'Amman (Regional Office)', 1200, '2024-02-01', { userId: 'u_nour' }),
+  ST(11, 'Khalid Mansour', 'Logistics / Warehouse Officer', 'Logistics', 'Amman (Regional Office)', 1100, '2022-08-01', { userId: 'u_khalid' }),
+  ST(12, 'Samer Al-Zoubi', 'P&O Technician — Irbid', 'Field Services', 'Amman (Regional Office)', 1150, '2025-10-01', { sourceProjectId: 'prj_irb', sourceProjectCode: 'GR-2025-IRB-03', sourceLineCode: 'BL-10', notes: 'Recruited for the Irbid workshop' }),
+  ST(13, 'Rawan Khasawneh', 'Outreach Officer — Irbid', 'Field Services', 'Amman (Regional Office)', 950, '2025-10-01', { sourceProjectId: 'prj_irb', sourceProjectCode: 'GR-2025-IRB-03', sourceLineCode: 'BL-10' }),
+]
 
 export const SEED_PARTNERS: Partner[] = [
   {

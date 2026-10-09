@@ -3,9 +3,9 @@ import { persist } from 'zustand/middleware'
 import type {
   ApprovalRule, Attachment, AuditEvent, Comment, Contract, ContractMilestone, LineItem, Notification, OrgSettings,
   PurchaseOrder, PurchaseRequisition, Quotation, User, Vendor, DocType, Role, GoodsReceipt, GoodsReceiptLine, Invoice, InvoiceLine, SourcingRecord, ExceptionType, ProjectBudget, Envelope, EnvelopeRecipient, EnvelopeField, Project, ProjectStage, Donor, Task, ProjectReport, ProjectComment, MasterBudget, MasterLine,
-  UiTheme, Partner, PartnerStage, DueDiligence, PartnerSubmission, PartnerAgreement,
+  UiTheme, Partner, PartnerStage, DueDiligence, PartnerSubmission, PartnerAgreement, StaffMember,
 } from '@/types'
-import { DOC_OWNER, SEED_PARTNERS, SEED_BUDGETS, SEED_DONORS, SEED_PROJECTS, SEED_TASKS, SEED_MASTER, SEED_CONTRACTS, SEED_GRNS, SEED_INVOICES, SEED_POS, SEED_PRS, SEED_RULES, SEED_SETTINGS, SEED_USERS, SEED_VENDORS, STANDARD_CLAUSES } from '@/data/seed'
+import { DOC_OWNER, SEED_PARTNERS, SEED_STAFF, SEED_BUDGETS, SEED_DONORS, SEED_PROJECTS, SEED_TASKS, SEED_MASTER, SEED_CONTRACTS, SEED_GRNS, SEED_INVOICES, SEED_POS, SEED_PRS, SEED_RULES, SEED_SETTINGS, SEED_USERS, SEED_VENDORS, STANDARD_CLAUSES } from '@/data/seed'
 import { hasBlockingIssues, receiptProgress, runMatch, invoiceTotals } from '@/lib/match'
 import { newEvent, recipientTurn } from '@/lib/esign'
 import { generateIPTT, generateReportingCalendar, generateSpendingPlan, monthsOf, parseMentions, reportLiveStatus, allIndicators } from '@/lib/grants'
@@ -13,6 +13,7 @@ import { blockingFailures, emptySourcing, isBidMethod, sourcingRequirements, tie
 import { applyDecision, buildChain, currentStep, resetChain, resolveApprover, chainFromSteps } from '@/lib/workflow'
 import { linesSubtotal, nowIso, uid } from '@/lib/format'
 import { emptyDueDiligence } from '@/lib/partners'
+import { unassignedSalaryLines, isSalaryLine, headcount, nextRhsNumber } from '@/lib/salary'
 
 type Decision = 'approved' | 'rejected' | 'returned' | 'delegated'
 
@@ -34,6 +35,7 @@ interface State {
   tasks: Task[]
   masterBudgets: MasterBudget[]
   partners: Partner[]
+  staff: StaffMember[]
   country: string            // current country context ('all' or a country name)
   uiTheme: UiTheme           // 'classic' (original interface) | 'modern'
   sidebarCollapsed: boolean  // desktop sidebar shown as an icon rail
@@ -128,6 +130,10 @@ interface Actions {
   submitPartnerVetting: (token: string, submission: Omit<PartnerSubmission, 'submittedAt'>) => { ok: boolean; error?: string }
   completeVetting: (id: string) => void
   setPartnerAgreement: (id: string, a: PartnerAgreement) => void
+  // Master salary plan
+  upsertStaff: (st: Partial<StaffMember> & { position: string }) => StaffMember
+  deleteStaff: (id: string) => void
+  confirmRecruitment: (id: string, name: string, startDate: string) => void
   // Appearance (per browser)
   setUiTheme: (t: UiTheme) => void
   toggleSidebar: () => void
@@ -191,6 +197,7 @@ const initial = (): State => ({
   tasks: SEED_TASKS,
   masterBudgets: SEED_MASTER,
   partners: SEED_PARTNERS,
+  staff: SEED_STAFF,
   country: 'all',
   uiTheme: 'classic',
   sidebarCollapsed: false,
@@ -785,6 +792,24 @@ export const useStore = create<State & Actions>()(
         completeVetting: (id) => { const a = actor(); set((s) => ({ partners: s.partners.map((p) => (p.id === id ? { ...p, dueDiligence: { ...p.dueDiligence, vetting: { ...p.dueDiligence.vetting, completedAt: nowIso(), completedBy: a.id, completedByName: a.name } } } : p)) })); const p = get().partners.find((x) => x.id === id)!; log('PARTNER', 'Vetting completed', { id: p.id, number: p.code }) },
         setPartnerAgreement: (id, agreement) => { set((s) => ({ partners: s.partners.map((p) => (p.id === id ? { ...p, agreement, updatedAt: nowIso() } : p)) })); const p = get().partners.find((x) => x.id === id)!; log('PARTNER', 'Agreement details updated', { id: p.id, number: p.code }, agreement.reference) },
 
+        // ---- Master salary plan ------------------------------------------------
+        upsertStaff: (data) => {
+          const exists = data.id ? get().staff.find((x) => x.id === data.id) : undefined
+          const st: StaffMember = exists ? { ...exists, ...data, updatedAt: nowIso() } : { id: uid('stf_'), rhsNumber: data.rhsNumber || nextRhsNumber(get().staff), name: '', department: '', country: get().settings.countries[0], contractType: 'full_time', monthlySalary: 0, currency: get().settings.defaultCurrency, startDate: nowIso().slice(0, 10), status: 'active', createdAt: nowIso(), updatedAt: nowIso(), ...data } as StaffMember
+          set((s) => ({ staff: exists ? s.staff.map((x) => (x.id === st.id ? st : x)) : [...s.staff, st] }))
+          log('STAFF', exists ? 'Staff record updated' : 'Staff added to the master salary plan', { id: st.id, number: st.rhsNumber }, `${st.name || '(to recruit)'} · ${st.position}`)
+          return st
+        },
+        deleteStaff: (id) => {
+          const st = get().staff.find((x) => x.id === id); if (!st) return
+          set((s) => ({ staff: s.staff.filter((x) => x.id !== id), budgets: s.budgets.map((b) => ({ ...b, lines: b.lines.map((l) => (l.staffIds?.includes(id) ? { ...l, staffIds: l.staffIds.filter((x) => x !== id) } : l)) })) }))
+          log('STAFF', 'Staff removed from the master salary plan', { id: st.id, number: st.rhsNumber }, st.name || st.position)
+        },
+        confirmRecruitment: (id, name, startDate) => {
+          set((s) => ({ staff: s.staff.map((x) => (x.id === id ? { ...x, name, startDate, status: 'active', updatedAt: nowIso() } : x)) }))
+          const st = get().staff.find((x) => x.id === id)!; log('STAFF', 'Position filled', { id: st.id, number: st.rhsNumber }, `${name} · ${st.position}`)
+        },
+
         setUiTheme: (t) => set({ uiTheme: t }),
         toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
         setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
@@ -812,6 +837,8 @@ export const useStore = create<State & Actions>()(
           if (stage === 'submitted') {
             if (!allIndicators(p.logframe).length) return { ok: false, error: 'Add the logframe with at least one indicator before submitting — the IPTT is generated from it.' }
             if (!budget?.lines.length) return { ok: false, error: 'The budget has no lines yet.' }
+            const open = unassignedSalaryLines(budget.lines)
+            if (open.length) return { ok: false, error: `Salary lines must carry a staff RHS number or be marked as a new position before submission: ${open.map((l) => l.code).join(', ')} (Budget tab).` }
             patch = { ...patch, submittedAt: nowIso(), iptt: generateIPTT(p), ipttGeneratedAt: nowIso(), requestedAmount: p.requestedAmount ?? budget.lines.reduce((s2, l) => s2 + l.amount, 0) }
           }
           if (stage === 'granted') {
@@ -820,7 +847,22 @@ export const useStore = create<State & Actions>()(
             const months = monthsOf(start, end)
             patch = { ...patch, grantedAt: nowIso(), outcome: 'funded', awardedAmount: opts.awardedAmount ?? p.requestedAmount ?? budget?.lines.reduce((s2, l) => s2 + l.amount, 0), startDate: start, endDate: end,
               iptt: generateIPTT(p), ipttGeneratedAt: p.ipttGeneratedAt ?? nowIso(), spendingPlan: p.spendingPlan.length ? p.spendingPlan : generateSpendingPlan(budget?.lines ?? [], months), reports: p.reports.length ? p.reports : generateReportingCalendar({ ...p, startDate: start, endDate: end }) }
-            if (budget) set((s) => ({ budgets: s.budgets.map((b) => (b.id === budget.id ? { ...b, status: 'active', approvedAt: nowIso().slice(0, 10), startDate: start, endDate: end, notes: `Approved budget — granted ${nowIso().slice(0, 10)}` } : b)) }))
+            if (budget) {
+              // New positions in the approved budget join the master salary plan as "to recruit", one per unit, with an RHS number
+              const created: StaffMember[] = []; const lineStaff: Record<string, string[]> = {}
+              for (const l of budget.lines) {
+                if (!isSalaryLine(l) || !l.newStaff) continue
+                const ids: string[] = []
+                for (let i = 0; i < headcount(l); i++) {
+                  const n = nextRhsNumber([...get().staff, ...created])
+                  const st: StaffMember = { id: uid('stf_'), rhsNumber: n, name: '', position: headcount(l) > 1 ? `${l.description} (${i + 1}/${headcount(l)})` : l.description, department: p.sectors[0] ?? 'Programs', country: p.countries[0] ?? get().settings.countries[0], contractType: 'full_time', monthlySalary: l.unitCost ?? Math.round(l.amount / headcount(l) / Math.max(1, l.frequency ?? 1)), currency: budget.currency, startDate: start ?? nowIso().slice(0, 10), endDate: end, status: 'planned', sourceProjectId: p.id, sourceProjectCode: p.code, sourceLineCode: l.code, notes: `New position from approved budget ${p.code} line ${l.code}`, createdAt: nowIso(), updatedAt: nowIso() }
+                  created.push(st); ids.push(st.id)
+                }
+                lineStaff[l.id] = ids
+              }
+              set((s) => ({ staff: [...s.staff, ...created], budgets: s.budgets.map((b) => (b.id === budget.id ? { ...b, status: 'active', approvedAt: nowIso().slice(0, 10), startDate: start, endDate: end, notes: `Approved budget — granted ${nowIso().slice(0, 10)}`, lines: b.lines.map((l) => (lineStaff[l.id] ? { ...l, staffIds: lineStaff[l.id], newStaff: false } : l)) } : b)) }))
+              if (created.length) { log('STAFF', `${created.length} new position(s) added to the master salary plan`, { id: p.id, number: p.code }, created.map((c) => `${c.rhsNumber} ${c.position}`).join(', ')); notifyRole('finance_director', { kind: 'task', title: `${created.length} new position(s) to recruit — ${p.code}`, body: created.map((c) => `${c.rhsNumber} ${c.position}`).join(', '), link: '/finance/salary-plan' }) }
+            }
           }
           if (stage === 'active') { if (p.stage !== 'granted') return { ok: false, error: 'A project is activated after it is granted.' }; patch = { ...patch, activatedAt: nowIso() } }
           if (stage === 'closed') {

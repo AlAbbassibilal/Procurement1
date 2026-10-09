@@ -1,7 +1,8 @@
-import type { ApprovalRule, Contract, OrgSettings, PurchaseOrder, PurchaseRequisition, User, Vendor, ContractClause, GoodsReceipt, Invoice, ProcurementTier, ProjectBudget, Donor, Project, Task, MasterBudget, Partner, StaffMember, LeaveRequest, Timesheet, Payslip, AttendanceRecord } from '@/types'
+import type { ApprovalRule, Contract, OrgSettings, PurchaseOrder, PurchaseRequisition, User, Vendor, ContractClause, GoodsReceipt, Invoice, ProcurementTier, ProjectBudget, Donor, Project, Task, MasterBudget, Partner, StaffMember, LeaveRequest, Timesheet, Payslip, AttendanceRecord, Vacancy, Applicant } from '@/types'
 import { generateReportingCalendar, generateSpendingPlan, monthsOf } from '@/lib/grants'
 import { emptySourcing } from '@/lib/tiers'
 import { emptyDueDiligence } from '@/lib/partners'
+import { scoreApplicant } from '@/lib/recruitment'
 import { addDays, toInputDate } from '@/lib/format'
 
 export const DOC_OWNER = 'Bilal Abbassi'
@@ -464,6 +465,35 @@ export const SEED_ATTENDANCE: AttendanceRecord[] = [
   { id: 'at_1', staffId: 'stf_4', date: toInputDate(new Date()), mode: 'office', checkInAt: new Date(new Date().setHours(8, 12, 0, 0)).toISOString(), lat: 31.9539, lng: 35.9106, accuracy: 25, locationStatus: 'captured' },
   { id: 'at_2', staffId: 'stf_14', date: toInputDate(new Date()), mode: 'office', checkInAt: new Date(new Date().setHours(8, 31, 0, 0)).toISOString(), lat: 31.9541, lng: 35.9102, accuracy: 18, locationStatus: 'captured' },
   { id: 'at_3', staffId: 'stf_8', date: toInputDate(addDays(new Date(), -1)), mode: 'office', checkInAt: new Date(addDays(new Date(), -1).setHours(8, 5, 0, 0)).toISOString(), checkOutAt: new Date(addDays(new Date(), -1).setHours(16, 40, 0, 0)).toISOString(), lat: 31.9538, lng: 35.9109, accuracy: 30, locationStatus: 'captured' },
+]
+
+// ---------------------------------------------------------------------------
+// Recruitment — vacancies and applicants
+// ---------------------------------------------------------------------------
+const vacPhysio: Vacancy = {
+  id: 'vac_1', number: `REC-${Y}-0001`, title: 'Physiotherapist — Irbid centre', department: 'Field Services', country: 'Amman (Regional Office)', contractType: 'full_time', headcount: 1, salaryRange: 'JOD 900 – 1,100', startDate: toInputDate(addDays(new Date(), 45)), duration: '12 months (renewable)',
+  reason: 'Outreach fitting camps under the Irbid grant need a physiotherapist for gait training and follow-up.', projectId: 'prj_irb', projectCode: 'GR-2025-IRB-03',
+  keywords: ['physiotherapy', 'rehabilitation', 'amputee', 'prosthetic', 'gait training', 'kobo'], minYears: 3,
+  jd: { purpose: 'Deliver physiotherapy and gait training to prosthetic users in Irbid and Mafraq, and support outreach camps.', responsibilities: '• Assess beneficiaries and design rehabilitation plans\n• Run gait-training sessions after fitting\n• Record follow-ups in Kobo and report monthly\n• Support outreach camps with the P&O team', qualifications: '• BSc Physiotherapy, licensed in Jordan\n• 3+ years with amputees or prosthetic users\n• Arabic and working English\n• Willing to travel in the northern governorates' },
+  status: 'advertised', approvals: [{ key: 'director', label: 'Line manager — Director of Programs', role: 'programs_director', approverId: 'u_bilal', approverName: 'Bilal Abbassi', status: 'approved', decidedBy: 'u_bilal', decidedByName: 'Bilal Abbassi', decidedAt: ago(9) }, { key: 'finance', label: 'Director of Finance & Support — budget check', role: 'finance_director', status: 'approved', decidedBy: 'u_shatha', decidedByName: 'Shatha Homsi', decidedAt: ago(8), note: 'Funded under GR-2025-IRB-03 BL-10' }],
+  advert: { summary: 'Restoring Hope Society is recruiting a Physiotherapist for its Irbid rehabilitation centre and outreach camps in the northern governorates.', responsibilities: 'Assess beneficiaries, design rehabilitation plans, run gait-training sessions after prosthetic fitting, record follow-ups in Kobo and support outreach camps.', requirements: 'BSc Physiotherapy and Jordanian licence · 3+ years with amputees or prosthetic users · Arabic and working English · willing to travel.', howToApply: 'Apply through this page with your CV (PDF or Word). Only shortlisted candidates will be contacted.', location: 'Irbid, Jordan', closingDate: toInputDate(addDays(new Date(), 14)), token: 'apply_physio_irbid_2026', publishedAt: ago(7), publishedBy: 'u_reem', publishedByName: 'Reem Nasser' },
+  requestedBy: 'u_hani', requestedByName: 'Hani Odeh', lineManagerStaffId: 'stf_7', createdAt: ago(12), updatedAt: ago(7), submittedAt: ago(11), ownerName: DOC_OWNER,
+}
+const vacDriver: Vacancy = {
+  id: 'vac_2', number: `REC-${Y}-0002`, title: 'Outreach Driver — Irbid', department: 'Operations', country: 'Amman (Regional Office)', contractType: 'full_time', headcount: 1, salaryRange: 'JOD 550 – 650', startDate: toInputDate(addDays(new Date(), 30)), duration: '9 months',
+  reason: 'Outreach camps in Mafraq need a dedicated vehicle and driver three days a week.', projectId: 'prj_irb', projectCode: 'GR-2025-IRB-03', keywords: ['driving licence', 'logistics', 'vehicle log', 'first aid'], minYears: 2,
+  jd: { purpose: 'Drive the outreach team safely to camp locations and maintain the vehicle log.', responsibilities: '• Drive staff and equipment to outreach sites\n• Keep the vehicle log and fuel records\n• Basic vehicle checks and maintenance follow-up', qualifications: '• Valid Jordanian driving licence (public)\n• 2+ years professional driving\n• First-aid certificate an advantage' },
+  status: 'pending_approval', approvals: [{ key: 'director', label: 'Line manager — Director of Programs', role: 'programs_director', approverId: 'u_bilal', approverName: 'Bilal Abbassi', status: 'pending' }, { key: 'finance', label: 'Director of Finance & Support — budget check', role: 'finance_director', status: 'pending' }],
+  requestedBy: 'u_hani', requestedByName: 'Hani Odeh', lineManagerStaffId: 'stf_7', createdAt: ago(2), updatedAt: ago(2), submittedAt: ago(2), ownerName: DOC_OWNER,
+}
+export const SEED_VACANCIES: Vacancy[] = [vacPhysio, vacDriver]
+const cvA = 'Rania Khaled — Physiotherapist. BSc Physiotherapy, University of Jordan (2017). Licensed physiotherapist with 6 years of experience in rehabilitation of amputees and prosthetic users at Al-Bashir Hospital (2018 – present). Gait training, home exercise programmes, Kobo data collection for follow-up surveys.'
+const cvB = 'Mohammad Ali — Physical therapist. 2 years experience in sports physiotherapy clinic (2023 – present). Interested in rehabilitation. Arabic, English.'
+const cvC = 'Dina Saleh — Senior Physiotherapist, 9+ years. Rehabilitation lead at Jordan Paralympic Committee (2015 – 2024): amputee rehabilitation, prosthetic gait training, team supervision, monthly reporting.'
+export const SEED_APPLICANTS: Applicant[] = [
+  { id: 'app_1', number: `APP-${Y}-0001`, vacancyId: 'vac_1', name: 'Rania Khaled', email: 'rania.k@example.com', phone: '+962 79 000 0001', country: 'Jordan', yearsExperience: 6, cvText: cvA, coverLetter: 'I have worked with prosthetic users since 2018 and would be glad to join the Irbid team.', score: scoreApplicant(vacPhysio, cvA, '', 6), status: 'shortlisted', notes: '', submittedAt: ago(5) },
+  { id: 'app_2', number: `APP-${Y}-0002`, vacancyId: 'vac_1', name: 'Mohammad Ali', email: 'm.ali@example.com', phone: '+962 79 000 0002', country: 'Jordan', yearsExperience: 2, cvText: cvB, coverLetter: '', score: scoreApplicant(vacPhysio, cvB, '', 2), status: 'new', notes: '', submittedAt: ago(4) },
+  { id: 'app_3', number: `APP-${Y}-0003`, vacancyId: 'vac_1', name: 'Dina Saleh', email: 'dina.s@example.com', phone: '+962 79 000 0003', country: 'Jordan', yearsExperience: 9, cvText: cvC, coverLetter: '', score: scoreApplicant(vacPhysio, cvC, '', 9), status: 'new', notes: '', submittedAt: ago(1) },
 ]
 
 export const SEED_PARTNERS: Partner[] = [

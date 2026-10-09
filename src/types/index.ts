@@ -192,7 +192,7 @@ export interface AuditEvent {
   at: string
   actorId: string
   actorName: string
-  docType: DocType | 'SYSTEM' | 'VENDOR' | 'USER' | 'BUDGET' | 'SETTINGS' | 'ESIGN' | 'PROJECT' | 'TASK' | 'DONOR' | 'MASTER' | 'PARTNER' | 'STAFF' | 'HR'
+  docType: DocType | 'SYSTEM' | 'VENDOR' | 'USER' | 'BUDGET' | 'SETTINGS' | 'ESIGN' | 'PROJECT' | 'TASK' | 'DONOR' | 'MASTER' | 'PARTNER' | 'STAFF' | 'HR' | 'RECRUIT'
   docId?: string
   docNumber?: string
   action: string
@@ -877,4 +877,28 @@ export interface AttendanceRecord {
   id: string; staffId: string; date: string; mode: AttendanceMode
   checkInAt: string; lat?: number; lng?: number; accuracy?: number; locationStatus: 'captured' | 'denied' | 'unavailable'; note?: string
   checkOutAt?: string; outLat?: number; outLng?: number
+}
+
+// ---------------------------------------------------------------------------
+// Recruitment — request → approvals (director, finance) → advertisement → applications
+// ---------------------------------------------------------------------------
+export type VacancyStatus = 'draft' | 'pending_approval' | 'approved' | 'advertised' | 'closed' | 'rejected'
+export interface VacancyApproval { key: 'director' | 'finance'; label: string; role: Role; approverId?: string; approverName?: string; status: 'pending' | 'approved' | 'rejected'; decidedBy?: string; decidedByName?: string; decidedAt?: string; note?: string }
+export interface JobDescription { purpose: string; responsibilities: string; qualifications: string; attachment?: Attachment; extractedText?: string }
+export interface Advertisement { summary: string; responsibilities: string; requirements: string; howToApply: string; location: string; closingDate: string; token: string; publishedAt: string; publishedBy: string; publishedByName: string }
+export interface Vacancy {
+  id: string; number: string; title: string; department: string; country: string; contractType: StaffMember['contractType']
+  headcount: number; salaryRange: string; startDate: string; duration: string; reason: string
+  projectId?: string; projectCode?: string; plannedStaffId?: string
+  keywords: string[]; minYears: number
+  jd: JobDescription
+  status: VacancyStatus; approvals: VacancyApproval[]; advert?: Advertisement
+  requestedBy: string; requestedByName: string; lineManagerStaffId?: string
+  createdAt: string; updatedAt: string; submittedAt?: string; closedAt?: string; ownerName: string
+}
+export type ApplicantStatus = 'new' | 'shortlisted' | 'interview' | 'offered' | 'hired' | 'rejected'
+export interface ApplicantScore { matched: string[]; missing: string[]; keywordPct: number; yearsDetected: number | null; yearsDeclared: number; meetsYears: boolean; total: number }
+export interface Applicant {
+  id: string; number: string; vacancyId: string; name: string; email: string; phone: string; country: string; yearsExperience: number
+  cv?: Attachment; cvText: string; coverLetter: string; score: ApplicantScore; status: ApplicantStatus; notes: string; submittedAt: string
 }

@@ -51,13 +51,6 @@ export default function VettingPublic() {
     setErr(''); setDone(true)
   }
 
-  const Shell = ({ children }: { children: React.ReactNode }) => (
-    <div className="min-h-screen bg-surface-sunken">
-      <header className="border-b border-line bg-surface"><div className="mx-auto flex max-w-[1000px] items-center justify-between px-4 py-3 lg:px-6"><Logo size="sm" /><span className="rounded-pill bg-brand-50 px-2.5 py-1 text-[11.5px] font-semibold text-brand-800">Partner vetting form</span></div></header>
-      <main className="mx-auto max-w-[1000px] px-4 py-6 lg:px-6">{children}</main>
-      <footer className="px-6 pb-8 pt-2 text-center text-[11.5px] text-ink-400">{settings.orgName} · {settings.address} · {settings.email} · Documents owned by Bilal Abbassi</footer>
-    </div>
-  )
 
   if (!partner || !share || !v) return <Shell><div className="card p-8 text-center"><h1 className="text-[20px] font-semibold">This link is not valid</h1><p className="mt-2 text-[13.5px] text-ink-600">Ask your {settings.orgShort} focal point for a new vetting link.</p></div></Shell>
   if (share.status === 'revoked') return <Shell><div className="card p-8 text-center"><h1 className="text-[20px] font-semibold">This form has been closed</h1><p className="mt-2 text-[13.5px] text-ink-600">{settings.orgShort} closed this vetting link. Contact your focal point if you still need to submit.</p></div></Shell>
@@ -152,5 +145,16 @@ function Section({ n, title, hint, children }: { n: number; title: string; hint?
       <div className="mb-4 flex items-start gap-3"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-brand-600 text-[13px] font-bold text-white">{n}</span><div><h2 className="text-[16px] font-semibold">{title}</h2>{hint && <p className="text-[12.5px] text-ink-500">{hint}</p>}</div></div>
       {children}
     </section>
+  )
+}
+
+function Shell({ children }: { children: React.ReactNode }) {
+  const settings = useStore((s) => s.settings)
+  return (
+    <div className="min-h-screen bg-surface-sunken">
+      <header className="border-b border-line bg-surface"><div className="mx-auto flex max-w-[1000px] items-center justify-between px-4 py-3 lg:px-6"><Logo size="sm" /><span className="rounded-pill bg-brand-50 px-2.5 py-1 text-[11.5px] font-semibold text-brand-800">Partner vetting form</span></div></header>
+      <main className="mx-auto max-w-[1000px] px-4 py-6 lg:px-6">{children}</main>
+      <footer className="px-6 pb-8 pt-2 text-center text-[11.5px] text-ink-400">{settings.orgName} · {settings.address} · {settings.email} · Documents owned by Bilal Abbassi</footer>
+    </div>
   )
 }

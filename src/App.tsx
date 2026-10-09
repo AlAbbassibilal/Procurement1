@@ -21,6 +21,10 @@ import HrRequests from '@/pages/hr/Requests'
 import HrTimesheets from '@/pages/hr/Timesheets'
 import HrAttendance from '@/pages/hr/Attendance'
 import HrPayroll from '@/pages/hr/Payroll'
+import Recruitment from '@/pages/hr/Recruitment'
+import VacancyForm from '@/pages/hr/VacancyForm'
+import VacancyPage from '@/pages/hr/Vacancy'
+import Apply from '@/pages/hr/Apply'
 import PartnerList from '@/pages/partnerships/List'
 import PartnerPage from '@/pages/partnerships/Partner'
 import VettingPublic from '@/pages/partnerships/VettingPublic'
@@ -73,7 +77,7 @@ function RequireAccess() {
   const staff = useStore((s) => s.staff)
   const myStaff = user ? staff.find((x) => x.userId === user.id) : undefined
   const lineManager = !!myStaff && staff.some((x) => x.lineManagerId === myStaff.id)
-  const hrSelf = pathname === '/hr/me' || (lineManager && /^\/hr\/(requests|timesheets|attendance)/.test(pathname))
+  const hrSelf = pathname === '/hr/me' || (lineManager && /^\/hr\/(requests|timesheets|attendance|recruitment)/.test(pathname)) || (/^\/hr\/recruitment/.test(pathname) && !!user && ['dept_manager', 'programs_director', 'executive_director', 'finance_director', 'procurement_manager'].includes(user.role))
   if (user && d && !canEnter(user, d.id) && !(holder && pathname.startsWith('/finance/master-budget')) && !hrPlan && !hrSelf) return <NoAccess />
   return <Outlet />
 }
@@ -86,6 +90,8 @@ export default function App() {
       <Route path="/login" element={authed ? <Navigate to="/" replace /> : <Login />} />
       {/* Partner-facing vetting form — the only page reachable without signing in */}
       <Route path="/partner-vetting/:token" element={<VettingPublic />} />
+      {/* Public job application page — anyone with the link */}
+      <Route path="/apply/:token" element={<Apply />} />
       <Route element={<RequireAuth />}>
         <Route element={<Layout />}>
          <Route element={<RequireAccess />}>
@@ -111,6 +117,10 @@ export default function App() {
           <Route path="hr/timesheets" element={<HrTimesheets />} />
           <Route path="hr/attendance" element={<HrAttendance />} />
           <Route path="hr/payroll" element={<HrPayroll />} />
+          <Route path="hr/recruitment" element={<Recruitment />} />
+          <Route path="hr/recruitment/new" element={<VacancyForm />} />
+          <Route path="hr/recruitment/:id/edit" element={<VacancyForm />} />
+          <Route path="hr/recruitment/:id" element={<VacancyPage />} />
           <Route path="media" element={<MediaHome />} />
           <Route path="approvals" element={<Approvals />} />
           <Route path="esign" element={<EnvelopeList />} />

@@ -6,11 +6,12 @@ import { Card, PageHeader, StatusPill, EmptyState, Tabs, PriorityDot } from '@/c
 import { fmtMoney, fmtDate, linesSubtotal, timeAgo } from '@/lib/format'
 import { canApprove, currentStep } from '@/lib/workflow'
 import { invoiceTotals } from '@/lib/match'
+import { canDecideVacancy, currentVacancyStep } from '@/lib/recruitment'
 
 export default function Approvals() {
   const user = useCurrentUser()!
   const nav = useNavigate()
-  const { prs, pos, contracts, invoices } = useStore()
+  const { prs, pos, contracts, invoices, vacancies } = useStore()
   const [tab, setTab] = useState<'queue' | 'history'>('queue')
 
   const qPR = prs.filter((p) => p.status === 'pending_approval' && canApprove(p.approvalChain, user))
@@ -19,7 +20,8 @@ export default function Approvals() {
   const qINV = invoices.filter((i) => i.status === 'pending_approval' && canApprove(i.approvalChain, user))
   const hPR = prs.filter((p) => p.approvalChain.some((s) => s.decidedBy === user.id))
   const hPO = pos.filter((p) => p.approvalChain.some((s) => s.decidedBy === user.id))
-  const total = qPR.length + qPO.length + qCT.length + qINV.length
+  const qREC = vacancies.filter((v) => canDecideVacancy(v, user))
+  const total = qPR.length + qPO.length + qCT.length + qINV.length + qREC.length
 
   return (
     <>
@@ -29,6 +31,12 @@ export default function Approvals() {
       {tab === 'queue' && (
         <div className="mt-5 space-y-5">
           {total === 0 && <EmptyState title="Your queue is empty" body="Documents will appear here when they reach a step assigned to you or your role." icon={<CheckSquare size={22} />} />}
+          {qREC.length > 0 && (
+            <Card title="Recruitment requests" padded={false}>
+              <table className="w-full text-[13px]"><thead><tr><th className="table-th">Request</th><th className="table-th">Raised by</th><th className="table-th">Step</th><th className="table-th">Funding</th><th className="table-th">Submitted</th></tr></thead>
+                <tbody>{qREC.map((v) => <tr key={v.id} className="cursor-pointer hover:bg-surface-muted" onClick={() => nav(`/hr/recruitment/${v.id}`)}><td className="table-td"><div className="font-medium text-ink-900">{v.title}</div><div className="text-[11.5px] text-ink-500">{v.number} · {v.headcount} × {v.department}</div></td><td className="table-td">{v.requestedByName}</td><td className="table-td">{currentVacancyStep(v)?.label}</td><td className="table-td">{v.projectCode ?? 'Core'}</td><td className="table-td text-ink-500">{v.submittedAt ? timeAgo(v.submittedAt) : ''}</td></tr>)}</tbody></table>
+            </Card>
+          )}
           {qPR.length > 0 && (
             <Card title="Purchase requisitions" padded={false}>
               <table className="w-full text-[13px]">

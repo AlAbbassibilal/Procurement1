@@ -149,3 +149,12 @@ export const recipientTurn = (env: Envelope): EnvelopeRecipient[] => {
   if (env.signingOrder === 'parallel') return open
   const minOrder = Math.min(...open.map((r) => r.order)); return open.filter((r) => r.order === minOrder)
 }
+
+/** Plain text of every page (used by recruitment to read CVs). */
+export async function pdfText(bytes: Uint8Array): Promise<string> {
+  await ensureWorker()
+  const doc = await pdfjs.getDocument({ data: bytes.slice() }).promise
+  const out: string[] = []
+  for (let i = 1; i <= doc.numPages; i++) { const page = await doc.getPage(i); const c = await page.getTextContent(); out.push(c.items.map((it) => ('str' in it ? it.str : '')).join(' ')) }
+  return out.join('\n')
+}

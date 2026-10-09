@@ -3,9 +3,9 @@ import { persist } from 'zustand/middleware'
 import type {
   ApprovalRule, Attachment, AuditEvent, Comment, Contract, ContractMilestone, LineItem, Notification, OrgSettings,
   PurchaseOrder, PurchaseRequisition, Quotation, User, Vendor, DocType, Role, GoodsReceipt, GoodsReceiptLine, Invoice, InvoiceLine, SourcingRecord, ExceptionType, ProjectBudget, Envelope, EnvelopeRecipient, EnvelopeField, Project, ProjectStage, Donor, Task, ProjectReport, ProjectComment, MasterBudget, MasterLine,
-  UiTheme, Partner, PartnerStage, DueDiligence, PartnerSubmission, PartnerAgreement, StaffMember, LeaveRequest, LeaveType, Timesheet, Payslip, AttendanceRecord, AttendanceMode,
+  UiTheme, Partner, PartnerStage, DueDiligence, PartnerSubmission, PartnerAgreement, StaffMember, LeaveRequest, LeaveType, Timesheet, Payslip, AttendanceRecord, AttendanceMode, Vacancy, Applicant, Advertisement, ApplicantStatus,
 } from '@/types'
-import { DOC_OWNER, SEED_PARTNERS, SEED_STAFF, SEED_LEAVE, SEED_TIMESHEETS, SEED_PAYSLIPS, SEED_ATTENDANCE, SEED_BUDGETS, SEED_DONORS, SEED_PROJECTS, SEED_TASKS, SEED_MASTER, SEED_CONTRACTS, SEED_GRNS, SEED_INVOICES, SEED_POS, SEED_PRS, SEED_RULES, SEED_SETTINGS, SEED_USERS, SEED_VENDORS, STANDARD_CLAUSES } from '@/data/seed'
+import { DOC_OWNER, SEED_PARTNERS, SEED_STAFF, SEED_LEAVE, SEED_TIMESHEETS, SEED_PAYSLIPS, SEED_ATTENDANCE, SEED_VACANCIES, SEED_APPLICANTS, SEED_BUDGETS, SEED_DONORS, SEED_PROJECTS, SEED_TASKS, SEED_MASTER, SEED_CONTRACTS, SEED_GRNS, SEED_INVOICES, SEED_POS, SEED_PRS, SEED_RULES, SEED_SETTINGS, SEED_USERS, SEED_VENDORS, STANDARD_CLAUSES } from '@/data/seed'
 import { hasBlockingIssues, receiptProgress, runMatch, invoiceTotals } from '@/lib/match'
 import { newEvent, recipientTurn } from '@/lib/esign'
 import { generateIPTT, generateReportingCalendar, generateSpendingPlan, monthsOf, parseMentions, reportLiveStatus, allIndicators } from '@/lib/grants'
@@ -14,6 +14,7 @@ import { applyDecision, buildChain, currentStep, resetChain, resolveApprover, ch
 import { linesSubtotal, nowIso, uid } from '@/lib/format'
 import { emptyDueDiligence } from '@/lib/partners'
 import { unassignedSalaryLines, isSalaryLine, headcount, nextRhsNumber } from '@/lib/salary'
+import { buildVacancyChain, canDecideVacancy, scoreApplicant } from '@/lib/recruitment'
 import { balances, computePayslip, hrSettings, workingDaysBetween, workingDaysInMonth, today as todayIso } from '@/lib/hr'
 
 type Decision = 'approved' | 'rejected' | 'returned' | 'delegated'
@@ -41,6 +42,8 @@ interface State {
   timesheets: Timesheet[]
   payslips: Payslip[]
   attendance: AttendanceRecord[]
+  vacancies: Vacancy[]
+  applicants: Applicant[]
   country: string            // current country context ('all' or a country name)
   uiTheme: UiTheme           // 'classic' (original interface) | 'modern'
   homeLayout: 'dashboard' | 'launcher'   // original dashboard home, or the app-launcher home
@@ -150,6 +153,14 @@ interface Actions {
   runPayroll: (period: string) => { created: number }
   checkIn: (data: { mode: AttendanceMode; lat?: number; lng?: number; accuracy?: number; locationStatus: AttendanceRecord['locationStatus']; note?: string }) => { ok: boolean; error?: string }
   checkOut: (pos?: { lat?: number; lng?: number }) => void
+  // Recruitment
+  saveVacancy: (data: Partial<Vacancy> & { title: string }) => Vacancy
+  submitVacancy: (id: string) => { ok: boolean; error?: string }
+  decideVacancy: (id: string, approve: boolean, note?: string) => void
+  publishVacancy: (id: string, advert: Omit<Advertisement, 'token' | 'publishedAt' | 'publishedBy' | 'publishedByName'>) => string
+  closeVacancy: (id: string) => void
+  applyToVacancy: (token: string, data: Omit<Applicant, 'id' | 'number' | 'vacancyId' | 'score' | 'status' | 'notes' | 'submittedAt'>) => { ok: boolean; error?: string; applicant?: Applicant }
+  setApplicantStatus: (id: string, status: ApplicantStatus, notes?: string) => void
   // Appearance (per browser)
   setUiTheme: (t: UiTheme) => void
   setHomeLayout: (l: 'dashboard' | 'launcher') => void
@@ -220,6 +231,8 @@ const initial = (): State => ({
   timesheets: SEED_TIMESHEETS,
   payslips: SEED_PAYSLIPS,
   attendance: SEED_ATTENDANCE,
+  vacancies: SEED_VACANCIES,
+  applicants: SEED_APPLICANTS,
   country: 'all',
   uiTheme: 'classic',
   homeLayout: 'dashboard',
@@ -235,7 +248,7 @@ const initial = (): State => ({
   audit: [
     { id: 'a1', at: nowIso(), actorId: 'u_bilal', actorName: DOC_OWNER, docType: 'SYSTEM', action: 'System initialised', detail: 'Demo dataset loaded' },
   ],
-  counters: { PR: 44, PO: 17, CT: 6, GRN: 9, INV: 12, ENV: 0, PT: 2, LR: 3, WFH: 2, PS: 3 },
+  counters: { PR: 44, PO: 17, CT: 6, GRN: 9, INV: 12, ENV: 0, PT: 2, LR: 3, WFH: 2, PS: 3, REC: 2, APP: 3 },
 })
 
 export const useStore = create<State & Actions>()(
@@ -257,7 +270,7 @@ export const useStore = create<State & Actions>()(
       const notifyRole = (role: Role, n: Omit<Notification, 'id' | 'userId' | 'at' | 'read'>) => {
         get().users.filter((u) => u.active && u.role === role).forEach((u) => notify(u.id, n))
       }
-      const nextNumber = (t: 'PR' | 'PO' | 'CT' | 'GRN' | 'INV' | 'ENV' | 'PT' | 'LR' | 'WFH' | 'PS') => {
+      const nextNumber = (t: 'PR' | 'PO' | 'CT' | 'GRN' | 'INV' | 'ENV' | 'PT' | 'LR' | 'WFH' | 'PS' | 'REC' | 'APP') => {
         const n = (get().counters[t] ?? 0) + 1
         set((s) => ({ counters: { ...s.counters, [t]: n } }))
         return `${t}-${new Date().getFullYear()}-${String(n).padStart(4, '0')}`
@@ -905,6 +918,67 @@ export const useStore = create<State & Actions>()(
           const day = todayIso()
           set((s) => ({ attendance: s.attendance.map((x) => (x.staffId === st.id && x.date === day && !x.checkOutAt ? { ...x, checkOutAt: nowIso(), outLat: pos?.lat, outLng: pos?.lng } : x)) }))
           log('HR', 'Checked out', { id: st.id, number: st.rhsNumber })
+        },
+
+        // ---- Recruitment ---------------------------------------------------------
+        saveVacancy: (data) => {
+          const a = actor(); const exists = data.id ? get().vacancies.find((v) => v.id === data.id) : undefined
+          const me = get().staff.find((x) => x.userId === a.id)
+          const v: Vacancy = exists ? { ...exists, ...data, id: exists.id, updatedAt: nowIso() } : { number: nextNumber('REC'), department: me?.department ?? a.department, country: get().settings.countries[0], contractType: 'full_time', headcount: 1, salaryRange: '', startDate: '', duration: '', reason: '', keywords: [], minYears: 0, jd: { purpose: '', responsibilities: '', qualifications: '' }, status: 'draft', approvals: [], requestedBy: a.id, requestedByName: a.name, lineManagerStaffId: me?.id, createdAt: nowIso(), updatedAt: nowIso(), ownerName: DOC_OWNER, ...data, id: uid('vac_') }
+          set((s) => ({ vacancies: exists ? s.vacancies.map((x) => (x.id === v.id ? v : x)) : [v, ...s.vacancies] }))
+          if (!exists) log('RECRUIT', 'Recruitment request created', { id: v.id, number: v.number }, v.title)
+          return v
+        },
+        submitVacancy: (id) => {
+          const a = actor(); const v = get().vacancies.find((x) => x.id === id); if (!v) return { ok: false, error: 'Not found' }
+          if (!v.title.trim() || !v.reason.trim()) return { ok: false, error: 'Title and justification are required.' }
+          if (!v.keywords.length) return { ok: false, error: 'Add at least one keyword — the system screens CVs against them.' }
+          if (!v.jd.purpose.trim() && !v.jd.attachment) return { ok: false, error: 'Write the job description or upload one.' }
+          const approvals = buildVacancyChain(a, get().staff, get().users)
+          set((s) => ({ vacancies: s.vacancies.map((x) => (x.id === id ? { ...x, status: 'pending_approval', approvals, submittedAt: nowIso(), updatedAt: nowIso() } : x)) }))
+          log('RECRUIT', 'Recruitment request submitted for approval', { id: v.id, number: v.number }, approvals.map((s) => s.label).join(' → '))
+          const first = approvals[0]!; const n = { kind: 'approval' as const, title: `Recruitment request — ${v.title}`, body: `${v.number} · ${v.headcount} × ${v.title} · raised by ${a.name}`, link: `/hr/recruitment/${v.id}` }
+          if (first.approverId) notify(first.approverId, n); else notifyRole(first.role, n)
+          return { ok: true }
+        },
+        decideVacancy: (id, approve, note) => {
+          const a = actor(); const v = get().vacancies.find((x) => x.id === id); if (!v || !canDecideVacancy(v, a)) return
+          const idx = v.approvals.findIndex((s) => s.status === 'pending')
+          const approvals = v.approvals.map((s, i) => (i === idx ? { ...s, status: approve ? 'approved' as const : 'rejected' as const, decidedBy: a.id, decidedByName: a.name, decidedAt: nowIso(), note } : s))
+          const done = approve && approvals.every((s) => s.status === 'approved')
+          const status: Vacancy['status'] = !approve ? 'rejected' : done ? 'approved' : 'pending_approval'
+          set((s) => ({ vacancies: s.vacancies.map((x) => (x.id === id ? { ...x, approvals, status, updatedAt: nowIso() } : x)) }))
+          log('RECRUIT', `Recruitment request ${approve ? 'approved' : 'rejected'} — ${v.approvals[idx]!.label}`, { id: v.id, number: v.number }, note)
+          if (!approve) notify(v.requestedBy, { kind: 'warning', title: `${v.number} rejected`, body: `${v.title}${note ? ' · ' + note : ''}`, link: `/hr/recruitment/${v.id}` })
+          else if (done) { notify(v.requestedBy, { kind: 'success', title: `${v.number} approved`, body: `${v.title} — HR & Admin will prepare the advertisement`, link: `/hr/recruitment/${v.id}` }); notifyRole('hr', { kind: 'task', title: `Create the advertisement — ${v.title}`, body: `${v.number} approved by ${approvals.map((s) => s.decidedByName).join(' and ')}`, link: `/hr/recruitment/${v.id}` }) }
+          else { const next = approvals[idx + 1]!; const n = { kind: 'approval' as const, title: `Recruitment request — ${v.title}`, body: `${v.number} · approved by ${a.name}, your budget check is next`, link: `/hr/recruitment/${v.id}` }; if (next.approverId) notify(next.approverId, n); else notifyRole(next.role, n) }
+        },
+        publishVacancy: (id, advert) => {
+          const a = actor(); const token = 'apply_' + uid('') + uid('')
+          set((s) => ({ vacancies: s.vacancies.map((x) => (x.id === id ? { ...x, status: 'advertised', advert: { ...advert, token, publishedAt: nowIso(), publishedBy: a.id, publishedByName: a.name }, updatedAt: nowIso() } : x)) }))
+          const v = get().vacancies.find((x) => x.id === id)!
+          log('RECRUIT', 'Vacancy advertised', { id: v.id, number: v.number }, `closing ${advert.closingDate}`)
+          notify(v.requestedBy, { kind: 'info', title: `${v.title} is advertised`, body: `Applications close ${advert.closingDate} — share the application link`, link: `/hr/recruitment/${v.id}?tab=advert` })
+          return token
+        },
+        closeVacancy: (id) => { set((s) => ({ vacancies: s.vacancies.map((x) => (x.id === id ? { ...x, status: 'closed', closedAt: nowIso(), updatedAt: nowIso() } : x)) })); const v = get().vacancies.find((x) => x.id === id)!; log('RECRUIT', 'Vacancy closed', { id: v.id, number: v.number }) },
+        applyToVacancy: (token, data) => {
+          const v = get().vacancies.find((x) => x.advert?.token === token)
+          if (!v || v.status !== 'advertised') return { ok: false, error: 'This vacancy is not open for applications.' }
+          if (v.advert!.closingDate && v.advert!.closingDate < nowIso().slice(0, 10)) return { ok: false, error: 'Applications for this vacancy have closed.' }
+          if (get().applicants.some((x) => x.vacancyId === v.id && x.email.trim().toLowerCase() === data.email.trim().toLowerCase())) return { ok: false, error: 'An application with this e-mail address was already received for this vacancy.' }
+          const app: Applicant = { id: uid('app_'), number: nextNumber('APP'), vacancyId: v.id, ...data, score: scoreApplicant(v, data.cvText, data.coverLetter, data.yearsExperience), status: 'new', notes: '', submittedAt: nowIso() }
+          set((s) => ({ applicants: [app, ...s.applicants], audit: [{ id: uid('a_'), at: nowIso(), actorId: 'applicant', actorName: `${app.name} (applicant)`, docType: 'RECRUIT' as const, docId: v.id, docNumber: v.number, action: 'Application received', detail: `${app.number} · match ${app.score.keywordPct}% · ${app.score.yearsDetected ?? app.yearsExperience} yrs` }, ...s.audit].slice(0, 500) }))
+          const n = { kind: 'info' as const, title: `New application — ${v.title}`, body: `${app.name} · keyword match ${app.score.keywordPct}% · ${Math.max(app.yearsExperience, app.score.yearsDetected ?? 0)} years`, link: `/hr/recruitment/${v.id}?tab=applicants` }
+          notifyRole('hr', n); notify(v.requestedBy, n)
+          return { ok: true, applicant: app }
+        },
+        setApplicantStatus: (id, status, notes) => {
+          const a = actor(); const app = get().applicants.find((x) => x.id === id); if (!app) return
+          set((s) => ({ applicants: s.applicants.map((x) => (x.id === id ? { ...x, status, notes: notes ?? x.notes } : x)) }))
+          const v = get().vacancies.find((x) => x.id === app.vacancyId)
+          log('RECRUIT', `Applicant ${status}`, v ? { id: v.id, number: v.number } : undefined, `${app.name}${notes ? ' · ' + notes : ''}`)
+          if (status === 'hired' && v?.plannedStaffId) { const st = get().staff.find((x) => x.id === v.plannedStaffId); if (st && st.status === 'planned') get().confirmRecruitment(st.id, app.name, v.startDate || nowIso().slice(0, 10)); notify(a.id, { kind: 'success', title: `${app.name} hired`, body: `Position ${st?.rhsNumber ?? ''} filled on the master salary plan`, link: '/hr/staff' }) }
         },
 
         setUiTheme: (t) => set({ uiTheme: t }),

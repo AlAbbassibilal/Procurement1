@@ -44,9 +44,11 @@ npm run build      # production bundle in dist/
 
 Sign in with any demo account (password `rhs2025`), e.g. `AlAbbassi.bilal@icloud.com` (administrator). The user menu lets you switch account to walk a document through every role, and reset the demo data.
 
-## Interface: Classic / Modern, and the sidebar
+## Interface: Classic / Modern, home screen, and the sidebar
 
 Two skins ship on the same brand palette. **Classic** is the original interface (navy sidebar, compact cards). **Modern** is a lighter redesign — white sidebar with a brand wash, 16 px cards, tinted canvas, frosted top bar and gradient primary actions. Switch between them under **Settings → Appearance** (admin) or from the account menu (any user); the choice is remembered per device and applies to the login page too. The skin lives in `src/theme/modern.css` as token overrides under `html[data-ui="modern"]`; components keep using the same Tailwind token classes.
+
+Two **home screens**: the original dashboard (greeting, my approvals / tasks / signatures, workspace cards with live figures) and an **app launcher** (search bar, Favorites · Work · Profile rail, large app tiles with the RHS line icons, a faint prosthesis watermark, locked tiles for workspaces the user cannot enter, pending-item badges). Switch from Settings → Appearance, from the account menu, or with the buttons on either home; favourites are per device (`src/pages/Launcher.tsx`).
 
 The sidebar can be hidden to an icon rail (sidebar button, header button or **Ctrl/⌘ + B**) and restored the same way; the state is remembered. The mobile drawer always shows the full menu.
 

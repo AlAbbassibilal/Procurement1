@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { CheckSquare, ListChecks, FileText, Lock, ArrowRight, PenLine, HandCoins, Handshake, ShoppingCart, Landmark, Users, Megaphone } from 'lucide-react'
+import { CheckSquare, ListChecks, FileText, Lock, ArrowRight, PenLine, HandCoins, Handshake, ShoppingCart, Landmark, Users, Megaphone, LayoutGrid } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
 import { PageHeader } from '@/components/ui'
 import { DEPARTMENTS, ACCESS_LABEL, effectiveAccess } from '@/lib/departments'
@@ -16,7 +16,7 @@ export const DEPT_ICON: Record<Department, React.ReactNode> = {
 export default function Home() {
   const user = useCurrentUser()!
   const nav = useNavigate()
-  const { prs, pos, invoices, contracts, budgets, envelopes, tasks, projects, settings, partners } = useStore()
+  const { prs, pos, invoices, contracts, budgets, envelopes, tasks, projects, settings, partners, setHomeLayout } = useStore()
   const access = effectiveAccess(user)
   const approvals = prs.filter((p) => p.status === 'pending_approval' && canApprove(p.approvalChain, user)).length
     + pos.filter((p) => p.status === 'pending_approval' && canApprove(p.approvalChain, user)).length
@@ -44,7 +44,8 @@ export default function Home() {
   return (
     <>
       <PageHeader eyebrow={`${ROLE_LABEL[user.role]} · ${user.department}`} title={`${greet}, ${user.name.split(' ')[0]}`}
-        subtitle={`${settings.orgShort} management platform — choose a workspace. Your access to each is set by the administrator.`} />
+        subtitle={`${settings.orgShort} management platform — choose a workspace. Your access to each is set by the administrator.`}
+        actions={<button className="btn-secondary btn-sm" onClick={() => setHomeLayout('launcher')} title="Switch the home screen to the app launcher (you can switch back from the account menu or Settings)"><LayoutGrid size={14} /> Try the app launcher</button>} />
 
       <div className="mb-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Link to="/approvals" className={cx('card flex items-center gap-4 px-5 py-4 hover:shadow-raised', approvals > 0 && 'border-sun-300')}>

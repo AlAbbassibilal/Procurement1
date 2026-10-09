@@ -8,7 +8,7 @@ import { cx } from '@/lib/format'
 import type { OrgSettings, UiTheme } from '@/types'
 
 export default function Settings() {
-  const { settings, updateSettings, uiTheme, setUiTheme, sidebarCollapsed, setSidebarCollapsed } = useStore()
+  const { settings, updateSettings, uiTheme, setUiTheme, sidebarCollapsed, setSidebarCollapsed, homeLayout, setHomeLayout } = useStore()
   const [s, setS] = useState<OrgSettings>(settings)
   const [saved, setSaved] = useState(false)
   const set = (p: Partial<OrgSettings>) => setS((x) => ({ ...x, ...p }))
@@ -45,6 +45,15 @@ export default function Settings() {
                     {on && <Check size={16} className="text-brand-700" />}
                   </div>
                 </button>) })}
+              <div className="sm:col-span-2">
+                <div className="label">Home screen</div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {([['dashboard', 'Dashboard (original)', 'Greeting, my approvals / tasks / signatures, and the six workspace cards with live figures.'], ['launcher', 'App launcher', 'Search bar, Favorites · Work · Profile rail and large app tiles — one click into each workspace.']] as const).map(([id, name, blurb]) => { const on = homeLayout === id; return (
+                    <button key={id} type="button" data-testid={`home-${id}`} aria-pressed={on} onClick={() => setHomeLayout(id)} className={cx('rounded-card border-2 p-3 text-left transition-all', on ? 'border-brand-600 bg-brand-50/50' : 'border-line hover:border-ink-300 hover:bg-surface-muted')}>
+                      <div className="text-[13.5px] font-semibold text-ink-900">{name}{on && <span className="ml-2 rounded-pill bg-brand-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">Active</span>}</div><div className="text-[12px] text-ink-500">{blurb}</div>
+                    </button>) })}
+                </div>
+              </div>
               <label className="flex items-start gap-3 rounded-control border border-line bg-surface-muted px-3 py-2.5 text-[13px] text-ink-700 sm:col-span-2">
                 <input type="checkbox" className="mt-0.5" checked={sidebarCollapsed} onChange={(e) => setSidebarCollapsed(e.target.checked)} />
                 <span><span className="flex items-center gap-1.5 font-medium text-ink-900"><PanelLeftClose size={14} /> Keep the sidebar hidden</span>Shows an icon rail instead of the full menu, leaving more room for what you are working on. Toggle any time with the sidebar button or <span className="kbd">Ctrl</span> + <span className="kbd">B</span>.</span>

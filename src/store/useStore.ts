@@ -38,6 +38,8 @@ interface State {
   staff: StaffMember[]
   country: string            // current country context ('all' or a country name)
   uiTheme: UiTheme           // 'classic' (original interface) | 'modern'
+  homeLayout: 'dashboard' | 'launcher'   // original dashboard home, or the app-launcher home
+  favorites: string[]        // launcher favourites (workspace ids / module paths)
   sidebarCollapsed: boolean  // desktop sidebar shown as an icon rail
   notifications: Notification[]
   audit: AuditEvent[]
@@ -136,6 +138,8 @@ interface Actions {
   confirmRecruitment: (id: string, name: string, startDate: string) => void
   // Appearance (per browser)
   setUiTheme: (t: UiTheme) => void
+  setHomeLayout: (l: 'dashboard' | 'launcher') => void
+  toggleFavorite: (key: string) => void
   toggleSidebar: () => void
   setSidebarCollapsed: (v: boolean) => void
 
@@ -200,6 +204,8 @@ const initial = (): State => ({
   staff: SEED_STAFF,
   country: 'all',
   uiTheme: 'classic',
+  homeLayout: 'dashboard',
+  favorites: [],
   sidebarCollapsed: false,
   notifications: [
     { id: 'n5', userId: 'u_rana', at: nowIso(), title: 'Invoice approval required', body: 'INV-2025-0012 · Amman Fleet & Logistics · JOD 742.40', link: '/invoices/inv_1', read: false, kind: 'approval' },
@@ -811,6 +817,8 @@ export const useStore = create<State & Actions>()(
         },
 
         setUiTheme: (t) => set({ uiTheme: t }),
+        setHomeLayout: (l) => set({ homeLayout: l }),
+        toggleFavorite: (key) => set((s) => ({ favorites: s.favorites.includes(key) ? s.favorites.filter((k) => k !== key) : [...s.favorites, key] })),
         toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
         setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
 
@@ -1037,7 +1045,7 @@ export const useStore = create<State & Actions>()(
         markRead: (id) => set((s) => ({ notifications: s.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)) })),
         markAllRead: () => { const me = get().currentUserId; set((s) => ({ notifications: s.notifications.map((n) => (n.userId === me ? { ...n, read: true } : n)) })) },
 
-        resetDemo: () => set({ ...initial(), currentUserId: get().currentUserId, uiTheme: get().uiTheme, sidebarCollapsed: get().sidebarCollapsed }),
+        resetDemo: () => set({ ...initial(), currentUserId: get().currentUserId, uiTheme: get().uiTheme, homeLayout: get().homeLayout, favorites: get().favorites, sidebarCollapsed: get().sidebarCollapsed }),
       }
     },
     { name: 'rhs-platform-v7', version: 7 },

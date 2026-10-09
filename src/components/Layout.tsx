@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { NavLink, Outlet, useNavigate, Link, useLocation } from 'react-router-dom'
 import {
   LayoutGrid, FileText, CheckSquare, Search, ShoppingCart, FileSignature, Building2, Users, SlidersHorizontal,
-  History, Bell, LogOut, ChevronDown, Menu, Settings, RotateCcw, ChevronsUpDown, PackageCheck, Receipt, Scale, Wallet, Gauge, Lock, PenLine, ListChecks, HandCoins, Building, FolderPlus, Table2, Landmark, Globe2, PanelLeftClose, PanelLeftOpen, Sparkles, Monitor, Handshake, ShieldCheck, IdCard,
+  History, Menu, Settings, ChevronsUpDown, PackageCheck, Receipt, Scale, Wallet, Gauge, Lock, PenLine, ListChecks, HandCoins, Building, FolderPlus, Table2, Landmark, Globe2, PanelLeftClose, PanelLeftOpen, Handshake, ShieldCheck, IdCard,
 } from 'lucide-react'
 import { DEPARTMENTS, deptForPath, canEnter, ACCESS_LABEL, accessOf } from '@/lib/departments'
 import { DEPT_ICON } from '@/pages/Home'
@@ -10,9 +10,10 @@ import { recipientTurn } from '@/lib/esign'
 import { useStore, useCurrentUser } from '@/store/useStore'
 import { Logo, SunMark } from './Logo'
 import { useUiTheme } from '@/lib/ui-theme'
-import { Avatar } from './ui'
-import { cx, timeAgo } from '@/lib/format'
-import { ROLE_LABEL, canApprove } from '@/lib/workflow'
+import { NotificationBell, UserMenu } from './HeaderMenus'
+import Launcher from '@/pages/Launcher'
+import { cx } from '@/lib/format'
+import { canApprove } from '@/lib/workflow'
 import type { Role } from '@/types'
 
 interface NavItem { to: string; label: string; icon: React.ReactNode; roles?: Role[]; badge?: number; soon?: boolean }
@@ -22,12 +23,10 @@ export default function Layout() {
   const nav = useNavigate()
   const { pathname } = useLocation()
   const dept = deptForPath(pathname)
-  const { logout, prs, pos, contracts, invoices, envelopes, tasks, runReminders, country, setCountry, masterBudgets, notifications, markRead, markAllRead, users, switchUser, settings, resetDemo, uiTheme, setUiTheme, sidebarCollapsed, toggleSidebar } = useStore()
+  const { prs, pos, contracts, invoices, envelopes, tasks, runReminders, country, setCountry, masterBudgets, settings, uiTheme, sidebarCollapsed, toggleSidebar, homeLayout } = useStore()
   useUiTheme()
   const modern = uiTheme === 'modern'
   const [open, setOpen] = useState(false)
-  const [notifOpen, setNotifOpen] = useState(false)
-  const [userOpen, setUserOpen] = useState(false)
 
   const myApprovals = useMemo(
     () => prs.filter((p) => p.status === 'pending_approval' && canApprove(p.approvalChain, user)).length
@@ -37,8 +36,6 @@ export default function Layout() {
     [prs, pos, contracts, invoices, user],
   )
   const sourcingCount = prs.filter((p) => p.status === 'approved' || p.status === 'sourcing').length
-  const myNotifs = notifications.filter((n) => n.userId === user.id)
-  const unread = myNotifs.filter((n) => !n.read).length
 
   const ICONS: Record<string, React.ReactNode> = {
     '/requisitions': <FileText size={17} />, '/sourcing': <Search size={17} />, '/orders': <ShoppingCart size={17} />, '/contracts': <FileSignature size={17} />,
@@ -164,6 +161,8 @@ export default function Layout() {
     </aside>
   )
 
+  if (homeLayout === 'launcher' && pathname === '/') return <Launcher />
+
   return (
     <div className="flex h-screen overflow-hidden">
       <div className="hidden lg:block shrink-0">{renderSidebar(sidebarCollapsed)}</div>
@@ -194,90 +193,8 @@ export default function Layout() {
             </select>
           </label>
 
-          {/* Notifications */}
-          <div className="relative">
-            <button className="btn-ghost btn-sm relative" onClick={() => { setNotifOpen((v) => !v); setUserOpen(false) }} aria-label="Notifications">
-              <Bell size={18} />
-              {unread > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-pill bg-accent-600 px-1 text-[10px] font-bold text-white">{unread}</span>}
-            </button>
-            {notifOpen && (
-              <>
-                <div className="fixed inset-0 z-30" onClick={() => setNotifOpen(false)} />
-                <div className="absolute right-0 z-40 mt-2 w-[360px] max-w-[92vw] rounded-card border border-line bg-surface shadow-raised animate-slide-up">
-                  <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
-                    <div className="text-[13.5px] font-semibold">Notifications</div>
-                    <button className="text-[12px] text-brand-700 hover:underline" onClick={markAllRead}>Mark all read</button>
-                  </div>
-                  <div className="max-h-[380px] overflow-y-auto scrollbar-thin">
-                    {myNotifs.length === 0 && <div className="px-4 py-8 text-center text-[13px] text-ink-500">You're all caught up.</div>}
-                    {myNotifs.slice(0, 30).map((n) => (
-                      <button key={n.id} onClick={() => { markRead(n.id); setNotifOpen(false); nav(n.link) }}
-                        className={cx('flex w-full gap-3 border-b border-line px-4 py-3 text-left hover:bg-surface-muted', !n.read && 'bg-brand-50/60')}>
-                        <span className={cx('mt-1.5 h-2 w-2 shrink-0 rounded-full', { approval: 'bg-sun-500', info: 'bg-info-500', success: 'bg-brand-600', warning: 'bg-accent-600', task: 'bg-brand-800', reminder: 'bg-accent-600' }[n.kind])} />
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-[13px] font-medium text-ink-900">{n.title}</span>
-                          <span className="block truncate text-[12.5px] text-ink-600">{n.body}</span>
-                          <span className="block text-[11px] text-ink-400">{timeAgo(n.at)}</span>
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* User menu */}
-          <div className="relative">
-            <button className="flex items-center gap-2.5 rounded-control px-2 py-1.5 hover:bg-ink-100" onClick={() => { setUserOpen((v) => !v); setNotifOpen(false) }}>
-              <Avatar name={user.name} color={user.avatarColor} />
-              <span className="hidden text-left sm:block">
-                <span className="block text-[13px] font-semibold leading-tight text-ink-900">{user.name}</span>
-                <span className="block text-[11.5px] leading-tight text-ink-500">{ROLE_LABEL[user.role]}</span>
-              </span>
-              <ChevronDown size={14} className="text-ink-400" />
-            </button>
-            {userOpen && (
-              <>
-                <div className="fixed inset-0 z-30" onClick={() => setUserOpen(false)} />
-                <div className="absolute right-0 z-40 mt-2 w-72 rounded-card border border-line bg-surface shadow-raised animate-slide-up">
-                  <div className="border-b border-line px-4 py-3">
-                    <div className="text-[13.5px] font-semibold text-ink-900">{user.name}</div>
-                    <div className="text-[12px] text-ink-500">{user.title} · {user.department}</div>
-                    <div className="text-[12px] text-ink-500">{user.email}</div>
-                  </div>
-                  <div className="border-b border-line px-2 py-2">
-                    <div className="px-2 pb-1 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-ink-400 flex items-center gap-1"><ChevronsUpDown size={11} /> Switch account (demo)</div>
-                    <div className="max-h-52 overflow-y-auto scrollbar-thin">
-                      {users.filter((u) => u.active).map((u) => (
-                        <button key={u.id} onClick={() => { switchUser(u.id); setUserOpen(false); nav('/') }}
-                          className={cx('flex w-full items-center gap-2 rounded-control px-2 py-1.5 text-left text-[12.5px] hover:bg-surface-muted', u.id === user.id && 'bg-brand-50')}>
-                          <Avatar name={u.name} color={u.avatarColor} size="sm" />
-                          <span className="flex-1 truncate">{u.name}</span>
-                          <span className="text-[11px] text-ink-400">{ROLE_LABEL[u.role]}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="border-b border-line px-4 py-2.5">
-                    <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-ink-400">Interface</div>
-                    <div className="grid grid-cols-2 gap-1 rounded-control bg-surface-muted p-1" role="radiogroup" aria-label="Interface">
-                      {(['classic', 'modern'] as const).map((t) => (
-                        <button key={t} role="radio" aria-checked={uiTheme === t} onClick={() => setUiTheme(t)}
-                          className={cx('flex items-center justify-center gap-1.5 rounded-control px-2 py-1.5 text-[12px] font-medium transition-colors', uiTheme === t ? 'bg-surface text-ink-900 shadow-card' : 'text-ink-500 hover:text-ink-800')}>
-                          {t === 'classic' ? <Monitor size={13} /> : <Sparkles size={13} />}{t === 'classic' ? 'Classic' : 'Modern'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="p-2">
-                    <button className="btn-ghost btn-sm w-full justify-start" onClick={() => { if (confirm('Reset all demo data to the initial state?')) { resetDemo(); setUserOpen(false); nav('/') } }}><RotateCcw size={14} /> Reset demo data</button>
-                    <button className="btn-ghost btn-sm w-full justify-start text-accent-700" onClick={() => { logout(); nav('/login') }}><LogOut size={14} /> Sign out</button>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
+          <NotificationBell />
+          <UserMenu />
         </header>
 
         <main className="flex-1 overflow-y-auto scrollbar-thin">

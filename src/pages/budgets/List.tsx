@@ -26,9 +26,9 @@ function TemplateSlot({ kind, label, hint, file, canEdit }: { kind: 'budget' | '
 export default function BudgetList() {
   const nav = useNavigate()
   const user = useCurrentUser()!
-  const { budgets, prs, pos, invoices, settings, deleteBudget } = useStore()
+  const { budgets, prs, pos, invoices, settings, deleteBudget, trips } = useStore()
   const canEdit = ['finance', 'finance_director', 'programs_director', 'admin'].includes(user.role)
-  const rows = budgets.map((b) => ({ b, ...computeBvA(b, prs, pos, invoices) }))
+  const rows = budgets.map((b) => ({ b, ...computeBvA(b, prs, pos, invoices, trips) }))
   const totalBudget = rows.reduce((s, r) => s + r.totals.budget, 0), totalSpent = rows.reduce((s, r) => s + r.totals.actual, 0), totalCommitted = rows.reduce((s, r) => s + r.totals.commitments, 0)
 
   return (

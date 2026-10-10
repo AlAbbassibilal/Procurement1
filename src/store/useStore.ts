@@ -3,9 +3,9 @@ import { persist } from 'zustand/middleware'
 import type {
   ApprovalRule, Attachment, AuditEvent, Comment, Contract, ContractMilestone, LineItem, Notification, OrgSettings,
   PurchaseOrder, PurchaseRequisition, Quotation, User, Vendor, DocType, Role, GoodsReceipt, GoodsReceiptLine, Invoice, InvoiceLine, SourcingRecord, ExceptionType, ProjectBudget, Envelope, EnvelopeRecipient, EnvelopeField, Project, ProjectStage, Donor, Task, ProjectReport, ProjectComment, MasterBudget, MasterLine,
-  UiTheme, Partner, PartnerStage, DueDiligence, PartnerSubmission, PartnerAgreement, StaffMember, LeaveRequest, LeaveType, Timesheet, Payslip, AttendanceRecord, AttendanceMode, Vacancy, Applicant, Advertisement, ApplicantStatus,
+  UiTheme, Partner, PartnerStage, DueDiligence, PartnerSubmission, PartnerAgreement, StaffMember, LeaveRequest, LeaveType, Timesheet, Payslip, AttendanceRecord, AttendanceMode, Vacancy, Applicant, Advertisement, ApplicantStatus, Warehouse, StockItem, StockMovement, StockRelease, StockReleaseLine, Waybill, Asset, AssetEvent, AssetCategory, Vehicle, TripRequest, TripPassenger,
 } from '@/types'
-import { DOC_OWNER, SEED_PARTNERS, SEED_STAFF, SEED_LEAVE, SEED_TIMESHEETS, SEED_PAYSLIPS, SEED_ATTENDANCE, SEED_VACANCIES, SEED_APPLICANTS, SEED_BUDGETS, SEED_DONORS, SEED_PROJECTS, SEED_TASKS, SEED_MASTER, SEED_CONTRACTS, SEED_GRNS, SEED_INVOICES, SEED_POS, SEED_PRS, SEED_RULES, SEED_SETTINGS, SEED_USERS, SEED_VENDORS, STANDARD_CLAUSES } from '@/data/seed'
+import { DOC_OWNER, SEED_PARTNERS, SEED_STAFF, SEED_LEAVE, SEED_TIMESHEETS, SEED_PAYSLIPS, SEED_ATTENDANCE, SEED_VACANCIES, SEED_APPLICANTS, SEED_WAREHOUSES, SEED_ITEMS, SEED_MOVEMENTS, SEED_RELEASES, SEED_WAYBILLS, SEED_ASSETS, SEED_VEHICLES, SEED_TRIPS, SEED_BUDGETS, SEED_DONORS, SEED_PROJECTS, SEED_TASKS, SEED_MASTER, SEED_CONTRACTS, SEED_GRNS, SEED_INVOICES, SEED_POS, SEED_PRS, SEED_RULES, SEED_SETTINGS, SEED_USERS, SEED_VENDORS, STANDARD_CLAUSES } from '@/data/seed'
 import { hasBlockingIssues, receiptProgress, runMatch, invoiceTotals } from '@/lib/match'
 import { newEvent, recipientTurn } from '@/lib/esign'
 import { generateIPTT, generateReportingCalendar, generateSpendingPlan, monthsOf, parseMentions, reportLiveStatus, allIndicators } from '@/lib/grants'
@@ -15,6 +15,7 @@ import { linesSubtotal, nowIso, uid } from '@/lib/format'
 import { emptyDueDiligence } from '@/lib/partners'
 import { unassignedSalaryLines, isSalaryLine, headcount, nextRhsNumber } from '@/lib/salary'
 import { buildVacancyChain, canDecideVacancy, scoreApplicant } from '@/lib/recruitment'
+import { twoStepChain, canDecideTwoStep, applyTwoStep, stockBalance, nextAssetTag, avgCost } from '@/lib/supply'
 import { balances, computePayslip, hrSettings, workingDaysBetween, workingDaysInMonth, today as todayIso } from '@/lib/hr'
 
 type Decision = 'approved' | 'rejected' | 'returned' | 'delegated'
@@ -44,6 +45,14 @@ interface State {
   attendance: AttendanceRecord[]
   vacancies: Vacancy[]
   applicants: Applicant[]
+  warehouses: Warehouse[]
+  items: StockItem[]
+  movements: StockMovement[]
+  releases: StockRelease[]
+  waybills: Waybill[]
+  assets: Asset[]
+  vehicles: Vehicle[]
+  trips: TripRequest[]
   country: string            // current country context ('all' or a country name)
   uiTheme: UiTheme           // 'classic' (original interface) | 'modern'
   homeLayout: 'dashboard' | 'launcher'   // original dashboard home, or the app-launcher home
@@ -101,7 +110,7 @@ interface Actions {
   addContractComment: (id: string, text: string) => void
 
   // Goods receipt
-  postGoodsReceipt: (poId: string, data: { deliveryNoteRef: string; location: string; notes: string; lines: GoodsReceiptLine[]; attachments: Attachment[] }) => { ok: boolean; grnId?: string; error?: string }
+  postGoodsReceipt: (poId: string, data: { deliveryNoteRef: string; location: string; notes: string; lines: GoodsReceiptLine[]; attachments: Attachment[]; warehouseId?: string; assetLines?: Record<string, { asAsset: boolean; category: AssetCategory }>; waybill?: { carrier: string; driverName: string; vehiclePlate: string } }) => { ok: boolean; grnId?: string; error?: string }
 
   // Invoices
   registerInvoice: (data: { poId: string; vendorInvoiceNo: string; invoiceDate: string; dueDate: string; lines: InvoiceLine[]; taxRate: number; attachments: Attachment[] }) => { ok: boolean; invoiceId?: string; error?: string }
@@ -161,6 +170,25 @@ interface Actions {
   closeVacancy: (id: string) => void
   applyToVacancy: (token: string, data: Omit<Applicant, 'id' | 'number' | 'vacancyId' | 'score' | 'status' | 'notes' | 'submittedAt'>) => { ok: boolean; error?: string; applicant?: Applicant }
   setApplicantStatus: (id: string, status: ApplicantStatus, notes?: string) => void
+  // Supply chain — warehouses, stock, releases, waybills, assets, fleet
+  upsertWarehouse: (w: Partial<Warehouse> & { name: string; country: string }) => Warehouse
+  upsertItem: (i: Partial<StockItem> & { description: string }) => StockItem
+  adjustStock: (warehouseId: string, itemId: string, quantity: number, note: string, unitCost?: number) => { ok: boolean; error?: string }
+  transferStock: (fromId: string, toId: string, lines: { itemId: string; quantity: number }[], transport: { carrier: string; driverName: string; vehiclePlate: string; projectCode?: string; notes?: string }) => { ok: boolean; error?: string; waybill?: Waybill }
+  createRelease: (data: { warehouseId: string; projectId?: string; projectCode?: string; budgetLine?: string; purpose: string; destination: string; neededBy: string; lines: StockReleaseLine[] }) => { ok: boolean; error?: string; release?: StockRelease }
+  decideRelease: (id: string, approve: boolean, note?: string) => void
+  issueRelease: (id: string, issued: Record<string, number>, transport: { carrier: string; driverName: string; vehiclePlate: string }) => { ok: boolean; error?: string }
+  createWaybill: (data: Omit<Waybill, 'id' | 'number' | 'status' | 'dispatchedBy' | 'dispatchedByName' | 'dispatchedAt' | 'attachments'>) => Waybill
+  receiveWaybill: (id: string) => void
+  registerAsset: (data: Partial<Asset> & { description: string }) => Asset
+  updateAsset: (id: string, patch: Partial<Asset>) => void
+  assetEvent: (id: string, ev: { type: AssetEvent['type']; detail: string; custodianStaffId?: string; location?: Asset['location']; status?: Asset['status']; condition?: Asset['condition']; waybillNumber?: string }) => void
+  upsertVehicle: (v: Partial<Vehicle> & { plate: string }) => Vehicle
+  createTrip: (data: { passengerType: 'staff' | 'beneficiary'; passengers: TripPassenger[]; from: string; to: string; date: string; time: string; returnDate?: string; purpose: string; projectId?: string; projectCode?: string; budgetLine?: string }) => { ok: boolean; error?: string; trip?: TripRequest }
+  decideTrip: (id: string, approve: boolean, note?: string) => void
+  assignTrip: (id: string, vehicleId: string, driverName: string) => void
+  startTrip: (id: string, startOdometer: number) => void
+  closeTrip: (id: string, data: { endOdometer: number; cost: number; costNote: string }) => void
   // Appearance (per browser)
   setUiTheme: (t: UiTheme) => void
   setHomeLayout: (l: 'dashboard' | 'launcher') => void
@@ -233,6 +261,14 @@ const initial = (): State => ({
   attendance: SEED_ATTENDANCE,
   vacancies: SEED_VACANCIES,
   applicants: SEED_APPLICANTS,
+  warehouses: SEED_WAREHOUSES,
+  items: SEED_ITEMS,
+  movements: SEED_MOVEMENTS,
+  releases: SEED_RELEASES,
+  waybills: SEED_WAYBILLS,
+  assets: SEED_ASSETS,
+  vehicles: SEED_VEHICLES,
+  trips: SEED_TRIPS,
   country: 'all',
   uiTheme: 'classic',
   homeLayout: 'dashboard',
@@ -248,7 +284,7 @@ const initial = (): State => ({
   audit: [
     { id: 'a1', at: nowIso(), actorId: 'u_bilal', actorName: DOC_OWNER, docType: 'SYSTEM', action: 'System initialised', detail: 'Demo dataset loaded' },
   ],
-  counters: { PR: 44, PO: 17, CT: 6, GRN: 9, INV: 12, ENV: 0, PT: 2, LR: 3, WFH: 2, PS: 3, REC: 2, APP: 3 },
+  counters: { PR: 44, PO: 17, CT: 6, GRN: 9, INV: 12, ENV: 0, PT: 2, LR: 3, WFH: 2, PS: 3, REC: 2, APP: 3, SM: 16, SR: 3, WB: 2, TR: 2 },
 })
 
 export const useStore = create<State & Actions>()(
@@ -270,7 +306,7 @@ export const useStore = create<State & Actions>()(
       const notifyRole = (role: Role, n: Omit<Notification, 'id' | 'userId' | 'at' | 'read'>) => {
         get().users.filter((u) => u.active && u.role === role).forEach((u) => notify(u.id, n))
       }
-      const nextNumber = (t: 'PR' | 'PO' | 'CT' | 'GRN' | 'INV' | 'ENV' | 'PT' | 'LR' | 'WFH' | 'PS' | 'REC' | 'APP') => {
+      const nextNumber = (t: 'PR' | 'PO' | 'CT' | 'GRN' | 'INV' | 'ENV' | 'PT' | 'LR' | 'WFH' | 'PS' | 'REC' | 'APP' | 'SM' | 'SR' | 'WB' | 'TR') => {
         const n = (get().counters[t] ?? 0) + 1
         set((s) => ({ counters: { ...s.counters, [t]: n } }))
         return `${t}-${new Date().getFullYear()}-${String(n).padStart(4, '0')}`
@@ -618,6 +654,27 @@ export const useStore = create<State & Actions>()(
           const status: PurchaseOrder['status'] = prog.complete ? 'received' : (po.status === 'contracted' ? 'contracted' : 'partially_received')
           set((s) => ({ grns: allGrns, pos: s.pos.map((p) => (p.id === poId ? { ...p, status, updatedAt: nowIso() } : p)) }))
           log('GRN', 'Goods receipt posted', grn, `${po.number} · ${prog.received}/${prog.ordered} received`)
+          // Supply chain: stock into the chosen warehouse, asset lines into the registry, inbound waybill
+          const pr0 = get().prs.find((p) => p.id === po.prId); const projectCode = pr0?.donorCode
+          const newAssets: Asset[] = []; const newMoves: StockMovement[] = []; const newItems: StockItem[] = []
+          for (const l of lines) {
+            const pl = po.lines.find((x) => x.id === l.lineItemId); if (!pl) continue
+            const flag = data.assetLines?.[l.lineItemId]
+            if (flag?.asAsset) {
+              for (let i = 0; i < Math.round(l.quantity); i++) {
+                const tag = nextAssetTag([...get().assets, ...newAssets])
+                newAssets.push({ id: uid('as_'), tag, description: pl.description + (l.quantity > 1 ? ` (${i + 1}/${Math.round(l.quantity)})` : ''), category: flag.category, serial: '', model: '', purchase: { poNumber: po.number, grnNumber: grn.number, vendor: po.vendorName, date: nowIso().slice(0, 10), cost: pl.unitPrice, currency: po.currency }, projectCode, budgetLine: pl.budgetLine, country: get().warehouses.find((w) => w.id === data.warehouseId)?.country ?? get().settings.countries[0], location: data.warehouseId ? { type: 'warehouse', warehouseId: data.warehouseId, name: get().warehouses.find((w) => w.id === data.warehouseId)!.name } : { type: 'office', name: data.location }, condition: 'new', status: 'in_store', history: [{ id: uid('ae_'), at: nowIso(), byName: a.name, type: 'registered', detail: `Received under ${grn.number} (${po.number}) — tagged`, location: data.warehouseId ? get().warehouses.find((w) => w.id === data.warehouseId)!.code : data.location }], attachments: [], notes: '', createdAt: nowIso(), updatedAt: nowIso() })
+              }
+            } else if (data.warehouseId && pl.unit && !/month|service|day|hour|lot|job/i.test(pl.unit)) {
+              let item = [...get().items, ...newItems].find((it) => it.description.toLowerCase() === pl.description.toLowerCase())
+              if (!item) { item = { id: uid('it_'), sku: `GEN-${String(get().items.length + newItems.length + 1).padStart(3, '0')}`, description: pl.description, category: pl.category || 'General', unit: pl.unit }; newItems.push(item) }
+              newMoves.push({ id: uid('mv_'), number: nextNumber('SM'), type: 'receipt', warehouseId: data.warehouseId, itemId: item.id, quantity: l.quantity, unitCost: pl.unitPrice, currency: po.currency, refType: 'GRN', refId: grn.id, refNumber: grn.number, projectCode, at: nowIso(), byId: a.id, byName: a.name })
+            }
+          }
+          const wb: Waybill | undefined = data.waybill ? { id: uid('wb_'), number: nextNumber('WB'), kind: 'inbound', from: po.vendorName, to: data.warehouseId ? get().warehouses.find((w) => w.id === data.warehouseId)!.name : data.location, date: nowIso().slice(0, 10), carrier: data.waybill.carrier, driverName: data.waybill.driverName, vehiclePlate: data.waybill.vehiclePlate, lines: lines.map((l) => { const pl = po.lines.find((x) => x.id === l.lineItemId)!; return { description: pl.description, quantity: l.quantity, unit: pl.unit } }), refType: 'GRN', refId: grn.id, refNumber: grn.number, projectCode, status: 'received', dispatchedBy: a.id, dispatchedByName: a.name, dispatchedAt: nowIso(), receivedBy: a.id, receivedByName: a.name, receivedAt: nowIso(), notes: data.deliveryNoteRef ? `Delivery note ${data.deliveryNoteRef}` : '', attachments: [] } : undefined
+          set((s) => ({ assets: [...newAssets, ...s.assets], items: [...s.items, ...newItems], movements: [...newMoves, ...s.movements], waybills: wb ? [wb, ...s.waybills] : s.waybills }))
+          if (newAssets.length) log('ASSET', `${newAssets.length} asset(s) registered from ${grn.number}`, grn, newAssets.map((x) => x.tag).join(', '))
+          if (newMoves.length) log('STOCK', `${newMoves.length} line(s) booked into stock from ${grn.number}`, grn)
           // re-evaluate any open invoices on this PO
           get().invoices.filter((i) => i.poId === poId && ['registered', 'exception', 'matched'].includes(i.status)).forEach((i) => get().rematchInvoice(i.id))
           notifyRole('finance', { kind: 'info', title: prog.complete ? 'PO fully received' : 'Goods receipt posted', body: `${grn.number} · ${po.number} · ${po.vendorName}`, link: `/receiving/${poId}` })
@@ -979,6 +1036,127 @@ export const useStore = create<State & Actions>()(
           const v = get().vacancies.find((x) => x.id === app.vacancyId)
           log('RECRUIT', `Applicant ${status}`, v ? { id: v.id, number: v.number } : undefined, `${app.name}${notes ? ' · ' + notes : ''}`)
           if (status === 'hired' && v?.plannedStaffId) { const st = get().staff.find((x) => x.id === v.plannedStaffId); if (st && st.status === 'planned') get().confirmRecruitment(st.id, app.name, v.startDate || nowIso().slice(0, 10)); notify(a.id, { kind: 'success', title: `${app.name} hired`, body: `Position ${st?.rhsNumber ?? ''} filled on the master salary plan`, link: '/hr/staff' }) }
+        },
+
+        // ---- Supply chain --------------------------------------------------------
+        upsertWarehouse: (data) => {
+          const exists = data.id ? get().warehouses.find((w) => w.id === data.id) : undefined
+          const w: Warehouse = exists ? { ...exists, ...data } : { id: uid('wh_'), code: data.code || `WH-${data.country.replace(/\(.*\)/, '').trim().slice(0, 3).toUpperCase()}-${String(get().warehouses.filter((x) => x.country === data.country).length + 1).padStart(2, '0')}`, address: '', active: true, ...data }
+          set((s) => ({ warehouses: exists ? s.warehouses.map((x) => (x.id === w.id ? w : x)) : [...s.warehouses, w] }))
+          log('STOCK', exists ? 'Warehouse updated' : 'Warehouse created', { id: w.id, number: w.code }, w.name)
+          return w
+        },
+        upsertItem: (data) => {
+          const exists = data.id ? get().items.find((i) => i.id === data.id) : undefined
+          const it: StockItem = exists ? { ...exists, ...data } : { id: uid('it_'), sku: data.sku || `GEN-${String(get().items.length + 1).padStart(3, '0')}`, category: 'General', unit: 'pcs', ...data }
+          set((s) => ({ items: exists ? s.items.map((x) => (x.id === it.id ? it : x)) : [...s.items, it] }))
+          return it
+        },
+        adjustStock: (warehouseId, itemId, quantity, note, unitCost) => {
+          const a = actor(); if (!quantity) return { ok: false, error: 'Quantity cannot be zero.' }
+          if (quantity < 0 && stockBalance(get().movements, warehouseId, itemId) + quantity < 0) return { ok: false, error: 'Adjustment would make the balance negative.' }
+          const m: StockMovement = { id: uid('mv_'), number: nextNumber('SM'), type: quantity > 0 ? 'receipt' : 'adjustment', warehouseId, itemId, quantity, unitCost, currency: get().settings.defaultCurrency, refType: 'adjustment', at: nowIso(), byId: a.id, byName: a.name, note }
+          set((s) => ({ movements: [m, ...s.movements] })); log('STOCK', 'Stock adjusted', { id: m.id, number: m.number }, `${quantity > 0 ? '+' : ''}${quantity} · ${note}`); return { ok: true }
+        },
+        transferStock: (fromId, toId, lines, transport) => {
+          const a = actor(); if (fromId === toId) return { ok: false, error: 'Choose two different warehouses.' }
+          const valid = lines.filter((l) => l.quantity > 0); if (!valid.length) return { ok: false, error: 'Enter at least one quantity.' }
+          for (const l of valid) if (stockBalance(get().movements, fromId, l.itemId) < l.quantity) return { ok: false, error: `Not enough stock of ${get().items.find((i) => i.id === l.itemId)?.description} in the source warehouse.` }
+          const from = get().warehouses.find((w) => w.id === fromId)!, to = get().warehouses.find((w) => w.id === toId)!
+          const wb: Waybill = { id: uid('wb_'), number: nextNumber('WB'), kind: 'transfer', from: `${from.code} ${from.name}`, to: `${to.code} ${to.name}`, date: nowIso().slice(0, 10), carrier: transport.carrier, driverName: transport.driverName, vehiclePlate: transport.vehiclePlate, lines: valid.map((l) => { const it = get().items.find((i) => i.id === l.itemId)!; return { description: it.description, quantity: l.quantity, unit: it.unit, itemId: it.id } }), refType: 'transfer', projectCode: transport.projectCode, status: 'dispatched', dispatchedBy: a.id, dispatchedByName: a.name, dispatchedAt: nowIso(), notes: transport.notes ?? '', attachments: [] }
+          const moves: StockMovement[] = valid.flatMap((l) => { const cost = avgCost(get().movements, l.itemId); return [
+            { id: uid('mv_'), number: nextNumber('SM'), type: 'transfer_out' as const, warehouseId: fromId, itemId: l.itemId, quantity: -l.quantity, refType: 'transfer' as const, refId: wb.id, refNumber: wb.number, projectCode: transport.projectCode, at: nowIso(), byId: a.id, byName: a.name },
+            { id: uid('mv_'), number: nextNumber('SM'), type: 'transfer_in' as const, warehouseId: toId, itemId: l.itemId, quantity: l.quantity, unitCost: cost || undefined, currency: get().settings.defaultCurrency, refType: 'transfer' as const, refId: wb.id, refNumber: wb.number, projectCode: transport.projectCode, at: nowIso(), byId: a.id, byName: a.name },
+          ] })
+          set((s) => ({ waybills: [wb, ...s.waybills], movements: [...moves, ...s.movements] }))
+          log('WAYBILL', 'Stock transfer dispatched', { id: wb.id, number: wb.number }, `${from.code} → ${to.code} · ${valid.length} line(s)`)
+          const mgr = get().staff.find((x) => x.id === to.managerStaffId); notify(mgr?.userId, { kind: 'info', title: `Transfer on its way — ${wb.number}`, body: `${from.name} → ${to.name} · confirm receipt when it arrives`, link: '/waybills' })
+          return { ok: true, waybill: wb }
+        },
+        createRelease: (data) => {
+          const a = actor(); const me = get().staff.find((x) => x.userId === a.id)
+          const lines = data.lines.filter((l) => l.quantity > 0); if (!lines.length) return { ok: false, error: 'Add at least one item with a quantity.' }
+          if (!data.purpose.trim()) return { ok: false, error: 'State the purpose.' }
+          for (const l of lines) if (stockBalance(get().movements, data.warehouseId, l.itemId) < l.quantity) return { ok: false, error: `Only ${stockBalance(get().movements, data.warehouseId, l.itemId)} ${l.unit} of ${l.description} in that warehouse.` }
+          const r: StockRelease = { id: uid('sr_'), number: nextNumber('SR'), requesterId: a.id, requesterName: a.name, rhsNumber: me?.rhsNumber ?? '—', ...data, lines, status: 'pending_approval', approvals: twoStepChain(a, get().staff, get().users), createdAt: nowIso() }
+          set((s) => ({ releases: [r, ...s.releases] })); log('STOCK', 'Stock release requested', { id: r.id, number: r.number }, `${r.purpose} · ${lines.length} line(s)`)
+          const first = r.approvals[0]!; const n = { kind: 'approval' as const, title: `Stock release — ${a.name}`, body: `${r.number} · ${r.purpose}`, link: '/stock-requests' }; if (first.approverId) notify(first.approverId, n); else notifyRole(first.role, n)
+          return { ok: true, release: r }
+        },
+        decideRelease: (id, approve, note) => {
+          const a = actor(); const r = get().releases.find((x) => x.id === id); if (!r || !canDecideTwoStep(r.approvals, a)) return
+          const res = applyTwoStep(r.approvals, a, approve, note, nowIso())
+          set((s) => ({ releases: s.releases.map((x) => (x.id === id ? { ...x, approvals: res.approvals, status: res.rejected ? 'rejected' : res.done ? 'approved' : 'pending_approval' } : x)) }))
+          log('STOCK', `Stock release ${approve ? 'approved' : 'rejected'} — ${r.approvals.find((x) => x.status === 'pending')?.label}`, { id: r.id, number: r.number }, note)
+          if (res.rejected) notify(r.requesterId, { kind: 'warning', title: `${r.number} rejected`, body: note ?? '', link: '/stock-requests' })
+          else if (res.done) { notify(r.requesterId, { kind: 'success', title: `${r.number} approved`, body: 'The warehouse will issue the items', link: '/stock-requests' }); const wh = get().warehouses.find((w) => w.id === r.warehouseId); const mgr = get().staff.find((x) => x.id === wh?.managerStaffId); const n = { kind: 'task' as const, title: `Issue stock — ${r.number}`, body: `${r.purpose} · ${wh?.name}`, link: '/stock-requests' }; if (mgr?.userId) notify(mgr.userId, n); else notifyRole('logistics', n) }
+          else if (res.next) { const n = { kind: 'approval' as const, title: `Stock release — ${r.requesterName}`, body: `${r.number} · approved by ${a.name}`, link: '/stock-requests' }; if (res.next.approverId) notify(res.next.approverId, n); else notifyRole(res.next.role, n) }
+        },
+        issueRelease: (id, issued, transport) => {
+          const a = actor(); const r = get().releases.find((x) => x.id === id); if (!r || r.status !== 'approved') return { ok: false, error: 'Only approved requests can be issued.' }
+          const wh = get().warehouses.find((w) => w.id === r.warehouseId)!
+          const lines = r.lines.map((l) => ({ ...l, issued: Math.max(0, Math.min(l.quantity, issued[l.itemId] ?? l.quantity)) }))
+          for (const l of lines) if (l.issued! > stockBalance(get().movements, r.warehouseId, l.itemId)) return { ok: false, error: `Not enough ${l.description} in ${wh.name}.` }
+          const wb: Waybill = { id: uid('wb_'), number: nextNumber('WB'), kind: 'outbound', from: `${wh.code} ${wh.name}`, to: r.destination, date: nowIso().slice(0, 10), carrier: transport.carrier, driverName: transport.driverName, vehiclePlate: transport.vehiclePlate, lines: lines.filter((l) => l.issued).map((l) => ({ description: l.description, quantity: l.issued!, unit: l.unit, itemId: l.itemId })), refType: 'release', refId: r.id, refNumber: r.number, projectCode: r.projectCode, status: 'dispatched', dispatchedBy: a.id, dispatchedByName: a.name, dispatchedAt: nowIso(), notes: r.purpose, attachments: [] }
+          const moves: StockMovement[] = lines.filter((l) => l.issued).map((l) => ({ id: uid('mv_'), number: nextNumber('SM'), type: 'issue', warehouseId: r.warehouseId, itemId: l.itemId, quantity: -l.issued!, refType: 'release', refId: r.id, refNumber: r.number, projectCode: r.projectCode, at: nowIso(), byId: a.id, byName: a.name, note: r.purpose }))
+          set((s) => ({ waybills: [wb, ...s.waybills], movements: [...moves, ...s.movements], releases: s.releases.map((x) => (x.id === id ? { ...x, lines, status: 'issued', issuedAt: nowIso(), issuedBy: a.id, issuedByName: a.name, waybillId: wb.id, waybillNumber: wb.number } : x)) }))
+          log('STOCK', 'Stock issued', { id: r.id, number: r.number }, `${wb.number} · ${moves.length} line(s)`)
+          notify(r.requesterId, { kind: 'success', title: `${r.number} issued — ${wb.number}`, body: `${wh.name} → ${r.destination} · confirm receipt on the waybill`, link: '/waybills' })
+          return { ok: true }
+        },
+        createWaybill: (data) => { const a = actor(); const wb: Waybill = { id: uid('wb_'), number: nextNumber('WB'), status: 'dispatched', dispatchedBy: a.id, dispatchedByName: a.name, dispatchedAt: nowIso(), attachments: [], ...data }; set((s) => ({ waybills: [wb, ...s.waybills] })); log('WAYBILL', 'Waybill issued', { id: wb.id, number: wb.number }, `${wb.from} → ${wb.to}`); return wb },
+        receiveWaybill: (id) => { const a = actor(); set((s) => ({ waybills: s.waybills.map((w) => (w.id === id ? { ...w, status: 'received', receivedBy: a.id, receivedByName: a.name, receivedAt: nowIso() } : w)) })); const w = get().waybills.find((x) => x.id === id)!; log('WAYBILL', 'Waybill received', { id: w.id, number: w.number }, `at ${w.to}`) },
+        registerAsset: (data) => {
+          const a = actor()
+          const asset: Asset = { id: uid('as_'), tag: data.tag || nextAssetTag(get().assets), category: 'other', serial: '', model: '', purchase: { date: nowIso().slice(0, 10), cost: 0, currency: get().settings.defaultCurrency }, country: get().settings.countries[0], location: { type: 'warehouse', warehouseId: get().warehouses[0]?.id, name: get().warehouses[0]?.name ?? '' }, condition: 'new', status: 'in_store', history: [], attachments: [], notes: '', createdAt: nowIso(), updatedAt: nowIso(), ...data }
+          asset.history = [{ id: uid('ae_'), at: nowIso(), byName: a.name, type: 'registered', detail: `Registered${asset.purchase.grnNumber ? ` from ${asset.purchase.grnNumber}` : ''}${asset.projectCode ? ` · ${asset.projectCode}` : ''}`, location: asset.location.name }, ...asset.history]
+          set((s) => ({ assets: [asset, ...s.assets] })); log('ASSET', 'Asset registered', { id: asset.id, number: asset.tag }, asset.description); return asset
+        },
+        updateAsset: (id, patch) => set((s) => ({ assets: s.assets.map((x) => (x.id === id ? { ...x, ...patch, updatedAt: nowIso() } : x)) })),
+        assetEvent: (id, ev) => {
+          const a = actor(); const asset = get().assets.find((x) => x.id === id); if (!asset) return
+          const e: AssetEvent = { id: uid('ae_'), at: nowIso(), byName: a.name, type: ev.type, detail: ev.detail, custodianStaffId: ev.custodianStaffId, location: ev.location?.name, waybillNumber: ev.waybillNumber }
+          const patch: Partial<Asset> = { history: [...asset.history, e], updatedAt: nowIso() }
+          if (ev.type === 'assigned') { patch.custodianStaffId = ev.custodianStaffId; patch.status = 'in_use'; patch.location = ev.location ?? { type: 'staff', name: get().staff.find((x) => x.id === ev.custodianStaffId)?.name ?? '' } }
+          if (ev.type === 'returned') { patch.custodianStaffId = undefined; patch.status = 'in_store'; if (ev.location) patch.location = ev.location }
+          if (ev.type === 'transferred' && ev.location) { patch.location = ev.location; if (ev.location.warehouseId) patch.country = get().warehouses.find((w) => w.id === ev.location!.warehouseId)?.country ?? asset.country }
+          if (ev.type === 'repair') patch.status = 'under_repair'
+          if (ev.type === 'disposed') { patch.status = 'disposed'; patch.custodianStaffId = undefined }
+          if (ev.type === 'lost') { patch.status = 'lost' }
+          if (ev.type === 'verified') { patch.lastVerifiedAt = nowIso(); if (asset.status === 'under_repair') patch.status = asset.custodianStaffId ? 'in_use' : 'in_store' }
+          if (ev.status) patch.status = ev.status; if (ev.condition) patch.condition = ev.condition
+          set((s) => ({ assets: s.assets.map((x) => (x.id === id ? { ...x, ...patch } : x)) }))
+          log('ASSET', `Asset ${ev.type}`, { id: asset.id, number: asset.tag }, ev.detail)
+          if (ev.type === 'assigned') { const st = get().staff.find((x) => x.id === ev.custodianStaffId); notify(st?.userId, { kind: 'info', title: `Asset in your custody — ${asset.tag}`, body: `${asset.description} · see My HR`, link: '/hr/me' }) }
+        },
+        upsertVehicle: (data) => { const exists = data.id ? get().vehicles.find((v) => v.id === data.id) : undefined; const v: Vehicle = exists ? { ...exists, ...data } : { id: uid('veh_'), makeModel: '', year: new Date().getFullYear(), country: get().settings.countries[0], status: 'available', odometer: 0, notes: '', ...data }; set((s) => ({ vehicles: exists ? s.vehicles.map((x) => (x.id === v.id ? v : x)) : [...s.vehicles, v] })); log('FLEET', exists ? 'Vehicle updated' : 'Vehicle registered', { id: v.id, number: v.plate }, v.makeModel); return v },
+        createTrip: (data) => {
+          const a = actor(); const me = get().staff.find((x) => x.userId === a.id)
+          if (!data.from.trim() || !data.to.trim() || !data.date) return { ok: false, error: 'From, to and date are required.' }
+          if (!data.passengers.length) return { ok: false, error: 'Add at least one passenger.' }
+          if (data.passengerType === 'staff' && data.passengers.some((p) => !p.rhsNumber)) return { ok: false, error: 'Every staff passenger needs an RHS number.' }
+          const t: TripRequest = { id: uid('tr_'), number: nextNumber('TR'), requesterId: a.id, requesterName: a.name, rhsNumber: me?.rhsNumber ?? '—', ...data, status: 'pending_approval', approvals: twoStepChain(a, get().staff, get().users), currency: get().settings.defaultCurrency, createdAt: nowIso() }
+          set((s) => ({ trips: [t, ...s.trips] })); log('FLEET', 'Transport requested', { id: t.id, number: t.number }, `${t.from} → ${t.to} · ${t.date}`)
+          const first = t.approvals[0]!; const n = { kind: 'approval' as const, title: `Transport request — ${a.name}`, body: `${t.number} · ${t.from} → ${t.to} · ${t.date}`, link: '/fleet' }; if (first.approverId) notify(first.approverId, n); else notifyRole(first.role, n)
+          return { ok: true, trip: t }
+        },
+        decideTrip: (id, approve, note) => {
+          const a = actor(); const t = get().trips.find((x) => x.id === id); if (!t || !canDecideTwoStep(t.approvals, a)) return
+          const res = applyTwoStep(t.approvals, a, approve, note, nowIso())
+          set((s) => ({ trips: s.trips.map((x) => (x.id === id ? { ...x, approvals: res.approvals, status: res.rejected ? 'rejected' : res.done ? 'approved' : 'pending_approval' } : x)) }))
+          log('FLEET', `Transport request ${approve ? 'approved' : 'rejected'}`, { id: t.id, number: t.number }, note)
+          if (res.rejected) notify(t.requesterId, { kind: 'warning', title: `${t.number} rejected`, body: note ?? '', link: '/fleet' })
+          else if (res.done) { notify(t.requesterId, { kind: 'success', title: `${t.number} approved`, body: 'Supply Chain will assign a vehicle and driver', link: '/fleet' }); notifyRole('logistics', { kind: 'task', title: `Assign vehicle — ${t.number}`, body: `${t.from} → ${t.to} · ${t.date} ${t.time}`, link: '/fleet' }) }
+          else if (res.next) { const n = { kind: 'approval' as const, title: `Transport request — ${t.requesterName}`, body: `${t.number} · approved by ${a.name}`, link: '/fleet' }; if (res.next.approverId) notify(res.next.approverId, n); else notifyRole(res.next.role, n) }
+        },
+        assignTrip: (id, vehicleId, driverName) => { const a = actor(); const v = get().vehicles.find((x) => x.id === vehicleId); if (!v) return; set((s) => ({ trips: s.trips.map((x) => (x.id === id ? { ...x, status: 'assigned', vehicleId, vehiclePlate: v.plate, driverName, assignedBy: a.id, assignedAt: nowIso() } : x)) })); const t = get().trips.find((x) => x.id === id)!; log('FLEET', 'Vehicle assigned', { id: t.id, number: t.number }, `${v.plate} · ${driverName}`); notify(t.requesterId, { kind: 'info', title: `${t.number} — vehicle assigned`, body: `${v.makeModel} ${v.plate}, driver ${driverName}`, link: '/fleet' }) },
+        startTrip: (id, startOdometer) => { set((s) => ({ trips: s.trips.map((x) => (x.id === id ? { ...x, status: 'in_progress', startOdometer } : x)), vehicles: s.vehicles.map((v) => (v.id === s.trips.find((x) => x.id === id)?.vehicleId ? { ...v, status: 'on_trip' } : v)) })); const t = get().trips.find((x) => x.id === id)!; log('FLEET', 'Trip started', { id: t.id, number: t.number }, `odometer ${startOdometer}`) },
+        closeTrip: (id, data) => {
+          const a = actor(); const t = get().trips.find((x) => x.id === id); if (!t) return
+          const distance = t.startOdometer !== undefined ? Math.max(0, data.endOdometer - t.startOdometer) : undefined
+          set((s) => ({ trips: s.trips.map((x) => (x.id === id ? { ...x, status: 'closed', endOdometer: data.endOdometer, distanceKm: distance, cost: data.cost, costNote: data.costNote, closedAt: nowIso(), closedBy: a.id, closedByName: a.name } : x)), vehicles: s.vehicles.map((v) => (v.id === t.vehicleId ? { ...v, status: 'available', odometer: Math.max(v.odometer, data.endOdometer) } : v)) }))
+          log('FLEET', 'Trip closed', { id: t.id, number: t.number }, `${distance ?? '?'} km · ${data.cost} ${t.currency}${t.projectCode ? ` charged to ${t.projectCode} ${t.budgetLine ?? ''}` : ''}`)
+          if (t.projectCode && data.cost > 0) notifyRole('finance', { kind: 'info', title: `Transport cost posted — ${t.number}`, body: `${data.cost} ${t.currency} on ${t.projectCode} ${t.budgetLine ?? ''} (BvA)`, link: `/budgets` })
         },
 
         setUiTheme: (t) => set({ uiTheme: t }),

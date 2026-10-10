@@ -25,6 +25,12 @@ import Recruitment from '@/pages/hr/Recruitment'
 import VacancyForm from '@/pages/hr/VacancyForm'
 import VacancyPage from '@/pages/hr/Vacancy'
 import Apply from '@/pages/hr/Apply'
+import Warehouses from '@/pages/supply/Warehouses'
+import StockRequests from '@/pages/supply/StockRequests'
+import Waybills from '@/pages/supply/Waybills'
+import Assets from '@/pages/supply/Assets'
+import Fleet from '@/pages/supply/Fleet'
+import SupplyProcess from '@/pages/supply/Process'
 import PartnerList from '@/pages/partnerships/List'
 import PartnerPage from '@/pages/partnerships/Partner'
 import VettingPublic from '@/pages/partnerships/VettingPublic'
@@ -77,7 +83,8 @@ function RequireAccess() {
   const staff = useStore((s) => s.staff)
   const myStaff = user ? staff.find((x) => x.userId === user.id) : undefined
   const lineManager = !!myStaff && staff.some((x) => x.lineManagerId === myStaff.id)
-  const hrSelf = pathname === '/hr/me' || (lineManager && /^\/hr\/(requests|timesheets|attendance|recruitment)/.test(pathname)) || (/^\/hr\/recruitment/.test(pathname) && !!user && ['dept_manager', 'programs_director', 'executive_director', 'finance_director', 'procurement_manager'].includes(user.role))
+  const selfService = ['/stock-requests', '/fleet', '/waybills'].some((x) => pathname.startsWith(x))
+  const hrSelf = selfService || pathname === '/hr/me' || (lineManager && /^\/hr\/(requests|timesheets|attendance|recruitment)/.test(pathname)) || (/^\/hr\/recruitment/.test(pathname) && !!user && ['dept_manager', 'programs_director', 'executive_director', 'finance_director', 'procurement_manager'].includes(user.role))
   if (user && d && !canEnter(user, d.id) && !(holder && pathname.startsWith('/finance/master-budget')) && !hrPlan && !hrSelf) return <NoAccess />
   return <Outlet />
 }
@@ -97,6 +104,13 @@ export default function App() {
          <Route element={<RequireAccess />}>
           <Route index element={<Home />} />
           <Route path="procurement" element={<Dashboard />} />
+          <Route path="supply-chain" element={<Dashboard />} />
+          <Route path="supply-chain/process" element={<SupplyProcess />} />
+          <Route path="warehouses" element={<Warehouses />} />
+          <Route path="stock-requests" element={<StockRequests />} />
+          <Route path="waybills" element={<Waybills />} />
+          <Route path="assets" element={<Assets />} />
+          <Route path="fleet" element={<Fleet />} />
           <Route path="grants" element={<GrantsOverview />} />
           <Route path="grants/tracker" element={<GrantsTracker />} />
           <Route path="grants/donors" element={<Donors />} />

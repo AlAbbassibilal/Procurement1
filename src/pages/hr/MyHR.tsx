@@ -7,11 +7,12 @@ import { balances, hrSettings, workingDaysBetween, LEAVE_LABEL, LEAVE_TONE, LEAV
 import { monthLabel } from '@/lib/grants'
 import { fmtDate, fmtDateTime, fmtMoney, cx } from '@/lib/format'
 import { useHrContext } from './shared'
+import { assetsOf, ASSET_STATUS_LABEL } from '@/lib/supply'
 import type { LeaveType, Timesheet, AttendanceMode } from '@/types'
 
 export default function MyHR() {
   const { me, reports, isManager } = useHrContext()
-  const { staff, leaveRequests, timesheets, payslips, attendance, settings, projects, submitLeave, cancelLeave, setTimesheetStatus, checkIn, checkOut } = useStore()
+  const { staff, leaveRequests, timesheets, payslips, attendance, settings, projects, assets, submitLeave, cancelLeave, setTimesheetStatus, checkIn, checkOut } = useStore()
   const hr = hrSettings(settings)
   const [mode, setMode] = useState<AttendanceMode>('office')
   const [busy, setBusy] = useState(false)
@@ -96,6 +97,9 @@ export default function MyHR() {
               {([['Annual leave', bal.annual, 'bg-brand-600'], ['Work from home', bal.wfh, 'bg-info-500']] as const).map(([l, b, c]) => <div key={l}><div className="mb-1 flex items-center justify-between text-[13px]"><span className="flex items-center gap-1.5 font-medium text-ink-900">{l === 'Work from home' && <Home size={13} />}{l}</span><span className="text-[12px] text-ink-500">{b.used} used · {b.pending} pending</span></div><div className="h-2.5 overflow-hidden rounded-pill bg-ink-100"><div className={cx('h-full', c)} style={{ width: `${b.entitlement ? (b.used / b.entitlement) * 100 : 0}%` }} /></div><div className="mt-1 text-[12.5px]"><b className="text-[16px] text-ink-900" data-testid={l === 'Annual leave' ? 'annual-remaining' : 'wfh-remaining'}>{b.remaining}</b> <span className="text-ink-500">of {b.entitlement} days remaining</span></div></div>)}
               <div className="text-[12.5px] text-ink-600">Sick leave taken: <b>{bal.sick}</b> day(s)</div>
             </div>
+          </Card>
+          <Card title="Assets in my custody" description="Equipment handed over to you — report issues to Supply Chain">
+            <ul className="divide-y divide-line">{assetsOf(assets, me.id).length === 0 && <li className="py-2 text-[13px] text-ink-500">No assets assigned to you.</li>}{assetsOf(assets, me.id).map((a) => <li key={a.id} className="py-2 text-[13px]"><div className="flex items-center justify-between"><Link to="/assets" className="font-medium text-ink-900 hover:text-brand-700">{a.description}</Link><span className="rounded-pill bg-surface-sunken px-2 py-0.5 text-[10.5px] font-semibold text-ink-600">{ASSET_STATUS_LABEL[a.status]}</span></div><div className="text-[12px] text-ink-500"><span className="font-mono">{a.tag}</span>{a.serial && ` · S/N ${a.serial}`}{a.projectCode && ` · ${a.projectCode}`} · since {fmtDate(a.history.filter((h) => h.type === 'assigned').slice(-1)[0]?.at ?? a.createdAt)}</div></li>)}</ul>
           </Card>
           <Card title={<span className="flex items-center gap-2"><Download size={16} /> Payslips</span>} description="Available once Finance has paid the month">
             <ul className="divide-y divide-line">{mySlips.length === 0 && <li className="py-2 text-[13px] text-ink-500">No payslip yet.</li>}{mySlips.map((p) => <li key={p.id} className="flex items-center justify-between py-2 text-[13px]"><span><b className="text-ink-900">{monthLabel(p.period)}</b><span className="block text-[12px] text-ink-500">Net {fmtMoney(p.net, p.currency)} · paid {fmtDate(p.paidAt)}</span></span><button className="btn-secondary btn-sm" data-testid="download-payslip" onClick={() => downloadPayslip(p, me, settings)}><Download size={13} /> PDF</button></li>)}</ul>

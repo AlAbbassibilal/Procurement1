@@ -12,7 +12,8 @@
 // Any other tabular layout falls back to header detection + column mapping.
 // ---------------------------------------------------------------------------
 import * as XLSX from 'xlsx'
-import type { BudgetLine, Currency, Invoice, OrgSettings, ProjectBudget, PurchaseOrder, PurchaseRequisition } from '@/types'
+import { fleetActuals } from './supply'
+import type { BudgetLine, Currency, Invoice, OrgSettings, ProjectBudget, PurchaseOrder, PurchaseRequisition, TripRequest } from '@/types'
 import { uid } from './format'
 
 export type Cell = string | number | null
@@ -224,7 +225,7 @@ const mk = (code: string, description: string, section: string, budget: number, 
 
 export interface BvA { rows: BvARow[]; sections: { name: string; rows: BvARow[]; total: BvARow }[]; unbudgeted: BvARow[]; totals: BvARow; approvedTotal: BvARow; unbudgetedTotal: BvARow }
 
-export function computeBvA(b: ProjectBudget, prs: PurchaseRequisition[], pos: PurchaseOrder[], invoices: Invoice[]): BvA {
+export function computeBvA(b: ProjectBudget, prs: PurchaseRequisition[], pos: PurchaseOrder[], invoices: Invoice[], trips: TripRequest[] = []): BvA {
   const projectPRs = prs.filter((p) => p.donorCode === b.donorCode)
   const projectPOs = pos.filter((po) => projectPRs.some((p) => p.id === po.prId) && OPEN_PO.includes(po.status))
   const paidInv = invoices.filter((i) => i.status === 'paid' && projectPOs.some((po) => po.id === i.poId))
@@ -235,6 +236,8 @@ export function computeBvA(b: ProjectBudget, prs: PurchaseRequisition[], pos: Pu
   for (const p of projectPRs.filter((p) => OPEN_PR.includes(p.status))) for (const l of p.lines) add(l.budgetLine, 'forecast', l.quantity * l.unitPrice)
   for (const po of projectPOs) for (const l of po.lines) add(l.budgetLine, 'commitments', l.quantity * l.unitPrice)
   for (const inv of paidInv) { const po = projectPOs.find((x) => x.id === inv.poId)!; for (const il of inv.lines) { const pl = po.lines.find((x) => x.id === il.lineItemId); if (pl) { add(pl.budgetLine, 'actual', il.quantity * il.unitPrice); add(pl.budgetLine, 'commitments', -(il.quantity * il.unitPrice)) } } }
+  // Fleet: closed transport requests charged to this project land as actuals on their budget line
+  for (const f of fleetActuals(trips, b.donorCode)) add(f.budgetLine, 'actual', f.amount)
   const get = (c: string) => { const a = acc[c] ?? { forecast: 0, commitments: 0, actual: 0 }; return { ...a, commitments: Math.max(0, a.commitments) } }
   const rows: BvARow[] = b.lines.map((l) => { const a = get(l.code); return mk(l.code, l.description, l.category ?? (l.costType === 'admin' ? 'Admin / Indirect Cost' : 'Direct Cost'), l.amount, a.actual, a.forecast, a.commitments, l) })
   const unbudgeted: BvARow[] = Object.keys(acc).filter((c) => !codes.includes(c)).map((c) => { const a = get(c); return mk(c, 'Not in approved budget', 'Unbudgeted Expenses (not in approved budget)', 0, a.actual, a.forecast, a.commitments) })

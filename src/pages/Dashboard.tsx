@@ -30,7 +30,7 @@ export default function Dashboard() {
   return (
     <>
       <PageHeader eyebrow={ROLE_LABEL[user.role]} title={`${greet}, ${user.name.split(' ')[0]}`}
-        subtitle={`Procurement workspace — what needs attention across ${settings.orgShort} procure-to-pay today.`}
+        subtitle={`Supply Chain workspace — what needs attention across ${settings.orgShort} procure-to-pay, warehouses, assets and fleet today.`}
         actions={<>
           <Link to="/approvals" className="btn-secondary"><CheckSquare size={15} /> My approvals {queueTotal > 0 && <span className="rounded-pill bg-sun-500 px-1.5 text-[11px] font-bold text-ink-900">{queueTotal}</span>}</Link>
           <button className="btn-primary" onClick={() => nav('/requisitions/new')}><Plus size={15} /> New requisition</button>
@@ -38,7 +38,7 @@ export default function Dashboard() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label="Awaiting my approval" value={queueTotal} hint="PRs, POs, invoices and contracts" tone="sun" icon={<CheckSquare size={18} />} />
-        <Stat label="In sourcing" value={inSourcing.length} hint="Approved PRs with Procurement" tone="brand" icon={<Search size={18} />} />
+        <Stat label="In sourcing" value={inSourcing.length} hint="Approved PRs with Supply Chain" tone="brand" icon={<Search size={18} />} />
         <Stat label="Open purchase orders" value={openPOs.length} hint={`${fmtMoney(committed, settings.defaultCurrency)} committed`} tone="ink" icon={<ShoppingCart size={18} />} />
         <Stat label="Pipeline value" value={fmtMoney(pipeline, settings.defaultCurrency)} hint="PRs in approval or sourcing" tone="accent" icon={<FileText size={18} />} />
       </div>

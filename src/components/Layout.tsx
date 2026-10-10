@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { NavLink, Outlet, useNavigate, Link, useLocation } from 'react-router-dom'
 import {
   LayoutGrid, FileText, CheckSquare, Search, ShoppingCart, FileSignature, Building2, Users, SlidersHorizontal,
-  History, Menu, Settings, ChevronsUpDown, PackageCheck, Receipt, Scale, Wallet, Gauge, Lock, PenLine, ListChecks, HandCoins, Building, FolderPlus, Table2, Landmark, Globe2, PanelLeftClose, PanelLeftOpen, Handshake, ShieldCheck, IdCard, UserRound, CalendarDays, Clock, MapPin, Banknote, BriefcaseBusiness,
+  History, Menu, Settings, ChevronsUpDown, PackageCheck, Receipt, Scale, Wallet, Gauge, Lock, PenLine, ListChecks, HandCoins, Building, FolderPlus, Table2, Landmark, Globe2, PanelLeftClose, PanelLeftOpen, Handshake, ShieldCheck, IdCard, UserRound, CalendarDays, Clock, MapPin, Banknote, BriefcaseBusiness, Warehouse, PackageOpen, Truck, Tag, Car, BookOpenText,
 } from 'lucide-react'
 import { DEPARTMENTS, deptForPath, canEnter, ACCESS_LABEL, accessOf } from '@/lib/departments'
 import { DEPT_ICON } from '@/pages/Home'
@@ -15,6 +15,7 @@ import Launcher from '@/pages/Launcher'
 import { cx } from '@/lib/format'
 import { canApprove } from '@/lib/workflow'
 import { canDecideVacancy } from '@/lib/recruitment'
+import { canDecideTwoStep } from '@/lib/supply'
 import type { Role } from '@/types'
 
 interface NavItem { to: string; label: string; icon: React.ReactNode; roles?: Role[]; badge?: number; soon?: boolean }
@@ -24,7 +25,7 @@ export default function Layout() {
   const nav = useNavigate()
   const { pathname } = useLocation()
   const dept = deptForPath(pathname)
-  const { prs, pos, contracts, invoices, envelopes, tasks, runReminders, country, setCountry, masterBudgets, settings, uiTheme, sidebarCollapsed, toggleSidebar, homeLayout, staff, vacancies } = useStore()
+  const { prs, pos, contracts, invoices, envelopes, tasks, runReminders, country, setCountry, masterBudgets, settings, uiTheme, sidebarCollapsed, toggleSidebar, homeLayout, staff, vacancies, releases, trips } = useStore()
   useUiTheme()
   const modern = uiTheme === 'modern'
   const [open, setOpen] = useState(false)
@@ -34,8 +35,10 @@ export default function Layout() {
         + pos.filter((p) => p.status === 'pending_approval' && canApprove(p.approvalChain, user)).length
         + invoices.filter((i) => i.status === 'pending_approval' && canApprove(i.approvalChain, user)).length
         + (user.role === 'legal' ? contracts.filter((c) => c.status === 'legal_review').length : 0)
-        + vacancies.filter((v) => canDecideVacancy(v, user)).length,
-    [prs, pos, contracts, invoices, vacancies, user],
+        + vacancies.filter((v) => canDecideVacancy(v, user)).length
+        + releases.filter((r) => r.status === 'pending_approval' && canDecideTwoStep(r.approvals, user) && r.requesterId !== user.id).length
+        + trips.filter((t) => t.status === 'pending_approval' && canDecideTwoStep(t.approvals, user) && t.requesterId !== user.id).length,
+    [prs, pos, contracts, invoices, vacancies, releases, trips, user],
   )
   const sourcingCount = prs.filter((p) => p.status === 'approved' || p.status === 'sourcing').length
 
@@ -43,7 +46,7 @@ export default function Layout() {
     '/requisitions': <FileText size={17} />, '/sourcing': <Search size={17} />, '/orders': <ShoppingCart size={17} />, '/contracts': <FileSignature size={17} />,
     '/receiving': <PackageCheck size={17} />, '/vendors': <Building2 size={17} />, '/admin/thresholds': <Scale size={17} />, '/invoices': <Receipt size={17} />,
     '/budgets': <Wallet size={17} />, '/admin/approval-matrix': <SlidersHorizontal size={17} />,
-    '/finance/master-budget': <Landmark size={17} />, '/partnerships/partners': <Handshake size={17} />, '/finance/salary-plan': <IdCard size={17} />, '/hr/me': <UserRound size={17} />, '/hr/staff': <Users size={17} />, '/hr/requests': <CalendarDays size={17} />, '/hr/timesheets': <Clock size={17} />, '/hr/attendance': <MapPin size={17} />, '/hr/payroll': <Banknote size={17} />, '/hr/recruitment': <BriefcaseBusiness size={17} />, '/partnerships/due-diligence': <ShieldCheck size={17} />, '/grants/tracker': <Table2 size={17} />, '/grants/new': <FolderPlus size={17} />, '/grants/donors': <Building size={17} />, '/grants': <HandCoins size={17} />,
+    '/finance/master-budget': <Landmark size={17} />, '/partnerships/partners': <Handshake size={17} />, '/finance/salary-plan': <IdCard size={17} />, '/hr/me': <UserRound size={17} />, '/hr/staff': <Users size={17} />, '/hr/requests': <CalendarDays size={17} />, '/hr/timesheets': <Clock size={17} />, '/hr/attendance': <MapPin size={17} />, '/hr/payroll': <Banknote size={17} />, '/hr/recruitment': <BriefcaseBusiness size={17} />, '/warehouses': <Warehouse size={17} />, '/stock-requests': <PackageOpen size={17} />, '/waybills': <Truck size={17} />, '/assets': <Tag size={17} />, '/fleet': <Car size={17} />, '/supply-chain/process': <BookOpenText size={17} />, '/partnerships/due-diligence': <ShieldCheck size={17} />, '/grants/tracker': <Table2 size={17} />, '/grants/new': <FolderPlus size={17} />, '/grants/donors': <Building size={17} />, '/grants': <HandCoins size={17} />,
   }
   const BADGES: Record<string, number> = {
     '/sourcing': sourcingCount, '/receiving': pos.filter((p) => ['issued', 'contracted', 'partially_received'].includes(p.status)).length, '/invoices': invoices.filter((i) => i.status === 'exception').length,
@@ -51,7 +54,7 @@ export default function Layout() {
   // Users without workspace access who reach a shared page (My HR, team pages for line managers) only see the pages they can open
   const myStaff = staff.find((x) => x.userId === user.id)
   const lineManager = !!myStaff && staff.some((x) => x.lineManagerId === myStaff.id)
-  const allowedWithoutAccess = new Set(['/hr/me', ...(lineManager || ['dept_manager', 'programs_director', 'executive_director', 'finance_director', 'procurement_manager'].includes(user.role) ? ['/hr/recruitment'] : []), ...(lineManager ? ['/hr/requests', '/hr/timesheets', '/hr/attendance'] : [])])
+  const allowedWithoutAccess = new Set(['/hr/me', '/stock-requests', '/fleet', '/waybills', ...(lineManager || ['dept_manager', 'programs_director', 'executive_director', 'finance_director', 'procurement_manager'].includes(user.role) ? ['/hr/recruitment'] : []), ...(lineManager ? ['/hr/requests', '/hr/timesheets', '/hr/attendance'] : [])])
   const deptItems: NavItem[] = dept ? dept.modules.filter((m, i, arr) => arr.findIndex((x) => x.to === m.to) === i).filter((m) => canEnter(user, dept.id) || allowedWithoutAccess.has(m.to)).map((m) => ({
     to: m.to, label: m.to === dept.home ? 'Overview' : m.label, icon: m.to === dept.home ? <Gauge size={17} /> : (ICONS[m.to] ?? <FileText size={17} />), badge: BADGES[m.to], soon: m.soon,
   })) : []

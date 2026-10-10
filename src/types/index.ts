@@ -192,7 +192,7 @@ export interface AuditEvent {
   at: string
   actorId: string
   actorName: string
-  docType: DocType | 'SYSTEM' | 'VENDOR' | 'USER' | 'BUDGET' | 'SETTINGS' | 'ESIGN' | 'PROJECT' | 'TASK' | 'DONOR' | 'MASTER' | 'PARTNER' | 'STAFF' | 'HR' | 'RECRUIT'
+  docType: DocType | 'SYSTEM' | 'VENDOR' | 'USER' | 'BUDGET' | 'SETTINGS' | 'ESIGN' | 'PROJECT' | 'TASK' | 'DONOR' | 'MASTER' | 'PARTNER' | 'STAFF' | 'HR' | 'RECRUIT' | 'STOCK' | 'ASSET' | 'FLEET' | 'WAYBILL'
   docId?: string
   docNumber?: string
   action: string
@@ -901,4 +901,55 @@ export interface ApplicantScore { matched: string[]; missing: string[]; keywordP
 export interface Applicant {
   id: string; number: string; vacancyId: string; name: string; email: string; phone: string; country: string; yearsExperience: number
   cv?: Attachment; cvText: string; coverLetter: string; score: ApplicantScore; status: ApplicantStatus; notes: string; submittedAt: string
+}
+
+// ---------------------------------------------------------------------------
+// Supply Chain — warehouses & stock, stock release requests, waybills, assets, fleet
+// ---------------------------------------------------------------------------
+export interface Warehouse { id: string; code: string; name: string; country: string; address: string; managerStaffId?: string; active: boolean }
+export interface StockItem { id: string; sku: string; description: string; category: string; unit: string; minLevel?: number }
+export type MovementType = 'receipt' | 'issue' | 'transfer_out' | 'transfer_in' | 'adjustment' | 'return'
+export interface StockMovement { id: string; number: string; type: MovementType; warehouseId: string; itemId: string; quantity: number; unitCost?: number; currency?: Currency; refType?: 'GRN' | 'release' | 'waybill' | 'adjustment' | 'transfer'; refId?: string; refNumber?: string; projectCode?: string; at: string; byId: string; byName: string; note?: string }
+export type TwoStepKey = 'manager' | 'supply'
+export interface TwoStepApproval { key: TwoStepKey; label: string; role: Role; approverId?: string; approverName?: string; status: 'pending' | 'approved' | 'rejected'; decidedBy?: string; decidedByName?: string; decidedAt?: string; note?: string }
+export type ReleaseStatus = 'pending_approval' | 'approved' | 'issued' | 'rejected' | 'cancelled'
+export interface StockReleaseLine { itemId: string; description: string; unit: string; quantity: number; issued?: number }
+export interface StockRelease {
+  id: string; number: string; requesterId: string; requesterName: string; rhsNumber: string
+  warehouseId: string; projectId?: string; projectCode?: string; budgetLine?: string; purpose: string; destination: string; neededBy: string
+  lines: StockReleaseLine[]; status: ReleaseStatus; approvals: TwoStepApproval[]
+  createdAt: string; issuedAt?: string; issuedBy?: string; issuedByName?: string; waybillId?: string; waybillNumber?: string
+}
+export type WaybillStatus = 'dispatched' | 'received' | 'cancelled'
+export interface WaybillLine { description: string; quantity: number; unit: string; itemId?: string; assetId?: string }
+export interface Waybill {
+  id: string; number: string; kind: 'inbound' | 'outbound' | 'transfer'
+  from: string; to: string; date: string; carrier: string; driverName: string; vehiclePlate: string
+  lines: WaybillLine[]; refType?: 'GRN' | 'release' | 'transfer' | 'asset'; refId?: string; refNumber?: string; projectCode?: string
+  status: WaybillStatus; dispatchedBy: string; dispatchedByName: string; dispatchedAt: string; receivedBy?: string; receivedByName?: string; receivedAt?: string; notes: string; attachments: Attachment[]
+}
+export type AssetCategory = 'it' | 'medical' | 'workshop' | 'vehicle' | 'furniture' | 'communications' | 'other'
+export type AssetStatus = 'in_store' | 'in_use' | 'under_repair' | 'lost' | 'disposed'
+export type AssetLocationType = 'warehouse' | 'office' | 'staff' | 'field' | 'partner'
+export interface AssetEvent { id: string; at: string; byName: string; type: 'registered' | 'assigned' | 'returned' | 'transferred' | 'repair' | 'disposed' | 'verified' | 'lost' | 'note'; detail: string; custodianStaffId?: string; location?: string; waybillNumber?: string }
+export interface Asset {
+  id: string; tag: string; description: string; category: AssetCategory; serial: string; model: string
+  purchase: { poNumber?: string; grnNumber?: string; vendor?: string; date: string; cost: number; currency: Currency }
+  projectCode?: string; budgetLine?: string; country: string
+  location: { type: AssetLocationType; warehouseId?: string; name: string }
+  custodianStaffId?: string; condition: 'new' | 'good' | 'fair' | 'poor'; status: AssetStatus
+  history: AssetEvent[]; attachments: Attachment[]; notes: string; lastVerifiedAt?: string; createdAt: string; updatedAt: string
+}
+export interface Vehicle { id: string; plate: string; makeModel: string; year: number; country: string; baseWarehouseId?: string; driverStaffId?: string; status: 'available' | 'on_trip' | 'maintenance' | 'disposed'; assetId?: string; odometer: number; notes: string }
+export type TripStatus = 'pending_approval' | 'approved' | 'assigned' | 'in_progress' | 'closed' | 'rejected' | 'cancelled'
+export interface TripPassenger { name: string; rhsNumber?: string; beneficiaryRef?: string }
+export interface TripRequest {
+  id: string; number: string; requesterId: string; requesterName: string; rhsNumber: string
+  passengerType: 'staff' | 'beneficiary'; passengers: TripPassenger[]
+  from: string; to: string; date: string; time: string; returnDate?: string; purpose: string
+  projectId?: string; projectCode?: string; budgetLine?: string
+  status: TripStatus; approvals: TwoStepApproval[]
+  vehicleId?: string; vehiclePlate?: string; driverName?: string; assignedBy?: string; assignedAt?: string
+  startOdometer?: number; endOdometer?: number; distanceKm?: number; cost?: number; currency: Currency; costNote?: string
+  closedAt?: string; closedBy?: string; closedByName?: string; createdAt: string
 }

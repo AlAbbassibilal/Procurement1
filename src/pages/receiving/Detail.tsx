@@ -6,12 +6,16 @@ import { Card, PageHeader, StatusPill, KV, Alert, Field } from '@/components/ui'
 import { AttachmentList, ProcessTracker } from '@/components/workflow'
 import { fmtDate, fmtDateTime, cx } from '@/lib/format'
 import { receiptProgress, receivedQty } from '@/lib/match'
-import type { Attachment, GoodsReceiptLine } from '@/types'
+import { ASSET_CATEGORY_LABEL, guessAssetCategory } from '@/lib/supply'
+import type { Attachment, GoodsReceiptLine, AssetCategory } from '@/types'
 
 export default function ReceivingDetail() {
   const { id } = useParams()
   const nav = useNavigate()
-  const { pos, grns, invoices, settings, postGoodsReceipt } = useStore()
+  const { pos, grns, invoices, settings, postGoodsReceipt, warehouses } = useStore()
+  const [wh, setWh] = useState<string>('')
+  const [assetLines, setAssetLines] = useState<Record<string, { asAsset: boolean; category: AssetCategory }>>({})
+  const [wb, setWb] = useState({ enabled: false, carrier: '', driverName: '', vehiclePlate: '' })
   const po = pos.find((p) => p.id === id)
   const [form, setForm] = useState<{ deliveryNoteRef: string; location: string; notes: string; attachments: Attachment[]; lines: Record<string, GoodsReceiptLine> }>(() => ({
     deliveryNoteRef: '', location: po?.deliveryAddress ?? settings.address, notes: '', attachments: [] as Attachment[], lines: {},
@@ -28,7 +32,7 @@ export default function ReceivingDetail() {
     setForm((f) => { const prev = f.lines[lineItemId] as GoodsReceiptLine | undefined; return { ...f, lines: { ...f.lines, [lineItemId]: { lineItemId, quantity: prev?.quantity ?? 0, condition: prev?.condition ?? 'good', notes: prev?.notes, ...patch } } } })
   const receiveAll = () => po.lines.forEach((l) => setLine(l.id, { quantity: Math.max(0, l.quantity - receivedQty(grns, po.id, l.id)) }))
   const submit = () => {
-    const r = postGoodsReceipt(po.id, { deliveryNoteRef: form.deliveryNoteRef, location: form.location, notes: form.notes, attachments, lines: Object.values(form.lines) })
+    const r = postGoodsReceipt(po.id, { deliveryNoteRef: form.deliveryNoteRef, location: form.location, notes: form.notes, attachments, lines: Object.values(form.lines), warehouseId: wh || undefined, assetLines, waybill: wb.enabled ? { carrier: wb.carrier, driverName: wb.driverName, vehiclePlate: wb.vehiclePlate } : undefined })
     if (!r.ok) return setErr(r.error ?? 'Failed')
     setErr(null); setPosted(r.grnId!); setForm((f) => ({ ...f, deliveryNoteRef: '', notes: '', attachments: [], lines: {} }))
   }
@@ -73,6 +77,16 @@ export default function ReceivingDetail() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Vendor delivery note / job card ref."><input className="input" value={form.deliveryNoteRef} onChange={(e) => setForm({ ...form, deliveryNoteRef: e.target.value })} /></Field>
                 <Field label="Received at (location)"><input className="input" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} /></Field>
+                <Field label="Book into warehouse" hint="Goods lines go into stock here; service lines are not stocked"><select className="input" data-testid="grn-warehouse" value={wh} onChange={(e) => setWh(e.target.value)}><option value="">— not stocked —</option>{warehouses.filter((w) => w.active).map((w) => <option key={w.id} value={w.id}>{w.code} · {w.name} ({w.country})</option>)}</select></Field>
+                <div className="sm:col-span-1">
+                  <div className="label">Assets & equipment on this receipt</div>
+                  <div className="space-y-1 rounded-control border border-line bg-surface-muted p-2 text-[12.5px]">{po.lines.map((l) => { const f = assetLines[l.id] ?? { asAsset: false, category: guessAssetCategory(l.description + ' ' + l.category) }; return <div key={l.id} className="flex items-center gap-2"><label className="flex flex-1 items-center gap-2"><input type="checkbox" data-testid={`asset-${l.id}`} checked={f.asAsset} onChange={(e) => setAssetLines({ ...assetLines, [l.id]: { ...f, asAsset: e.target.checked } })} /><span className="truncate">{l.description}</span></label>{f.asAsset && <select className="input w-40 text-[11.5px]" value={f.category} onChange={(e) => setAssetLines({ ...assetLines, [l.id]: { ...f, category: e.target.value as AssetCategory } })}>{(Object.keys(ASSET_CATEGORY_LABEL) as AssetCategory[]).map((c) => <option key={c} value={c}>{ASSET_CATEGORY_LABEL[c]}</option>)}</select>}</div> })}</div>
+                  <div className="mt-1 text-[11.5px] text-ink-500">Ticked lines are registered one asset per unit (tag, PO, GRN, project, budget line, cost) instead of stock.</div>
+                </div>
+                <div className="sm:col-span-2 rounded-control border border-line p-3">
+                  <label className="flex items-center gap-2 text-[13px] font-medium text-ink-900"><input type="checkbox" checked={wb.enabled} onChange={(e) => setWb({ ...wb, enabled: e.target.checked })} /> Record the inbound waybill (carrier, driver, vehicle)</label>
+                  {wb.enabled && <div className="mt-3 grid gap-3 sm:grid-cols-3"><Field label="Carrier"><input className="input" value={wb.carrier} onChange={(e) => setWb({ ...wb, carrier: e.target.value })} placeholder="Vendor transport / RHS fleet" /></Field><Field label="Driver"><input className="input" value={wb.driverName} onChange={(e) => setWb({ ...wb, driverName: e.target.value })} /></Field><Field label="Vehicle plate"><input className="input" value={wb.vehiclePlate} onChange={(e) => setWb({ ...wb, vehiclePlate: e.target.value })} /></Field></div>}
+                </div>
                 <Field label="Inspection notes" className="sm:col-span-2"><textarea className="input min-h-[72px]" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Condition on arrival, discrepancies, who inspected…" /></Field>
               </div>
               <div className="mt-4"><div className="label">Signed delivery note / photos</div><AttachmentList items={attachments} onAdd={(a) => setForm({ ...form, attachments: [...attachments, a] })} onRemove={(aid) => setForm({ ...form, attachments: attachments.filter((a) => a.id !== aid) })} /></div>

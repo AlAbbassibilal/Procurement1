@@ -7,11 +7,12 @@ import { fmtMoney, fmtDate, linesSubtotal, timeAgo } from '@/lib/format'
 import { canApprove, currentStep } from '@/lib/workflow'
 import { invoiceTotals } from '@/lib/match'
 import { canDecideVacancy, currentVacancyStep } from '@/lib/recruitment'
+import { canDecideTwoStep, currentTwoStep } from '@/lib/supply'
 
 export default function Approvals() {
   const user = useCurrentUser()!
   const nav = useNavigate()
-  const { prs, pos, contracts, invoices, vacancies } = useStore()
+  const { prs, pos, contracts, invoices, vacancies, releases, trips } = useStore()
   const [tab, setTab] = useState<'queue' | 'history'>('queue')
 
   const qPR = prs.filter((p) => p.status === 'pending_approval' && canApprove(p.approvalChain, user))
@@ -21,7 +22,9 @@ export default function Approvals() {
   const hPR = prs.filter((p) => p.approvalChain.some((s) => s.decidedBy === user.id))
   const hPO = pos.filter((p) => p.approvalChain.some((s) => s.decidedBy === user.id))
   const qREC = vacancies.filter((v) => canDecideVacancy(v, user))
-  const total = qPR.length + qPO.length + qCT.length + qINV.length + qREC.length
+  const qSR = releases.filter((r) => r.status === 'pending_approval' && canDecideTwoStep(r.approvals, user) && r.requesterId !== user.id)
+  const qTR = trips.filter((t) => t.status === 'pending_approval' && canDecideTwoStep(t.approvals, user) && t.requesterId !== user.id)
+  const total = qPR.length + qPO.length + qCT.length + qINV.length + qREC.length + qSR.length + qTR.length
 
   return (
     <>
@@ -31,6 +34,18 @@ export default function Approvals() {
       {tab === 'queue' && (
         <div className="mt-5 space-y-5">
           {total === 0 && <EmptyState title="Your queue is empty" body="Documents will appear here when they reach a step assigned to you or your role." icon={<CheckSquare size={22} />} />}
+          {qSR.length > 0 && (
+            <Card title="Stock release requests" padded={false}>
+              <table className="w-full text-[13px]"><thead><tr><th className="table-th">Request</th><th className="table-th">Requester</th><th className="table-th">Items</th><th className="table-th">Step</th><th className="table-th">Project</th></tr></thead>
+                <tbody>{qSR.map((r) => <tr key={r.id} className="cursor-pointer hover:bg-surface-muted" onClick={() => nav('/stock-requests')}><td className="table-td"><div className="font-medium text-ink-900">{r.purpose}</div><div className="text-[11.5px] text-ink-500">{r.number} · → {r.destination}</div></td><td className="table-td">{r.requesterName} <span className="font-mono text-[11px] text-ink-500">{r.rhsNumber}</span></td><td className="table-td text-[12.5px]">{r.lines.map((l) => `${l.quantity} ${l.unit} ${l.description}`).join(' · ')}</td><td className="table-td">{currentTwoStep(r.approvals)?.label}</td><td className="table-td">{r.projectCode ?? 'Core'}</td></tr>)}</tbody></table>
+            </Card>
+          )}
+          {qTR.length > 0 && (
+            <Card title="Transport requests" padded={false}>
+              <table className="w-full text-[13px]"><thead><tr><th className="table-th">Request</th><th className="table-th">Requester</th><th className="table-th">Route · date</th><th className="table-th">Passengers</th><th className="table-th">Step</th></tr></thead>
+                <tbody>{qTR.map((t) => <tr key={t.id} className="cursor-pointer hover:bg-surface-muted" onClick={() => nav('/fleet')}><td className="table-td"><div className="font-medium text-ink-900">{t.purpose}</div><div className="text-[11.5px] text-ink-500">{t.number} · {t.projectCode ?? 'Core'}</div></td><td className="table-td">{t.requesterName} <span className="font-mono text-[11px] text-ink-500">{t.rhsNumber}</span></td><td className="table-td text-[12.5px]">{t.from} → {t.to}<div className="text-ink-500">{fmtDate(t.date)} {t.time}</div></td><td className="table-td text-[12.5px]">{t.passengerType} · {t.passengers.length}</td><td className="table-td">{currentTwoStep(t.approvals)?.label}</td></tr>)}</tbody></table>
+            </Card>
+          )}
           {qREC.length > 0 && (
             <Card title="Recruitment requests" padded={false}>
               <table className="w-full text-[13px]"><thead><tr><th className="table-th">Request</th><th className="table-th">Raised by</th><th className="table-th">Step</th><th className="table-th">Funding</th><th className="table-th">Submitted</th></tr></thead>

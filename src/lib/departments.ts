@@ -31,10 +31,10 @@ export const DEPARTMENTS: DepartmentDef[] = [
     modules: [{ to: '/partnerships', label: 'Overview' }, { to: '/partnerships/partners', label: 'Partner register' }, { to: '/partnerships/due-diligence', label: 'Due diligence tracker' }, { to: '/partnerships/agreements', label: 'Agreements & MoUs', soon: true }, { to: '/partnerships/reporting', label: 'Partner reporting', soon: true }],
   },
   {
-    id: 'procurement', name: 'Procurement', short: 'Requisition to contract', home: '/procurement', paths: ['/procurement', '/requisitions', '/sourcing', '/orders', '/contracts', '/receiving', '/vendors', '/admin/thresholds'],
-    description: 'Purchase requisitions, SOP-driven sourcing (direct, quotations, closed and open bids), purchase orders, contracts, goods receipt and the approved supplier database.',
+    id: 'procurement', name: 'Supply Chain', short: 'Procurement, warehouses, assets & fleet', home: '/procurement', paths: ['/procurement', '/supply-chain', '/requisitions', '/sourcing', '/orders', '/contracts', '/receiving', '/vendors', '/admin/thresholds', '/warehouses', '/stock-requests', '/waybills', '/assets', '/fleet'],
+    description: 'Procure-to-pay (requisitions, SOP-driven sourcing, purchase orders, contracts, goods receipt and suppliers), warehouses and stock in every country, waybills, the asset registry and fleet management.',
     tone: { tile: 'bg-brand-800 text-white', text: 'text-brand-800', ring: 'ring-brand-300' },
-    modules: [{ to: '/procurement', label: 'Overview' }, { to: '/requisitions', label: 'Requisitions' }, { to: '/sourcing', label: 'Sourcing & quotations' }, { to: '/orders', label: 'Purchase orders' }, { to: '/contracts', label: 'Contracts' }, { to: '/receiving', label: 'Goods receipt' }, { to: '/vendors', label: 'Vendors' }, { to: '/admin/thresholds', label: 'Procurement thresholds' }],
+    modules: [{ to: '/procurement', label: 'Overview' }, { to: '/requisitions', label: 'Requisitions' }, { to: '/sourcing', label: 'Sourcing & quotations' }, { to: '/orders', label: 'Purchase orders' }, { to: '/contracts', label: 'Contracts' }, { to: '/receiving', label: 'Goods receipt (GRN)' }, { to: '/waybills', label: 'Waybills' }, { to: '/warehouses', label: 'Warehouses & stock' }, { to: '/stock-requests', label: 'Stock release requests' }, { to: '/assets', label: 'Asset registry' }, { to: '/fleet', label: 'Fleet & transport' }, { to: '/vendors', label: 'Vendors' }, { to: '/admin/thresholds', label: 'Procurement thresholds' }, { to: '/supply-chain/process', label: 'Process documentation' }],
   },
   {
     id: 'finance', name: 'Financial', short: 'Payments, budgets & reporting', home: '/finance', paths: ['/finance', '/invoices', '/admin/approval-matrix'],

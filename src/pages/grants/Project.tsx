@@ -20,7 +20,7 @@ const TABS: { id: Tab; label: string }[] = [{ id: 'dashboard', label: 'Dashboard
 export default function ProjectPage() {
   const { id } = useParams(); const nav = useNavigate(); const [sp, setSp] = useSearchParams()
   const user = useCurrentUser()!
-  const { projects, budgets, prs, pos, invoices, users, tasks, advanceProject, updateProject, addProjectComment, addReport, updateReport, submitReport, partners } = useStore()
+  const { projects, budgets, prs, pos, invoices, users, tasks, advanceProject, updateProject, addProjectComment, addReport, updateReport, submitReport, partners, trips } = useStore()
   const p = projects.find((x) => x.id === id)
   const tab = (sp.get('tab') as Tab) || 'dashboard'
   const setTab = (t: Tab) => setSp({ tab: t })
@@ -33,7 +33,7 @@ export default function ProjectPage() {
   const [newReport, setNewReport] = useState<{ title: string; type: ProjectReport['type']; dueDate: string; reminderDays: number } | null>(null)
   if (!p) return <Alert tone="danger">Project not found. <Link to="/grants" className="underline">Back</Link></Alert>
   const budget = budgets.find((b) => b.id === p.budgetId)
-  const bva = budget ? computeBvA(budget, prs, pos, invoices) : undefined
+  const bva = budget ? computeBvA(budget, prs, pos, invoices, trips) : undefined
   const lvl = accessOf(user, 'grants'); const isTeam = p.managerId === user.id || p.teamIds.includes(user.id)
   const canEdit = lvl === 'manage' || (lvl === 'edit' && isTeam) || user.role === 'admin'
   const canStage = lvl === 'manage' || user.role === 'admin'

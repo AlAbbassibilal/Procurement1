@@ -14,12 +14,12 @@ export const StagePill = ({ stage }: { stage: ProjectStage }) => <span className
 export default function GrantsOverview() {
   const nav = useNavigate()
   const user = useCurrentUser()!
-  const { projects: allProjects, budgets, prs, pos, invoices, tasks, settings, country } = useStore()
+  const { projects: allProjects, budgets, prs, pos, invoices, tasks, settings, country, trips } = useStore()
   const projects = allProjects.filter((p) => country === 'all' || p.countries.includes(country))
   const ccy = settings.defaultCurrency
   const by = (st: ProjectStage[]) => projects.filter((p) => st.includes(p.stage))
   const live = by(['granted', 'active'])
-  const bva = (p: typeof projects[number]) => { const b = budgets.find((x) => x.id === p.budgetId); return b ? computeBvA(b, prs, pos, invoices).totals : undefined }
+  const bva = (p: typeof projects[number]) => { const b = budgets.find((x) => x.id === p.budgetId); return b ? computeBvA(b, prs, pos, invoices, trips).totals : undefined }
   const portfolio = live.reduce((s, p) => s + (p.awardedAmount ?? 0), 0)
   const spent = live.reduce((s, p) => { const t = bva(p); return s + (t ? t.actual + t.commitments : 0) }, 0)
   const reportsDue = projects.filter((p) => ['granted', 'active'].includes(p.stage)).flatMap((p) => p.reports.map((r) => ({ p, r, live: reportLiveStatus(r) }))).filter((x) => x.live === 'due' || x.live === 'overdue').sort((a, b) => a.r.dueDate.localeCompare(b.r.dueDate))

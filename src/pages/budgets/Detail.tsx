@@ -11,12 +11,12 @@ export default function BudgetDetail() {
   const { id } = useParams()
   const nav = useNavigate()
   const user = useCurrentUser()!
-  const { budgets, prs, pos, invoices, settings, upsertBudget, masterBudgets } = useStore()
+  const { budgets, prs, pos, invoices, settings, upsertBudget, masterBudgets, trips } = useStore()
   const masterLines = masterBudgets.flatMap((m) => m.lines)
   const b = budgets.find((x) => x.id === id)
   const [received, setReceived] = useState<string | null>(null)
   if (!b) return <Alert tone="danger">Budget not found. <Link to="/budgets" className="underline">Back</Link></Alert>
-  const bva = computeBvA(b, prs, pos, invoices)
+  const bva = computeBvA(b, prs, pos, invoices, trips)
   const { totals: T, approvedTotal: A, unbudgetedTotal: U } = bva
   const canEdit = ['finance', 'finance_director', 'programs_director', 'admin'].includes(user.role)
   const projectPRs = prs.filter((p) => p.donorCode === b.donorCode)

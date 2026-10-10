@@ -12,13 +12,13 @@ import type { ProjectStage } from '@/types'
 
 export default function GrantsTracker() {
   const nav = useNavigate()
-  const { projects: allProjects, budgets, prs, pos, invoices, settings, country } = useStore()
+  const { projects: allProjects, budgets, prs, pos, invoices, settings, country, trips } = useStore()
   const projects = allProjects.filter((p) => country === 'all' || p.countries.includes(country))
   const [tab, setTab] = useState<'pipeline' | 'active' | 'closed' | 'all'>('all')
   const ccy = settings.defaultCurrency
   const stages: Record<typeof tab, ProjectStage[]> = { pipeline: ['development', 'submitted'], active: ['granted', 'active'], closed: ['closed'], all: ['development', 'submitted', 'granted', 'active', 'closed'] }
   const rows = projects.filter((p) => stages[tab].includes(p.stage)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-  const row = (p: typeof projects[number]) => { const b = budgets.find((x) => x.id === p.budgetId); const t = b ? computeBvA(b, prs, pos, invoices).totals : undefined; const next = p.reports.filter((r) => !['submitted', 'approved'].includes(r.status)).sort((a, c) => a.dueDate.localeCompare(c.dueDate))[0]; return { b, t, next, nextLive: next ? reportLiveStatus(next) : undefined, ip: ipttProgress(p) } }
+  const row = (p: typeof projects[number]) => { const b = budgets.find((x) => x.id === p.budgetId); const t = b ? computeBvA(b, prs, pos, invoices, trips).totals : undefined; const next = p.reports.filter((r) => !['submitted', 'approved'].includes(r.status)).sort((a, c) => a.dueDate.localeCompare(c.dueDate))[0]; return { b, t, next, nextLive: next ? reportLiveStatus(next) : undefined, ip: ipttProgress(p) } }
   const years = [...new Set(projects.flatMap((p) => [p.grantedAt, p.submittedAt, p.closedAt].filter(Boolean).map((d) => d!.slice(0, 4))))].sort().reverse()
   const exportXlsx = () => {
     const aoa = [['Project code', 'Title', 'Donor', 'Stage', 'Outcome', 'Currency', 'Requested', 'Awarded', 'Start', 'End', 'Manager', 'Submitted', 'Granted', 'Closed', 'Spent + committed', 'Burn %', 'IPTT %', 'Next report', 'Next report due'], ...projects.map((p) => { const r = row(p); return [p.code, p.title, p.donorName, STAGE_LABEL[p.stage], p.outcome ?? '', p.currency, p.requestedAmount ?? '', p.awardedAmount ?? '', p.startDate ?? '', p.endDate ?? '', p.managerName ?? '', p.submittedAt?.slice(0, 10) ?? '', p.grantedAt?.slice(0, 10) ?? '', p.closedAt?.slice(0, 10) ?? '', r.t ? r.t.actual + r.t.commitments : '', r.t?.burnWithCommitPct ?? '', r.ip.pct, r.next?.title ?? '', r.next?.dueDate ?? ''] })]

@@ -43,14 +43,14 @@ function WorkspaceFrame({ id, children, intro }: { id: Department; children?: Re
 }
 
 export function FinanceHome() {
-  const { invoices, budgets, prs, pos, settings, masterBudgets, projects, staff } = useStore()
+  const { invoices, budgets, prs, pos, settings, masterBudgets, projects, staff, trips } = useStore()
   const ccy = settings.defaultCurrency
   const sc = staffCoverage(staff.filter((s) => s.status !== 'left'), budgets, projects, new Date().getFullYear(), settings); const sAnnual = sc.reduce((s, c) => s + c.annual, 0), sCov = sc.reduce((s, c) => s + c.covered, 0)
   const mb = [...masterBudgets].sort((a, b) => b.year - a.year)[0]
   const cov = mb ? coverageFor(mb, budgets, projects, settings) : []
   const mTotal = cov.reduce((s, c) => s + c.line.amount, 0), mCov = cov.reduce((s, c) => s + c.covered, 0)
   const sum = (st: string[]) => invoices.filter((i) => st.includes(i.status)).reduce((s, i) => s + invoiceTotals(i.lines, i.taxRate).total, 0)
-  const bv = budgets.filter((b) => b.status === 'active').map((b) => computeBvA(b, prs, pos, invoices).totals)
+  const bv = budgets.filter((b) => b.status === 'active').map((b) => computeBvA(b, prs, pos, invoices, trips).totals)
   return (
     <WorkspaceFrame id="finance" intro={
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-6">

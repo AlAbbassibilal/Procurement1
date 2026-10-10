@@ -16,7 +16,7 @@ export const DEPT_ICON: Record<Department, React.ReactNode> = {
 export default function Home() {
   const user = useCurrentUser()!
   const nav = useNavigate()
-  const { prs, pos, invoices, contracts, budgets, envelopes, tasks, projects, settings, partners, setHomeLayout } = useStore()
+  const { prs, pos, invoices, contracts, budgets, envelopes, tasks, projects, settings, partners, setHomeLayout, trips } = useStore()
   const access = effectiveAccess(user)
   const approvals = prs.filter((p) => p.status === 'pending_approval' && canApprove(p.approvalChain, user)).length
     + pos.filter((p) => p.status === 'pending_approval' && canApprove(p.approvalChain, user)).length
@@ -26,7 +26,7 @@ export default function Home() {
   const toSign = envelopes.filter((e) => e.status === 'sent' && recipientTurn(e).some((r) => r.userId === user.id)).length
   const myOpen = prs.filter((p) => p.requesterId === user.id && !['closed', 'cancelled', 'rejected'].includes(p.status)).length
   const active = budgets.filter((b) => b.status === 'active')
-  const bvas = active.map((b) => computeBvA(b, prs, pos, invoices).totals)
+  const bvas = active.map((b) => computeBvA(b, prs, pos, invoices, trips).totals)
   const approvedTotal = bvas.reduce((s, t) => s + t.budget, 0), spentTotal = bvas.reduce((s, t) => s + t.actual + t.commitments, 0)
   const ccy = settings.defaultCurrency
   const hour = new Date().getHours()

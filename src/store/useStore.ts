@@ -61,6 +61,7 @@ interface State {
   notifications: Notification[]
   audit: AuditEvent[]
   counters: Record<string, number>
+  dataMode: DataMode
 }
 
 interface Actions {
@@ -234,9 +235,24 @@ interface Actions {
   markAllRead: () => void
 
   resetDemo: () => void
+  resetData: (mode: DataMode) => void
 }
 
-const initial = (): State => ({
+export type DataMode = 'clean' | 'demo'
+/** Which dataset a fresh browser starts with: clean (accounts + policy only) unless a demo flag is set. */
+export const startupMode = (): DataMode => { try { return localStorage.getItem('rhs-platform-mode') === 'demo' ? 'demo' : 'clean' } catch { return 'clean' } }
+/** Staff records for the platform accounts only — positions and line managers kept, salaries and contracts cleared. */
+const cleanStaff = (): StaffMember[] => SEED_STAFF.filter((s) => s.userId).map((s) => ({ ...s, monthlySalary: 0, endDate: undefined, contractRef: undefined, notes: '', sourceProjectId: undefined, sourceProjectCode: undefined, sourceLineCode: undefined, status: 'active' as const }))
+const EMPTY_COUNTERS = { PR: 0, PO: 0, CT: 0, GRN: 0, INV: 0, ENV: 0, PT: 0, LR: 0, WFH: 0, PS: 0, REC: 0, APP: 0, SM: 0, SR: 0, WB: 0, TR: 0 }
+/** Clean start: user accounts, approval matrix, policy settings and minimal staff records; every register and document empty. */
+const cleanInitial = (): State => ({
+  ...demoInitial(), vendors: [], prs: [], pos: [], contracts: [], grns: [], invoices: [], budgets: [], envelopes: [], projects: [], donors: [], tasks: [], masterBudgets: [], partners: [],
+  staff: cleanStaff(), leaveRequests: [], timesheets: [], payslips: [], attendance: [], vacancies: [], applicants: [], warehouses: [], items: [], movements: [], releases: [], waybills: [], assets: [], vehicles: [], trips: [],
+  notifications: [], audit: [{ id: 'a1', at: nowIso(), actorId: 'u_bilal', actorName: DOC_OWNER, docType: 'SYSTEM', action: 'System initialised', detail: 'Clean start — no sample data' }], counters: { ...EMPTY_COUNTERS }, dataMode: 'clean',
+})
+const initial = (mode: DataMode = startupMode()): State => (mode === 'demo' ? demoInitial() : cleanInitial())
+const demoInitial = (): State => ({
+  dataMode: 'demo',
   currentUserId: null,
   users: SEED_USERS,
   vendors: SEED_VENDORS,
@@ -1388,10 +1404,11 @@ export const useStore = create<State & Actions>()(
         markRead: (id) => set((s) => ({ notifications: s.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)) })),
         markAllRead: () => { const me = get().currentUserId; set((s) => ({ notifications: s.notifications.map((n) => (n.userId === me ? { ...n, read: true } : n)) })) },
 
-        resetDemo: () => set({ ...initial(), currentUserId: get().currentUserId, uiTheme: get().uiTheme, homeLayout: get().homeLayout, favorites: get().favorites, sidebarCollapsed: get().sidebarCollapsed }),
+        resetDemo: () => get().resetData('demo'),
+        resetData: (mode) => { try { localStorage.setItem('rhs-platform-mode', mode) } catch { /* private window */ } set({ ...initial(mode), currentUserId: get().currentUserId, uiTheme: get().uiTheme, homeLayout: get().homeLayout, favorites: get().favorites, sidebarCollapsed: get().sidebarCollapsed }) },
       }
     },
-    { name: 'rhs-platform-v7', version: 7 },
+    { name: 'rhs-platform-v8', version: 8 },
   ),
 )
 

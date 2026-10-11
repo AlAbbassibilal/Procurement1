@@ -15,6 +15,7 @@ import * as XLSX from 'xlsx'
 import { fleetActuals } from './supply'
 import type { BudgetLine, Currency, Invoice, OrgSettings, ProjectBudget, PurchaseOrder, PurchaseRequisition, TripRequest } from '@/types'
 import { uid } from './format'
+import { saveWorkbook } from './download'
 
 export type Cell = string | number | null
 export interface ParsedSheet { name: string; rows: Cell[][] }
@@ -357,6 +358,6 @@ export function exportBvA(b: ProjectBudget, bva: BvA, prs: PurchaseRequisition[]
   const ws4 = XLSX.utils.aoa_to_sheet(cm as (string | number | null)[][]); ws4['!cols'] = [{ wch: 14 }, { wch: 28 }, { wch: 14 }, { wch: 40 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 18 }]
   XLSX.utils.book_append_sheet(wb, ws4, 'Commitments')
 
-  XLSX.writeFile(wb, `BvA-${b.donorCode}-${new Date().toISOString().slice(0, 10)}.xlsx`)
+  saveWorkbook(XLSX, wb, `BvA-${b.donorCode}-${new Date().toISOString().slice(0, 10)}.xlsx`)
 }
 const codes_has = (b: ProjectBudget, code: string) => b.lines.some((l) => matchCode(code, l.code))

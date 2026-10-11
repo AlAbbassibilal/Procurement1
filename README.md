@@ -45,7 +45,9 @@ npm run dev        # http://localhost:5173
 npm run build      # production bundle in dist/
 ```
 
-Sign in with any demo account (password `rhs2025`), e.g. `AlAbbassi.bilal@icloud.com` (administrator). The user menu lets you switch account to walk a document through every role, and reset the demo data.
+**Data modes.** A fresh browser starts **clean**: user accounts, the approval matrix and policy settings only, every register empty. Load the sample dataset or reset to clean from the account menu or Settings → Data. **Downloads** go through the host save dialog inside the claude.ai viewer and through a normal browser download elsewhere (`src/lib/download.ts`).
+
+Sign in with any account (password `rhs2025`), e.g. `AlAbbassi.bilal@icloud.com` (administrator). The user menu lets you switch account to walk a document through every role, and reset the demo data.
 
 ## Interface: Classic / Modern, home screen, and the sidebar
 

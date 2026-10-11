@@ -7,6 +7,7 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import type { AttendanceRecord, HrSettings, LeaveRequest, LeaveType, OrgSettings, Payslip, Project, ProjectBudget, StaffMember, Timesheet, TimesheetLine } from '@/types'
 import { monthsOf, monthLabel } from './grants'
 import { uid } from './format'
+import { saveWorkbook, saveFile } from './download'
 
 export const HR_DEFAULTS: HrSettings = { annualLeaveDays: 14, wfhDays: 14, weekend: [5, 6], socialSecurityPct: 7.5, incomeTaxPct: 0, checkInStart: '08:00', checkInEnd: '10:00' }
 export const hrSettings = (s: OrgSettings): HrSettings => ({ ...HR_DEFAULTS, ...(s.hr ?? {}) })
@@ -79,7 +80,7 @@ export function exportTimesheet(t: Timesheet, st: StaffMember, settings: OrgSett
     [], ['Staff acknowledgement', t.acknowledgedAt ?? ''], ['Approved by', t.approvedByName ?? '', t.approvedAt ?? ''],
   ]
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Timesheet')
-  XLSX.writeFile(wb, `Timesheet_${st.rhsNumber}_${t.period}.xlsx`)
+  saveWorkbook(XLSX, wb, `Timesheet_${st.rhsNumber}_${t.period}.xlsx`)
 }
 
 // ---- payroll ---------------------------------------------------------------
@@ -126,7 +127,7 @@ export async function payslipPdf(p: Payslip, st: StaffMember, settings: OrgSetti
 }
 export async function downloadPayslip(p: Payslip, st: StaffMember, settings: OrgSettings) {
   const bytes = await payslipPdf(p, st, settings)
-  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/pdf' })); const a = document.createElement('a'); a.href = url; a.download = `Payslip_${st.rhsNumber}_${p.period}.pdf`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000)
+  await saveFile(`Payslip_${st.rhsNumber}_${p.period}.pdf`, new Blob([bytes as BlobPart], { type: 'application/pdf' }), 'application/pdf')
 }
 
 // ---- attendance --------------------------------------------------------------

@@ -5,6 +5,7 @@ import { Card, PageHeader, Stat } from '@/components/ui'
 import { mapLink, hoursWorked, MODE_LABEL, today, onLeaveToday, hrSettings } from '@/lib/hr'
 import { fmtDate, cx } from '@/lib/format'
 import { useHrContext } from './shared'
+import { saveWorkbook } from '@/lib/download'
 
 export default function HrAttendance() {
   const { visibleStaff } = useHrContext()
@@ -13,7 +14,7 @@ export default function HrAttendance() {
   const [day, setDay] = useState(today())
   const rows = visibleStaff.filter((s) => s.status === 'active').map((s) => ({ s, a: attendance.find((x) => x.staffId === s.id && x.date === day), leave: leaveRequests.find((r) => r.staffId === s.id && onLeaveToday(r, day)) }))
   const late = (t: string) => new Date(t).toTimeString().slice(0, 5) > hr.checkInEnd
-  const exportX = async () => { const X = await import('xlsx'); const aoa = [['Date', 'RHS no.', 'Name', 'Mode', 'Check-in', 'Check-out', 'Hours', 'Latitude', 'Longitude', 'Accuracy (m)', 'Location', 'Leave'], ...rows.map(({ s, a, leave }) => [day, s.rhsNumber, s.name, a ? MODE_LABEL[a.mode] : '', a ? a.checkInAt.slice(11, 16) : '', a?.checkOutAt ? a.checkOutAt.slice(11, 16) : '', a ? hoursWorked(a) ?? '' : '', a?.lat ?? '', a?.lng ?? '', a?.accuracy ?? '', a?.locationStatus ?? '', leave?.number ?? ''])]; const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(aoa), 'Attendance'); X.writeFile(wb, `Attendance_${day}.xlsx`) }
+  const exportX = async () => { const X = await import('xlsx'); const aoa = [['Date', 'RHS no.', 'Name', 'Mode', 'Check-in', 'Check-out', 'Hours', 'Latitude', 'Longitude', 'Accuracy (m)', 'Location', 'Leave'], ...rows.map(({ s, a, leave }) => [day, s.rhsNumber, s.name, a ? MODE_LABEL[a.mode] : '', a ? a.checkInAt.slice(11, 16) : '', a?.checkOutAt ? a.checkOutAt.slice(11, 16) : '', a ? hoursWorked(a) ?? '' : '', a?.lat ?? '', a?.lng ?? '', a?.accuracy ?? '', a?.locationStatus ?? '', leave?.number ?? ''])]; const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(aoa), 'Attendance'); saveWorkbook(X, wb, `Attendance_${day}.xlsx`) }
   return (
     <>
       <PageHeader title="Attendance" subtitle="Daily check-ins with the captured location. Staff check in from My HR; the browser location is stored with the time." actions={<div className="flex gap-2"><input type="date" className="input w-44" value={day} onChange={(e) => setDay(e.target.value)} /><button className="btn-secondary" onClick={exportX}><Download size={15} /> Export</button></div>} />

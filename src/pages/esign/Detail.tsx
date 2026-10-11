@@ -8,6 +8,7 @@ import { renderPages, finalizeEnvelope, recipientTurn, fmtStamp, FIELD_LABEL, ty
 import { getFile, putFile } from '@/lib/fileStore'
 import { fmtDateTime, cx } from '@/lib/format'
 import type { EnvelopeField } from '@/types'
+import { saveFile } from '@/lib/download'
 
 export default function EnvelopeDetail() {
   const { id } = useParams()
@@ -62,7 +63,7 @@ export default function EnvelopeDetail() {
     let b = await getFile(key)
     if (!b && which === 'completed' && bytes) { b = await finalizeEnvelope(bytes, env, settings.orgName); await putFile(key, b) }
     if (!b) return setErr('File not available in this browser (files are stored locally in the demo).')
-    const url = URL.createObjectURL(new Blob([b as BlobPart], { type: 'application/pdf' })); const a = document.createElement('a'); a.href = url; a.download = which === 'completed' ? `${env.number}-signed.pdf` : env.documentName.replace(/\.(png|jpe?g)$/i, '.pdf'); a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000)
+    await saveFile(which === 'completed' ? `${env.number}-signed.pdf` : env.documentName.replace(/\.(png|jpe?g)$/i, '.pdf'), new Blob([b as BlobPart], { type: 'application/pdf' }), 'application/pdf')
   }
   const regenerate = async () => { if (!bytes) return; setBusy(true); try { const out = await finalizeEnvelope(bytes, env, settings.orgName); const key = `${env.fileKey}__completed.pdf`; await putFile(key, out); updateEnvelope(env.id, { completedFileKey: key }) } catch (e) { setErr((e as Error).message) } setBusy(false) }
   const progress = env.recipients.filter((r) => r.role !== 'cc'); const done = progress.filter((r) => ['signed', 'approved'].includes(r.status)).length

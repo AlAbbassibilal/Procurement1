@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx'
 import type { MasterBudget, MasterLine, OrgSettings, Project, ProjectBudget } from '@/types'
 import { toUSD, fromUSD } from './tiers'
 import { monthsOf } from './grants'
+import { saveWorkbook } from './download'
 
 export const MASTER_CATEGORIES = ['Personnel — Amman support', 'Personnel — field', 'Office, IT & operations', 'Statutory, compliance & risk', 'Programme support', 'Capital & equipment', 'Other']
 
@@ -45,5 +46,5 @@ export function exportMasterBudget(mb: MasterBudget, cov: Coverage[], settings: 
   const det: (string | number | null)[][] = [['Master line', 'Project code', 'Project', 'Project line', 'Description', 'Budget status', `Amount (${mb.currency})`, `Prorated to ${mb.year}`]]
   for (const c of cov) for (const l of c.lines) det.push([c.line.code, l.budget.donorCode, l.budget.name, l.line.code, l.line.description, l.status, Math.round(l.amount), Math.round(l.prorated)])
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(det), 'Coverage detail')
-  XLSX.writeFile(wb, `Master-Budget-${mb.year}.xlsx`)
+  saveWorkbook(XLSX, wb, `Master-Budget-${mb.year}.xlsx`)
 }

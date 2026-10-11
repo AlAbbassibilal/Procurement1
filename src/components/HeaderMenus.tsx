@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, LogOut, ChevronDown, RotateCcw, ChevronsUpDown, Sparkles, Monitor, LayoutGrid, Grid2x2 } from 'lucide-react'
+import { Bell, LogOut, ChevronDown, RotateCcw, ChevronsUpDown, Sparkles, Monitor, LayoutGrid, Grid2x2, Database } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
 import { Avatar } from './ui'
 import { cx, timeAgo } from '@/lib/format'
@@ -53,7 +53,7 @@ export function NotificationBell() {
 export function UserMenu() {
   const user = useCurrentUser()!
   const nav = useNavigate()
-  const { users, switchUser, logout, resetDemo, uiTheme, setUiTheme, homeLayout, setHomeLayout } = useStore()
+  const { users, switchUser, logout, resetData, dataMode, uiTheme, setUiTheme, homeLayout, setHomeLayout } = useStore()
   const [open, setOpen] = useState(false)
   return (
     <div className="relative">
@@ -108,7 +108,8 @@ export function UserMenu() {
               </div>
             </div>
             <div className="p-2">
-              <button className="btn-ghost btn-sm w-full justify-start" onClick={() => { if (confirm('Reset all demo data to the initial state?')) { resetDemo(); setOpen(false); nav('/') } }}><RotateCcw size={14} /> Reset demo data</button>
+              <button className="btn-ghost btn-sm w-full justify-start" data-testid="reset-clean" onClick={() => { if (confirm('Clear all data and start clean? Accounts and policy settings are kept.')) { resetData('clean'); setOpen(false); nav('/') } }}><RotateCcw size={14} /> Reset — clean start</button>
+              <button className="btn-ghost btn-sm w-full justify-start" data-testid="load-sample" onClick={() => { if (confirm('Replace the current data with the sample dataset?')) { resetData('demo'); setOpen(false); nav('/') } }}><Database size={14} /> Load sample data{dataMode === 'demo' && <span className="ml-auto rounded-pill bg-sun-100 px-1.5 text-[10px] font-semibold text-sun-700">loaded</span>}</button>
               <button className="btn-ghost btn-sm w-full justify-start text-accent-700" onClick={() => { logout(); nav('/login') }}><LogOut size={14} /> Sign out</button>
             </div>
           </div>

@@ -8,6 +8,7 @@ import { DD_CHECKLIST, DD_PLATFORMS, DD_VETTING_QUESTIONS, PCA_SECTIONS, PCA_CAT
 import type { PcaKey } from '@/data/dueDiligence'
 import { uid } from './format'
 import type { DueDiligence, Partner, PartnerStage, PartnerType, PartnerRisk, PcaScore, Project, Vetting, KeyPerson } from '@/types'
+import { saveWorkbook } from './download'
 
 export const PARTNER_STAGE_LABEL: Record<PartnerStage, string> = {
   identified: 'Identified', due_diligence: 'Due diligence', approved: 'Approved', agreement: 'Agreement / MoU', active: 'Active', closed: 'Closed', declined: 'Declined',
@@ -191,5 +192,5 @@ export function exportDueDiligence(p: Partner) {
     ]
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), `Full - ${PCA_CATEGORY_LABELS[s.key]}`.slice(0, 31))
   }
-  XLSX.writeFile(wb, `${p.code}_Due_Diligence_${p.acronym || p.name.replace(/\W+/g, '_')}.xlsx`)
+  saveWorkbook(XLSX, wb, `${p.code}_Due_Diligence_${p.acronym || p.name.replace(/\W+/g, '_')}.xlsx`)
 }

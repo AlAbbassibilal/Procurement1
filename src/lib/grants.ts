@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx'
 import { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, WidthType, AlignmentType, HeadingLevel, BorderStyle, ShadingType } from 'docx'
 import type { BudgetLine, IPTTEntry, LogframeIndicator, LogframeRow, Project, ProjectBudget, ProjectReport, ProjectStage, SpendingPlanEntry, OrgSettings } from '@/types'
 import { uid } from './format'
+import { saveWorkbook, saveFile } from './download'
 
 export const STAGE_LABEL: Record<ProjectStage, string> = { development: 'Under development', submitted: 'Submitted', granted: 'Granted', active: 'Active', closed: 'Closed' }
 export const STAGE_DESC: Record<ProjectStage, string> = {
@@ -126,7 +127,7 @@ export function exportBudgetTemplate(p: Project, b: ProjectBudget | undefined, s
   const wsN = XLSX.utils.aoa_to_sheet(narr as (string | number | null)[][]); wsN['!cols'] = [{ wch: 8 }, { wch: 40 }, { wch: 14 }, { wch: 40 }, { wch: 60 }]; XLSX.utils.book_append_sheet(wb, wsN, 'Budget Narrative')
   const acc: unknown[][] = [['Accounts Number', 'Account', null, 'Location', 'Code'], ...[['Program Field Staff', 2601], ['Management Field Staff', 2602], ['Head Office staff', 2603], ['Support Field staff', 2604], ['Staff Transportation', 2605], ['Ben Transportation', 2606], ['Car Rent', 2607], ['Fuel for generator or Car', 2608], ['IT Equipment', 2609], ['Project / Center Equipments', 2610], ['Prosthetics components', 2611], ['Media Equipments', 2612], ['Consultant', 2613], ['Daily worker', 2614], ['Training for staff', 2615], ['International Travel', 2616], ['Partnership', 2617], ['Subscription', 2618], ['Office Rent', 2619], ['Stationary', 2620], ['Workshops / Seminars / Team Building', 2621], ['Legal Fees', 2622], ['Bank Fees', 2623], ['Insurance', 2624], ['Telecommunication and Internet Cost', 2625], ['Nutrition and food', 2626], ['Social Security', 2627], ['Contingency', 2628]].map((r, i) => [r[0], r[1], null, ['Amman', 'Gaza', 'Sudan', 'Syria', 'Lebanon', 'West Bank'][i] ?? null, i < 6 ? i + 1 : null])]
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(acc as (string | number | null)[][]), 'Accounts & Activity')
-  XLSX.writeFile(wb, `${p.code}-Project-Budget.xlsx`)
+  saveWorkbook(XLSX, wb, `${p.code}-Project-Budget.xlsx`)
 }
 
 /** Annex IPTT: 'Partner Logical framework' + 'IPTT' with Male/Female/Other per month. */
@@ -151,7 +152,7 @@ export function exportIPTT(p: Project) {
   const wsI = XLSX.utils.aoa_to_sheet(ip as (string | number | null)[][]); wsI['!cols'] = [{ wch: 16 }, { wch: 10 }, { wch: 44 }, { wch: 30 }, { wch: 18 }, { wch: 14 }, { wch: 9 }, { wch: 9 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, ...months.flatMap(() => [{ wch: 7 }, { wch: 7 }, { wch: 7 }])]
   wsI['!merges'] = months.map((_, mi) => ({ s: { r: 4, c: 15 + mi * 3 }, e: { r: 4, c: 17 + mi * 3 } })); wsI['!freeze'] = { xSplit: 3, ySplit: 7 }
   XLSX.utils.book_append_sheet(wb, wsI, 'IPTT')
-  XLSX.writeFile(wb, `${p.code}-IPTT.xlsx`)
+  saveWorkbook(XLSX, wb, `${p.code}-IPTT.xlsx`)
 }
 
 /** Work plan: sections, activities, status and a 4-weeks-per-month grid (C = completed, O = ongoing, P = planned). */
@@ -165,7 +166,7 @@ export function exportWorkplan(p: Project) {
   for (const sec of sections) { rows.push([sec]); for (const a of p.workplan.filter((x) => x.section === sec)) { const r: unknown[] = [a.title, a.description ?? '', a.budgetLine ?? '', a.status === 'completed' ? 'Completed' : a.status === 'ongoing' ? 'Ongoing' : 'Planned']; months.forEach((m) => weekKeys(m).forEach((k) => r.push(a.weeks[k] ?? ''))); rows.push(r) } }
   const ws = XLSX.utils.aoa_to_sheet(rows as (string | number | null)[][]); ws['!cols'] = [{ wch: 40 }, { wch: 50 }, { wch: 11 }, { wch: 11 }, ...months.flatMap(() => [{ wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }])]
   ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 2, c: 3 } }, { s: { r: 0, c: 11 }, e: { r: 2, c: 11 + months.length * 4 - 8 } }, ...months.map((_, i) => ({ s: { r: 3, c: 4 + i * 4 }, e: { r: 3, c: 7 + i * 4 } }))]; ws['!freeze'] = { xSplit: 4, ySplit: 5 }
-  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Sheet1'); XLSX.writeFile(wb, `${p.code}-Workplan.xlsx`)
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Sheet1'); saveWorkbook(XLSX, wb, `${p.code}-Workplan.xlsx`)
 }
 
 /** Annex 2 — Logical Framework (Word). */
@@ -184,4 +185,4 @@ export async function exportLogframeDocx(p: Project, settings: OrgSettings): Pro
   return Packer.toBlob(doc)
 }
 
-export const download = (blob: Blob, name: string) => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000) }
+export const download = (blob: Blob, name: string) => saveFile(name, blob, blob.type)

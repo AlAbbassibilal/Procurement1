@@ -7,6 +7,7 @@ import { newLogframeRow, newIndicator, allIndicators, monthsOf, monthLabel, week
 import { fmtMoney, uid, cx } from '@/lib/format'
 import { isSalaryLine, headcount, unassignedSalaryLines } from '@/lib/salary'
 import type { Project, LogframeRow, LogframeIndicator, WorkplanActivity, BudgetLine, ProjectBudget } from '@/types'
+import { saveWorkbook } from '@/lib/download'
 
 const LEVELS: LogframeRow['level'][] = ['goal', 'outcome', 'output', 'activity']
 const LEVEL_TONE: Record<LogframeRow['level'], string> = { goal: 'bg-brand-800 text-white', outcome: 'bg-brand-600 text-white', output: 'bg-brand-100 text-brand-800', activity: 'bg-surface-sunken text-ink-700' }
@@ -179,7 +180,7 @@ export function SpendingTab({ p, budget, canEdit }: { p: Project; budget?: Proje
   const get = (code: string, m: string) => p.spendingPlan.find((e) => e.lineCode === code && e.period === m)?.amount ?? 0
   const setCell = (code: string, m: string, v: number) => updateProject(p.id, { spendingPlan: [...p.spendingPlan.filter((e) => !(e.lineCode === code && e.period === m)), { lineCode: code, period: m, amount: v }] })
   const regen = () => confirm('Spread each budget line evenly over the project months? Existing figures will be replaced.') && updateProject(p.id, { spendingPlan: generateSpendingPlan(lines, months) })
-  const exportX = async () => { const X = await import('xlsx'); const aoa = [['Line', 'Description', 'Budget', ...months.map(monthLabel), 'Planned total', 'Variance'], ...lines.map((l) => { const row = months.map((m) => get(l.code, m)); const t = row.reduce((s, x) => s + x, 0); return [l.code, l.description, l.amount, ...row, t, l.amount - t] }), ['TOTAL', '', lines.reduce((s, l) => s + l.amount, 0), ...months.map((m) => planTotal(p.spendingPlan, (e) => e.period === m)), planTotal(p.spendingPlan), lines.reduce((s, l) => s + l.amount, 0) - planTotal(p.spendingPlan)]]; const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(aoa), 'Spending plan'); X.writeFile(wb, `${p.code}-Spending-plan.xlsx`) }
+  const exportX = async () => { const X = await import('xlsx'); const aoa = [['Line', 'Description', 'Budget', ...months.map(monthLabel), 'Planned total', 'Variance'], ...lines.map((l) => { const row = months.map((m) => get(l.code, m)); const t = row.reduce((s, x) => s + x, 0); return [l.code, l.description, l.amount, ...row, t, l.amount - t] }), ['TOTAL', '', lines.reduce((s, l) => s + l.amount, 0), ...months.map((m) => planTotal(p.spendingPlan, (e) => e.period === m)), planTotal(p.spendingPlan), lines.reduce((s, l) => s + l.amount, 0) - planTotal(p.spendingPlan)]]; const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(aoa), 'Spending plan'); saveWorkbook(X, wb, `${p.code}-Spending-plan.xlsx`) }
   const total = planTotal(p.spendingPlan), budgetTotal = lines.reduce((s, l) => s + l.amount, 0)
   return (
     <div className="space-y-4">

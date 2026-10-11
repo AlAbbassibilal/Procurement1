@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx'
 import type { BudgetLine, OrgSettings, Project, ProjectBudget, StaffMember } from '@/types'
 import { toUSD, fromUSD } from './tiers'
 import { monthsOf, monthLabel } from './grants'
+import { saveWorkbook } from './download'
 
 export const STAFF_STATUS_LABEL = { active: 'Active', planned: 'New — to recruit', left: 'Left' } as const
 export const STAFF_STATUS_TONE = { active: 'bg-brand-100 text-brand-800', planned: 'bg-sun-100 text-sun-700', left: 'bg-ink-100 text-ink-500' } as const
@@ -87,5 +88,5 @@ export function exportSalaryPlan(cov: StaffCoverage[], year: number, settings: O
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(plan), 'Spending plan')
   const detail = [['RHS no.', 'Name', 'Project', 'Budget line', 'Description', 'LoE %', 'Line amount (share)', `Prorated ${year}`, 'Budget status'], ...cov.flatMap((c) => c.lines.map((l) => [c.staff.rhsNumber, c.staff.name, l.budget.donorCode, l.line.code, l.line.description, (l.line.pct ?? 1), Math.round(l.amount), Math.round(l.prorated), l.status]))]
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detail), 'Coverage detail')
-  XLSX.writeFile(wb, `RHS_Master_Salary_Plan_${year}.xlsx`)
+  saveWorkbook(XLSX, wb, `RHS_Master_Salary_Plan_${year}.xlsx`)
 }

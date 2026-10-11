@@ -8,6 +8,7 @@ import { CONTRACT_LABEL } from '@/lib/salary'
 import { fmtDate, fmtDateTime, cx } from '@/lib/format'
 import { useHrContext } from './shared'
 import type { Applicant, ApplicantStatus, Advertisement } from '@/types'
+import { saveWorkbook } from '@/lib/download'
 
 type Tab = 'request' | 'advert' | 'applicants'
 
@@ -87,7 +88,7 @@ export default function VacancyPage() {
       {tab === 'applicants' && (
         <>
           <div className="mb-4 grid gap-4 sm:grid-cols-4"><Stat label="Applications" value={apps.length} /><Stat label={`Meeting ${v.minYears}+ years`} value={apps.filter((a) => a.score.meetsYears).length} tone="brand" /><Stat label="Full keyword match" value={apps.filter((a) => a.score.keywordPct === 100).length} /><Stat label="Shortlisted / interview" value={apps.filter((a) => ['shortlisted', 'interview', 'offered'].includes(a.status)).length} tone="sun" /></div>
-          <Card padded={false} description="Ranked by match: 70 % keywords found in the CV and cover letter, 30 % years of experience (declared or detected in the CV)." title="Candidates" actions={<button className="btn-secondary btn-sm" onClick={async () => { const X = await import('xlsx'); const aoa = [['Rank', 'Applicant', 'E-mail', 'Phone', 'Country', 'Years declared', 'Years detected', 'Keyword match %', ...v.keywords, 'Total score', 'Status', 'Submitted'], ...apps.map((a, i) => [i + 1, a.name, a.email, a.phone, a.country, a.yearsExperience, a.score.yearsDetected ?? '', a.score.keywordPct, ...v.keywords.map((k) => (a.score.matched.includes(k) ? 'yes' : '')), a.score.total, a.status, a.submittedAt.slice(0, 10)])]; const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(aoa), 'Applicants'); X.writeFile(wb, `${v.number}_applicants.xlsx`) }}><Download size={13} /> Export</button>}>
+          <Card padded={false} description="Ranked by match: 70 % keywords found in the CV and cover letter, 30 % years of experience (declared or detected in the CV)." title="Candidates" actions={<button className="btn-secondary btn-sm" onClick={async () => { const X = await import('xlsx'); const aoa = [['Rank', 'Applicant', 'E-mail', 'Phone', 'Country', 'Years declared', 'Years detected', 'Keyword match %', ...v.keywords, 'Total score', 'Status', 'Submitted'], ...apps.map((a, i) => [i + 1, a.name, a.email, a.phone, a.country, a.yearsExperience, a.score.yearsDetected ?? '', a.score.keywordPct, ...v.keywords.map((k) => (a.score.matched.includes(k) ? 'yes' : '')), a.score.total, a.status, a.submittedAt.slice(0, 10)])]; const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(aoa), 'Applicants'); saveWorkbook(X, wb, `${v.number}_applicants.xlsx`) }}><Download size={13} /> Export</button>}>
             <div className="overflow-x-auto"><table className="w-full min-w-[1000px] text-[13px]">
               <thead><tr><th className="table-th w-10">#</th><th className="table-th">Applicant</th><th className="table-th w-44">Match</th><th className="table-th">Keywords found</th><th className="table-th">Experience</th><th className="table-th">Status</th><th className="table-th w-40" /></tr></thead>
               <tbody>{apps.length === 0 && <tr><td colSpan={7} className="table-td text-ink-500">No applications yet{v.advert ? ' — share the application link.' : '.'}</td></tr>}{apps.map((a, i) => (

@@ -9,6 +9,7 @@ import { STAGE_LABEL, reportLiveStatus, ipttProgress } from '@/lib/grants'
 import { fmtMoney, fmtDate, cx } from '@/lib/format'
 import { StagePill } from './Overview'
 import type { ProjectStage } from '@/types'
+import { saveWorkbook } from '@/lib/download'
 
 export default function GrantsTracker() {
   const nav = useNavigate()
@@ -22,7 +23,7 @@ export default function GrantsTracker() {
   const years = [...new Set(projects.flatMap((p) => [p.grantedAt, p.submittedAt, p.closedAt].filter(Boolean).map((d) => d!.slice(0, 4))))].sort().reverse()
   const exportXlsx = () => {
     const aoa = [['Project code', 'Title', 'Donor', 'Stage', 'Outcome', 'Currency', 'Requested', 'Awarded', 'Start', 'End', 'Manager', 'Submitted', 'Granted', 'Closed', 'Spent + committed', 'Burn %', 'IPTT %', 'Next report', 'Next report due'], ...projects.map((p) => { const r = row(p); return [p.code, p.title, p.donorName, STAGE_LABEL[p.stage], p.outcome ?? '', p.currency, p.requestedAmount ?? '', p.awardedAmount ?? '', p.startDate ?? '', p.endDate ?? '', p.managerName ?? '', p.submittedAt?.slice(0, 10) ?? '', p.grantedAt?.slice(0, 10) ?? '', p.closedAt?.slice(0, 10) ?? '', r.t ? r.t.actual + r.t.commitments : '', r.t?.burnWithCommitPct ?? '', r.ip.pct, r.next?.title ?? '', r.next?.dueDate ?? ''] })]
-    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Grants tracker'); XLSX.writeFile(wb, `Grants-tracker-${new Date().toISOString().slice(0, 10)}.xlsx`)
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Grants tracker'); saveWorkbook(XLSX, wb, `Grants-tracker-${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
   return (
     <>

@@ -132,7 +132,7 @@ export function EmptyState({ title, body, action, icon }: { title: string; body?
 // ---------------------------------------------------------------------------
 // Field
 // ---------------------------------------------------------------------------
-export function Field({ label, children, hint, required, className }: { label: string; children: ReactNode; hint?: string; required?: boolean; className?: string }) {
+export function Field({ label, children, hint, required, className }: { label: string; children: ReactNode; hint?: ReactNode; required?: boolean; className?: string }) {
   return (
     <label className={cx('block', className)}>
       <span className="label">{label}{required && <span className="ml-0.5 text-accent-600">*</span>}</span>

@@ -1,11 +1,11 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Plus, Pencil, Trash2, KeyRound, Network, Copy, Mail, RefreshCw } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { Plus, Pencil, Trash2, KeyRound, Network, Copy, Mail, RefreshCw, IdCard } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { Card, PageHeader, Modal, Field, Avatar, StatusPill, Alert } from '@/components/ui'
 import { ROLE_LABEL } from '@/lib/workflow'
 import { DEPARTMENTS } from '@/data/seed'
-import type { Role, User, Department, AccessLevel } from '@/types'
+import type { Role, User, Department, AccessLevel, StaffMember } from '@/types'
 import { DEPARTMENTS as WORKSPACES, ACCESS_LABEL, effectiveAccess, defaultAccess } from '@/lib/departments'
 import { PERMISSIONS, ROLE_PERMISSIONS, customCount } from '@/lib/permissions'
 import { cx, fmtDateTime } from '@/lib/format'
@@ -55,8 +55,20 @@ function PermissionsEditor({ user, onChange }: { user: User; onChange: (perms: R
 }
 
 export default function Users() {
-  const { users, staff, upsertUser, deleteUser, issueTempPassword, currentUserId, settings } = useStore()
+  const { users, staff, upsertUser, upsertStaff, deleteUser, issueTempPassword, currentUserId, settings } = useStore()
+  const [sp, setSp] = useSearchParams()
   const [edit, setEdit] = useState<Partial<User> | null>(null)
+  /** Staff record the account is linked to: a staff id, NONE (system / external account) or '' (not chosen yet). */
+  const NONE = '__none__'
+  const [linkStaff, setLinkStaff] = useState<string>('')
+  const newUser = (st?: StaffMember): Partial<User> => ({ role: 'requester', department: st?.department || DEPARTMENTS[0], active: true, avatarColor: COLORS[Math.floor(Math.random() * COLORS.length)], password: tempPassword(), mustChangePassword: true, email: '', name: st?.name ?? '', title: st?.position ?? '' })
+  const openNew = (st?: StaffMember) => { setLinkStaff(st ? st.id : ''); setEdit(newUser(st)) }
+  const openEdit = (u: User) => { const st = staff.find((x) => x.userId === u.id); setLinkStaff(st ? st.id : NONE); setEdit(u) }
+  // "Create account" from the staff register: /admin/users?staff=<id>
+  useEffect(() => { const id = sp.get('staff'); if (id) { const st = staff.find((x) => x.id === id); if (st && !st.userId) openNew(st); setSp({}, { replace: true }) } }, [sp]) // eslint-disable-line react-hooks/exhaustive-deps
+  /** Positions available for linking: unlinked staff (plus the one already linked to the account being edited). */
+  const linkable = staff.filter((x) => x.status !== 'left' && (!x.userId || x.userId === edit?.id))
+  const pickStaff = (id: string) => { setLinkStaff(id); const st = staff.find((x) => x.id === id); if (st) setEdit({ ...edit, name: st.name || edit?.name || '', title: st.position, department: st.department || edit?.department || '' }) }
   const [invite, setInvite] = useState<{ user: User; password: string } | null>(null)
   const [copied, setCopied] = useState(false)
   const [perm, setPerm] = useState<User | null>(null)
@@ -68,7 +80,7 @@ export default function Users() {
   return (
     <>
       <PageHeader title="Users & access" subtitle="Roles drive approval chains; workspace access decides which department cards a person can open; function permissions decide exactly what they can do inside. Line managers, budget holders and approval limits live in the org chart."
-        actions={<div className="flex gap-2"><Link to="/admin/org-chart" className="btn-secondary"><Network size={15} /> Org chart</Link><button className="btn-primary" onClick={() => setEdit({ role: 'requester', department: DEPARTMENTS[0], active: true, avatarColor: COLORS[Math.floor(Math.random() * COLORS.length)], password: tempPassword(), mustChangePassword: true, email: '' })}><Plus size={15} /> Add user</button></div>} />
+        actions={<div className="flex gap-2"><Link to="/hr/staff" className="btn-secondary"><IdCard size={15} /> Staff register</Link><Link to="/admin/org-chart" className="btn-secondary"><Network size={15} /> Org chart</Link><button className="btn-primary" onClick={() => openNew()}><Plus size={15} /> Add user</button></div>} />
       {err && <div className="mb-4"><Alert tone="danger">{err}</Alert></div>}
       <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {ROLES.map((r) => <div key={r} className="card px-4 py-3"><div className="text-[11.5px] uppercase tracking-[0.05em] text-ink-500">{ROLE_LABEL[r]}</div><div className="text-[18px] font-semibold text-ink-900">{users.filter((u) => u.role === r && u.active).length}</div></div>)}
@@ -84,20 +96,27 @@ export default function Users() {
               <td className="table-td"><div className="flex flex-wrap gap-1">{WORKSPACES.filter((w) => effectiveAccess(u)[w.id] !== 'none').map((w) => <span key={w.id} className={`rounded-pill px-1.5 py-0.5 text-[10.5px] font-medium ${effectiveAccess(u)[w.id] === 'manage' ? 'bg-brand-50 text-brand-800' : effectiveAccess(u)[w.id] === 'edit' ? 'bg-info-50 text-info-700' : 'bg-surface-sunken text-ink-600'}`}>{w.name} · {ACCESS_LABEL[effectiveAccess(u)[w.id]]}</span>)}</div></td>
               <td className="table-td"><button className="btn-secondary btn-sm" data-testid={`perms-${u.email}`} onClick={() => setPerm(u)}><KeyRound size={13} /> {u.role === 'admin' ? 'All' : custom ? `${custom} custom` : 'Role defaults'}</button></td>
               <td className="table-td"><StatusPill status={u.active ? 'active' : 'blocked'} />{u.mustChangePassword && <div className="mt-1 text-[10.5px] text-sun-700">temporary password{u.invitedAt ? ` · ${fmtDateTime(u.invitedAt)}` : ''}</div>}{u.passwordChangedAt && !u.mustChangePassword && <div className="mt-1 text-[10.5px] text-ink-400">own password set</div>}</td>
-              <td className="table-td"><div className="flex justify-end gap-1"><button className="btn-ghost btn-sm" title="Edit" onClick={() => setEdit(u)}><Pencil size={14} /></button><button className="btn-ghost btn-sm text-accent-700 disabled:opacity-40" title={u.id === currentUserId ? 'You cannot delete your own account' : 'Delete account'} data-testid={`delete-${u.email}`} disabled={u.id === currentUserId} onClick={() => remove(u)}><Trash2 size={14} /></button></div></td>
+              <td className="table-td"><div className="flex justify-end gap-1"><button className="btn-ghost btn-sm" title="Edit" onClick={() => openEdit(u)}><Pencil size={14} /></button><button className="btn-ghost btn-sm text-accent-700 disabled:opacity-40" title={u.id === currentUserId ? 'You cannot delete your own account' : 'Delete account'} data-testid={`delete-${u.email}`} disabled={u.id === currentUserId} onClick={() => remove(u)}><Trash2 size={14} /></button></div></td>
             </tr>) })}</tbody>
         </table></div>
       </Card>
 
       <Modal open={!!edit} onClose={() => setEdit(null)} title={edit?.id ? 'Edit user' : 'Add user'}
-        footer={<><button className="btn-secondary" onClick={() => setEdit(null)}>Cancel</button><button className="btn-primary" data-testid="user-save" onClick={() => { if (!edit?.name || !edit?.email) return alert('Name and email are required.'); if (users.some((u) => u.email.toLowerCase() === edit.email!.trim().toLowerCase() && u.id !== edit.id)) return alert('An account with this email already exists.'); const isNew = !edit.id; const id = edit.id ?? `u_${edit.email!.trim().toLowerCase().split('@')[0]!.replace(/[^a-z0-9]/g, '')}_${Date.now().toString(36)}`; upsertUser({ ...edit, id, email: edit.email!.trim() }); setEdit(null); if (isNew) { const u = useStore.getState().users.find((x) => x.id === id); if (u) { setCopied(false); setInvite({ user: u, password: u.password }) } } }}>Save</button></>}>
+        footer={<><button className="btn-secondary" onClick={() => setEdit(null)}>Cancel</button><button className="btn-primary" data-testid="user-save" onClick={() => { if (!linkStaff) return alert('Choose the position from the staff register (or "no staff record" for a system / external account).'); if (!edit?.name || !edit?.email) return alert('Name and email are required.'); if (!edit.title) return alert('Job title is required.'); if (users.some((u) => u.email.toLowerCase() === edit.email!.trim().toLowerCase() && u.id !== edit.id)) return alert('An account with this email already exists.'); const isNew = !edit.id; const id = edit.id ?? `u_${edit.email!.trim().toLowerCase().split('@')[0]!.replace(/[^a-z0-9]/g, '')}_${Date.now().toString(36)}`; upsertUser({ ...edit, id, email: edit.email!.trim() }); const prev = staff.find((x) => x.userId === id); if (linkStaff !== NONE && prev && prev.id !== linkStaff) upsertStaff({ id: prev.id, position: prev.position, userId: undefined }); if (linkStaff === NONE && prev) upsertStaff({ id: prev.id, position: prev.position, userId: undefined }); if (linkStaff !== NONE) { const st = staff.find((x) => x.id === linkStaff); if (st) upsertStaff({ id: st.id, position: st.position, userId: id }) } setEdit(null); if (isNew) { const u = useStore.getState().users.find((x) => x.id === id); if (u) { setCopied(false); setInvite({ user: u, password: u.password }) } } }}>Save</button></>}>
         {edit && (
           <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Position (from the staff register)" required className="sm:col-span-2" hint={linkStaff === NONE ? 'System or external account — job title typed freely.' : linkStaff ? 'Name, job title and department are synced from this staff record; change the position on the staff register.' : <>Positions are written on the <Link to="/hr/staff" className="text-brand-700 hover:underline">staff register</Link> first, then linked here.</>}>
+              <select className="input" data-testid="user-staff" value={linkStaff} onChange={(e) => pickStaff(e.target.value)}>
+                <option value="">— choose a position —</option>
+                {linkable.map((st) => <option key={st.id} value={st.id}>{st.rhsNumber} · {st.position}{st.name ? ` · ${st.name}` : ' · (to recruit)'}{st.department ? ` · ${st.department}` : ''}</option>)}
+                <option value={NONE}>— no staff record (system / external account) —</option>
+              </select>
+            </Field>
             <Field label="Full name" required><input className="input" value={edit.name ?? ''} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></Field>
             <Field label="RHS.jo email" required hint={edit.email && !isOrgEmail(edit.email) ? 'Not an @rhs.jo address — single sign-on will not match it later.' : 'The person’s work account, e.g. name@rhs.jo'}><input className="input" data-testid="user-email" placeholder="name@rhs.jo" value={edit.email ?? ''} onChange={(e) => setEdit({ ...edit, email: e.target.value })} /></Field>
             <Field label="Role"><select className="input" value={edit.role} onChange={(e) => setEdit({ ...edit, role: e.target.value as Role })}>{ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}</select></Field>
-            <Field label="Department"><select className="input" value={edit.department} onChange={(e) => setEdit({ ...edit, department: e.target.value })}>{DEPARTMENTS.map((d) => <option key={d}>{d}</option>)}</select></Field>
-            <Field label="Job title" className="sm:col-span-2"><input className="input" value={edit.title ?? ''} onChange={(e) => setEdit({ ...edit, title: e.target.value })} /></Field>
+            <Field label="Department"><input className="input" list="user-departments" value={edit.department ?? ''} readOnly={!!linkStaff && linkStaff !== NONE} onChange={(e) => setEdit({ ...edit, department: e.target.value })} /><datalist id="user-departments">{[...new Set([...DEPARTMENTS, ...staff.map((x) => x.department).filter(Boolean)])].map((d) => <option key={d} value={d} />)}</datalist></Field>
+            <Field label="Job title" className="sm:col-span-2" hint={linkStaff && linkStaff !== NONE ? 'Synced from the staff register.' : undefined}><input className="input" data-testid="user-title" value={edit.title ?? ''} readOnly={!!linkStaff && linkStaff !== NONE} onChange={(e) => setEdit({ ...edit, title: e.target.value })} /></Field>
             {edit.id ? (
               <Field label="Password" hint={edit.mustChangePassword ? 'Temporary — the person must set their own at next sign-in.' : 'Set by the person. Issue a new temporary password if they forgot it.'}><button type="button" className="btn-secondary btn-sm" data-testid="reset-password" onClick={() => { const pw = issueTempPassword(edit.id!); if (pw) { const u = useStore.getState().users.find((x) => x.id === edit.id)!; setEdit(null); setCopied(false); setInvite({ user: u, password: pw }) } }}><RefreshCw size={13} /> Issue new temporary password</button></Field>
             ) : (

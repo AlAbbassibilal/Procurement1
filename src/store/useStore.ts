@@ -913,7 +913,11 @@ export const useStore = create<State & Actions>()(
         upsertStaff: (data) => {
           const exists = data.id ? get().staff.find((x) => x.id === data.id) : undefined
           const st: StaffMember = exists ? { ...exists, ...data, updatedAt: nowIso() } : { id: uid('stf_'), rhsNumber: data.rhsNumber || nextRhsNumber(get().staff), name: '', department: '', country: get().settings.countries[0], contractType: 'full_time', monthlySalary: 0, currency: get().settings.defaultCurrency, startDate: nowIso().slice(0, 10), status: 'active', createdAt: nowIso(), updatedAt: nowIso(), ...data } as StaffMember
-          set((s) => ({ staff: exists ? s.staff.map((x) => (x.id === st.id ? st : x)) : [...s.staff, st] }))
+          set((s) => ({
+            staff: exists ? s.staff.map((x) => (x.id === st.id ? st : x)) : [...s.staff, st],
+            // the staff register is the source of positions: a linked account mirrors name, position and department
+            users: st.userId ? s.users.map((u) => (u.id === st.userId ? { ...u, title: st.position, department: st.department || u.department, name: st.name || u.name } : u)) : s.users,
+          }))
           log('STAFF', exists ? 'Staff record updated' : 'Staff added to the master salary plan', { id: st.id, number: st.rhsNumber }, `${st.name || '(to recruit)'} · ${st.position}`)
           return st
         },

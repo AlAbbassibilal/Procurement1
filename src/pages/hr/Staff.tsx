@@ -10,7 +10,7 @@ import { useHrContext } from './shared'
 import type { StaffMember, StaffStatus, Currency } from '@/types'
 
 export default function HrStaff() {
-  const { canStaff: hrManage, visibleStaff } = useHrContext()
+  const { user, canStaff: hrManage, visibleStaff } = useHrContext()
   const { staff, leaveRequests, settings, users, upsertStaff } = useStore()
   const hr = hrSettings(settings)
   const [edit, setEdit] = useState<Partial<StaffMember> | null>(null)
@@ -24,12 +24,13 @@ export default function HrStaff() {
       <div className="mb-5 grid gap-4 sm:grid-cols-3"><Stat label="Active staff" value={staff.filter((s) => s.status === 'active').length} tone="brand" /><Stat label="Contracts ending within 60 days" value={ending.length} hint={ending.map((s) => s.name).join(', ') || undefined} tone={ending.length ? 'accent' : 'default'} /><Stat label="Entitlements" value={`${hr.annualLeaveDays} + ${hr.wfhDays}`} hint="annual leave days + work-from-home days per year" /></div>
       <input className="input mb-3 w-72" placeholder="Search RHS no., name, position…" value={q} onChange={(e) => setQ(e.target.value)} />
       <Card padded={false}><div className="overflow-x-auto"><table className="w-full min-w-[1150px] text-[13px]">
-        <thead><tr><th className="table-th w-24">RHS no.</th><th className="table-th">Staff</th><th className="table-th">Line manager</th><th className="table-th">Contract</th><th className="table-th">Start</th><th className="table-th">End</th><th className="table-th w-40">Annual leave</th><th className="table-th w-36">WFH</th><th className="table-th">Status</th><th className="table-th w-12" /></tr></thead>
+        <thead><tr><th className="table-th w-24">RHS no.</th><th className="table-th">Staff</th><th className="table-th">Line manager</th><th className="table-th">Account</th><th className="table-th">Contract</th><th className="table-th">Start</th><th className="table-th">End</th><th className="table-th w-40">Annual leave</th><th className="table-th w-36">WFH</th><th className="table-th">Status</th><th className="table-th w-12" /></tr></thead>
         <tbody>{list.map((s) => { const b = balances(s, leaveRequests, settings); const left = contractDaysLeft(s); const mgr = staff.find((x) => x.id === s.lineManagerId); return (
           <tr key={s.id} className="hover:bg-surface-muted">
             <td className="table-td font-mono text-[12px] text-brand-700">{s.rhsNumber}</td>
             <td className="table-td"><div className="font-medium text-ink-900">{s.name || <i className="text-ink-500">to recruit</i>}</div><div className="text-[12px] text-ink-500">{s.position} · {s.department}</div></td>
             <td className="table-td text-ink-700">{mgr?.name ?? '—'}</td>
+            <td className="table-td text-[12px]">{(() => { const u = users.find((x) => x.id === s.userId); return u ? <span className="text-ink-700">{u.email}</span> : user.role === 'admin' && s.status !== 'left' ? <Link to={`/admin/users?staff=${s.id}`} className="text-brand-700 hover:underline" data-testid={`create-account-${s.rhsNumber}`}>Create account</Link> : <span className="text-ink-400">none</span> })()}</td>
             <td className="table-td text-ink-700">{CONTRACT_LABEL[s.contractType]}{s.contractRef && <div className="font-mono text-[11px] text-ink-500">{s.contractRef}</div>}</td>
             <td className="table-td">{fmtDate(s.startDate)}</td>
             <td className="table-td">{s.endDate ? <span className={cx(left !== null && left <= 60 && left >= 0 && 'font-semibold text-accent-700')}>{fmtDate(s.endDate)}{left !== null && left >= 0 && left <= 60 && <AlertTriangle size={12} className="ml-1 inline" />}</span> : <span className="text-ink-400">open-ended</span>}</td>

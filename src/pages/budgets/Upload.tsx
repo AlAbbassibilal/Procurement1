@@ -70,6 +70,13 @@ export default function BudgetUpload() {
     upsertBudget(b); nav(back || `/budgets/${b.id}`)
   }
   const editLine = (id: string, patch: Partial<BudgetLine>) => setLines(shown.map((l) => (l.id === id ? { ...l, ...patch } : l)))
+  /** Edit the calculation basis of a line; the approved total follows units × frequency × unit cost × LoE % once a unit cost is given. */
+  const basis = (l: BudgetLine, p: { units?: string; frequency?: string; unitCost?: string; pct?: string }) => {
+    const n = (v: string | undefined, cur: number | undefined) => (v === undefined ? cur : v === '' ? undefined : Number(v))
+    const next: BudgetLine = { ...l, units: n(p.units, l.units), frequency: n(p.frequency, l.frequency), unitCost: n(p.unitCost, l.unitCost), pct: p.pct === undefined ? l.pct : p.pct === '' ? undefined : Number(p.pct) / 100 }
+    if (next.unitCost != null && !Number.isNaN(next.unitCost)) next.amount = Math.round((next.units ?? 1) * (next.frequency ?? 1) * next.unitCost * (next.pct ?? 1) * 100) / 100
+    editLine(l.id, next)
+  }
   const direct = shown.filter((l) => l.costType === 'direct').reduce((s, l) => s + l.amount, 0), admin = shown.filter((l) => l.costType === 'admin').reduce((s, l) => s + l.amount, 0)
 
   return (
@@ -86,7 +93,7 @@ export default function BudgetUpload() {
             </label>
             {sheets.length > 0 && mode === 'rhs' && (
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-control border border-brand-200 bg-brand-50 px-3 py-2 text-[13px] text-brand-800">
-                <span className="flex items-center gap-2"><Sparkles size={15} /> <b>RHS Project Budget Template detected</b> — Direct Cost and Admin Cost lines extracted with activity code, account, location and unit detail.</span>
+                <span className="flex items-center gap-2"><Sparkles size={15} /> <b>RHS budget layout detected</b> — every sheet with “# of units”, “Frequency” and “Unit cost” columns is read with its full calculation basis (unit, units × frequency × unit cost × LoE %), activity code, account and location; admin / indirect sheets are recognised by name.</span>
                 <button className="btn-ghost btn-sm" onClick={() => { setMode('generic'); setLines(null) }}>Map columns manually instead</button>
               </div>
             )}
@@ -109,19 +116,20 @@ export default function BudgetUpload() {
             </Card>
           )}
 
+          {sheets.length > 0 && mode === 'generic' && [mapping.quantity, mapping.frequency, mapping.unitCost].every((i) => i < 0) && <Alert tone="warning"><b>Only totals will be imported.</b> Map the “# of units”, “Frequency” and “Unit cost” columns above to keep each line’s calculation basis (units × frequency × unit cost × LoE %), or fill them in the table below.</Alert>}
           {warnings.length > 0 && <Alert tone="warning"><b>Check these before saving:</b><ul className="mt-1 list-disc pl-5">{warnings.map((w, i) => <li key={i}>{w}</li>)}</ul></Alert>}
           {sheets.length > 0 && (
             <Card title={`${mode === 'rhs' ? '2' : '3'} · Extracted budget lines (${shown.length})`} description="Review and correct before saving. Sub-total and total rows are skipped; section headings become the category." padded={false}
               actions={<button className="btn-secondary btn-sm" onClick={() => setLines([...shown, { id: uid('bl_'), code: '', description: '', amount: 0 }])}><Plus size={13} /> Add line</button>}>
               <div className="overflow-x-auto scrollbar-thin">
-                <table className="w-full min-w-[1040px] text-[13px]">
-                  <thead><tr><th className="table-th w-28">Code</th><th className="table-th">Description</th><th className="table-th w-44">Section</th><th className="table-th w-24">Location</th><th className="table-th w-20">Acct</th><th className="table-th w-36">Basis</th><th className="table-th w-36 text-right">Approved ({meta.currency})</th><th className="table-th w-10" /></tr></thead>
+                <table className="w-full min-w-[1240px] text-[13px]">
+                  <thead><tr><th className="table-th w-28">Code</th><th className="table-th">Description</th><th className="table-th w-44">Section</th><th className="table-th w-24">Location</th><th className="table-th w-20">Acct</th><th className="table-th w-72">Basis (units × freq × unit cost × LoE)</th><th className="table-th w-36 text-right">Approved ({meta.currency})</th><th className="table-th w-10" /></tr></thead>
                   <tbody>{shown.map((l) => (
                     <tr key={l.id} className={l.costType === 'admin' ? 'bg-surface-muted/60' : undefined}><td className="table-td"><input className="input font-mono" value={l.code} onChange={(e) => editLine(l.id, { code: e.target.value })} /></td>
                       <td className="table-td"><input className="input" value={l.description} onChange={(e) => editLine(l.id, { description: e.target.value })} />{l.activityCode && <div className="mt-0.5 text-[11px] text-ink-500">Activity {l.activityCode}{l.costType && ` · ${l.costType}`}</div>}</td>
                       <td className="table-td"><input className="input" value={l.category ?? ''} onChange={(e) => editLine(l.id, { category: e.target.value || undefined })} /></td>
                       <td className="table-td text-ink-600">{l.location ?? ''}</td><td className="table-td font-mono text-[12px] text-ink-600">{l.accountNo ?? ''}</td>
-                      <td className="table-td text-[12px] text-ink-500">{l.unitCost != null ? `${l.units ?? 1} ${l.unit ?? ''} × ${l.frequency ?? 1} × ${l.unitCost.toLocaleString()}${l.pct != null && l.pct !== 1 ? ` × ${Math.round(l.pct * 100)}%` : ''}` : '—'}</td>
+                      <td className="table-td"><div className="flex items-center gap-1 text-[11.5px] text-ink-500" title="# of units × frequency (months) × unit cost × LoE %"><input className="input w-14 px-1 text-[11.5px]" placeholder="units" value={l.units ?? ''} onChange={(e) => basis(l, { units: e.target.value })} /><span>×</span><input className="input w-14 px-1 text-[11.5px]" placeholder="freq" value={l.frequency ?? ''} onChange={(e) => basis(l, { frequency: e.target.value })} /><span>×</span><input className="input w-20 px-1 text-[11.5px]" placeholder="unit cost" value={l.unitCost ?? ''} onChange={(e) => basis(l, { unitCost: e.target.value })} /><span>×</span><input className="input w-14 px-1 text-[11.5px]" placeholder="LoE %" value={l.pct != null ? Math.round(l.pct * 100) : ''} onChange={(e) => basis(l, { pct: e.target.value })} /><span>%</span></div>{l.unit && <div className="mt-0.5 text-[11px] text-ink-400">per {l.unit}</div>}</td>
                       <td className="table-td"><input type="number" step="0.01" className="input text-right" value={l.amount} onChange={(e) => editLine(l.id, { amount: Number(e.target.value) })} /></td>
                       <td className="table-td"><button className="btn-ghost btn-sm text-accent-700" onClick={() => setLines(shown.filter((x) => x.id !== l.id))}><Trash2 size={13} /></button></td></tr>))}
                     {shown.length === 0 && <tr><td colSpan={8} className="px-4 py-6 text-center text-ink-500">Nothing extracted — check the header row and the Description / Approved total mapping.</td></tr>}

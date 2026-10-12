@@ -71,13 +71,20 @@ export function detectMeta(sheets: ParsedSheet[]): BudgetMeta {
 // ---------------------------------------------------------------------------
 // RHS Project Budget Template (Direct Cost + Admin Cost)
 // ---------------------------------------------------------------------------
-export const isRhsTemplate = (sheets: ParsedSheet[]) => sheets.some((s) => /^direct\s*cost/i.test(s.name)) && sheets.some((s) => /^admin\s*cost/i.test(s.name))
+/** A "line sheet" carries the calculation basis: # of units, frequency and unit cost columns (the Direct Cost / Admin Cost sheets of the RHS template, whatever they are named). */
+export function isLineSheet(rows: Cell[][]): boolean {
+  const m = guessMapping(rows[detectHeaderRow(rows)] ?? [])
+  return [m.quantity, m.frequency, m.unitCost].filter((i) => i >= 0).length >= 2 && m.description >= 0
+}
+/** Admin / indirect sheet? From the sheet name or its title rows. */
+const isAdminSheet = (s: ParsedSheet) => /admin|indirect|overhead|support\s*cost/i.test(s.name + ' ' + s.rows.slice(0, 4).map((r) => r.map((c) => str(c)).join(' ')).join(' '))
+export const isRhsTemplate = (sheets: ParsedSheet[]) => sheets.some((s) => isLineSheet(s.rows))
 
+/** Every line sheet is read with its full basis (unit, # of units, frequency, unit cost, LoE %); summary and narrative sheets are ignored. */
 export function extractRhsTemplate(sheets: ParsedSheet[], warnings?: string[]): BudgetLine[] {
   const out: BudgetLine[] = []
-  for (const costType of ['direct', 'admin'] as const) {
-    const sh = sheets.find((s) => (costType === 'direct' ? /^direct\s*cost/i : /^admin\s*cost/i).test(s.name))
-    if (!sh) continue
+  for (const sh of sheets.filter((s) => isLineSheet(s.rows))) {
+    const costType: BudgetLine['costType'] = isAdminSheet(sh) ? 'admin' : 'direct'
     const h = detectHeaderRow(sh.rows)
     const m = guessMapping(sh.rows[h] ?? [])
     out.push(...extractLines(sh.rows, h, m, warnings).map((l) => ({ ...l, costType })))
@@ -95,7 +102,10 @@ export function sheetScore(rows: Cell[][]): number {
   const header = rows[h] ?? []
   const hits = header.filter((c) => typeof c === 'string' && HEADER_HINTS.test(c)).length
   const numericRows = rows.slice(h + 1).filter((r) => r.some((c) => typeof c === 'number')).length
-  return hits * 10 + Math.min(numericRows, 20)
+  // sheets that carry the calculation basis (units × frequency × unit cost) beat summary sheets
+  const m = guessMapping(header)
+  const basis = [m.quantity, m.frequency, m.unitCost].filter((i) => i >= 0).length * 15
+  return hits * 10 + Math.min(numericRows, 20) + basis
 }
 
 /** Header row = first row with ≥ 3 text cells where several look like budget headers. */
@@ -113,8 +123,8 @@ export function detectHeaderRow(rows: Cell[][]): number {
 
 const GUESS: Record<MapKey, RegExp> = {
   unitCost: /unit\s*(cost|price|rate)|^rate$|^price$/i,
-  quantity: /#\s*(of\s*)?units?|^qty|quantity|^no\.?\s*of/i,
-  frequency: /freq|^months?$|^duration$/i,
+  quantity: /#\s*(of\s*)?units?|^#$|^qty|quantity|^no\.?\s*of|number\s*of\s*units?|^units?\s*\(/i,
+  frequency: /freq|^months?$|^duration$|no\.?\s*of\s*months|^times$|occurr|^period/i,
   pct: /loe|%|percent|covering|allocat/i,
   activityCode: /activity\s*code|^activity$/i,
   accountNo: /account\s*(no|number|code)|^account$/i,

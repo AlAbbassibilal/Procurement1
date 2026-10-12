@@ -13,6 +13,7 @@ import { blockingFailures, emptySourcing, isBidMethod, sourcingRequirements, tie
 import { applyDecision, buildChain, currentStep, resetChain, resolveApprover, chainFromSteps, lineManagerSteps } from '@/lib/workflow'
 import { linesSubtotal, nowIso, uid } from '@/lib/format'
 import { passwordProblem, tempPassword } from '@/lib/auth'
+import { RHS_ALL_USERS, RHS_STAFF, HUMANITY_DONOR, HUMANITY_PROJECT, HUMANITY_BUDGET, HUMANITY_CODE } from '@/data/rhs'
 import { emptyDueDiligence } from '@/lib/partners'
 import { unassignedSalaryLines, isSalaryLine, headcount, nextRhsNumber } from '@/lib/salary'
 import { buildVacancyChain, canDecideVacancy, scoreApplicant } from '@/lib/recruitment'
@@ -246,14 +247,14 @@ export type DataMode = 'clean' | 'demo'
 /** Which dataset a fresh browser starts with: clean (accounts + policy only) unless a demo flag is set. */
 export const startupMode = (): DataMode => { try { return localStorage.getItem('rhs-platform-mode') === 'demo' ? 'demo' : 'clean' } catch { return 'clean' } }
 /** Staff records for the platform accounts only — positions and line managers kept, salaries and contracts cleared. */
-/** Clean start: only Bilal's own staff record (top of the org chart); colleagues are added from the org chart / staff register. */
-const cleanStaff = (): StaffMember[] => SEED_STAFF.filter((s) => s.userId === CORE_USER.id).map((s) => ({ ...s, monthlySalary: 0, endDate: undefined, contractRef: undefined, notes: '', lineManagerId: undefined, budgetHolder: true, approvalLimitUSD: undefined, sourceProjectId: undefined, sourceProjectCode: undefined, sourceLineCode: undefined, status: 'active' as const }))
+/** Clean start: Bilal at the top of the org chart (salary 4,935 USD/month from the budget narrative) and the RHS colleagues from src/data/rhs.ts. */
+const cleanStaff = (): StaffMember[] => [...SEED_STAFF.filter((s) => s.userId === CORE_USER.id).map((s) => ({ ...s, monthlySalary: 4935, currency: 'USD' as const, endDate: undefined, contractRef: undefined, notes: '', lineManagerId: undefined, budgetHolder: true, approvalLimitUSD: undefined, sourceProjectId: undefined, sourceProjectCode: undefined, sourceLineCode: undefined, status: 'active' as const })), ...RHS_STAFF]
 const EMPTY_COUNTERS = { PR: 0, PO: 0, CT: 0, GRN: 0, INV: 0, ENV: 0, PT: 0, LR: 0, WFH: 0, PS: 0, REC: 0, APP: 0, SM: 0, SR: 0, WB: 0, TR: 0 }
 /** Clean start: user accounts, approval matrix, policy settings and minimal staff records; every register and document empty. */
 const cleanInitial = (): State => ({
-  ...demoInitial(), users: [CORE_USER], vendors: [], prs: [], pos: [], contracts: [], grns: [], invoices: [], budgets: [], envelopes: [], projects: [], donors: [], tasks: [], masterBudgets: [], partners: [],
+  ...demoInitial(), users: RHS_ALL_USERS, vendors: [], prs: [], pos: [], contracts: [], grns: [], invoices: [], budgets: [HUMANITY_BUDGET], envelopes: [], projects: [HUMANITY_PROJECT], donors: [HUMANITY_DONOR], tasks: [], masterBudgets: [], partners: [],
   staff: cleanStaff(), leaveRequests: [], timesheets: [], payslips: [], attendance: [], vacancies: [], applicants: [], warehouses: [], items: [], movements: [], releases: [], waybills: [], assets: [], vehicles: [], trips: [],
-  notifications: [], audit: [{ id: 'a1', at: nowIso(), actorId: 'u_bilal', actorName: DOC_OWNER, docType: 'SYSTEM', action: 'System initialised', detail: 'Clean start — no sample data' }], counters: { ...EMPTY_COUNTERS }, dataMode: 'clean',
+  notifications: [], audit: [{ id: 'a1', at: nowIso(), actorId: 'u_bilal', actorName: DOC_OWNER, docType: 'SYSTEM', action: 'System initialised', detail: 'RHS setup — accounts, org chart and the Humanity project' }], counters: { ...EMPTY_COUNTERS }, dataMode: 'clean',
 })
 const initial = (mode: DataMode = startupMode()): State => (mode === 'demo' ? demoInitial() : cleanInitial())
 const demoInitial = (): State => ({
@@ -1454,7 +1455,7 @@ export const useStore = create<State & Actions>()(
       }
     },
     {
-      name: 'rhs-platform-v8', version: 9,
+      name: 'rhs-platform-v8', version: 10,
       migrate: (persisted: unknown, version: number) => {
         const st = persisted as State
         if (version < 9 && st?.users) {
@@ -1466,6 +1467,15 @@ export const useStore = create<State & Actions>()(
             st.staff = (st.staff ?? []).filter((x) => !x.userId || !demoIds.has(x.userId) || x.userId === CORE_USER.id).map((x) => (x.userId === CORE_USER.id ? { ...x, lineManagerId: undefined, budgetHolder: true } : x))
           }
           if (st.currentUserId && !st.users.some((u) => u.id === st.currentUserId)) st.currentUserId = null
+        }
+        if (version < 10 && st?.users && st.dataMode !== 'demo') {
+          // RHS setup: colleagues' accounts and staff records, the Humanity donor and project — added where missing
+          const emails = new Set(st.users.map((u) => u.email.toLowerCase()))
+          st.users = [...st.users, ...RHS_ALL_USERS.filter((u) => !emails.has(u.email.toLowerCase()))]
+          const staffIds = new Set((st.staff ?? []).map((x) => x.id)); const linked = new Set((st.staff ?? []).map((x) => x.userId).filter(Boolean))
+          st.staff = [...(st.staff ?? []), ...RHS_STAFF.filter((x) => !staffIds.has(x.id) && !linked.has(x.userId))]
+          if (!(st.donors ?? []).some((d) => d.id === HUMANITY_DONOR.id || d.name.toLowerCase() === 'humanity')) st.donors = [HUMANITY_DONOR, ...(st.donors ?? [])]
+          if (!(st.projects ?? []).some((p) => p.code === HUMANITY_CODE)) { st.projects = [HUMANITY_PROJECT, ...(st.projects ?? [])]; st.budgets = [HUMANITY_BUDGET, ...(st.budgets ?? []).filter((b) => b.id !== HUMANITY_BUDGET.id)] }
         }
         return st
       },

@@ -48,11 +48,13 @@ npm run dev        # http://localhost:5173
 npm run build      # production bundle in dist/
 ```
 
+**Spending plan = forecast.** On a project's Spending plan tab the forecast is typed per budget line and month (months from the project dates); the totals show on the BvA in a "Planned (spending plan)" column beside the automatic "Forecast (PRs)" pipeline figure.
+
 **Dates.** Every date field (`DateInput` in `src/components/ui.tsx`) accepts only real calendar dates between 1990-01-01 and 2050-12-31 in YYYY-MM-DD form; anything else is refused with a message and never saved.
 
 **Data modes.** A fresh browser starts **clean**: Bilal's administrator account, the approval matrix and policy settings only, every register empty. "Reset — clean start" wipes documents and registers but keeps the accounts you created, their permissions and the org chart; "Load sample data" replaces everything with the demo dataset (account menu or Settings → Data). **Downloads** go through the host save dialog inside the claude.ai viewer and through a normal browser download elsewhere (`src/lib/download.ts`).
 
-Sign in as the administrator: `babbassi@RHS.jo` (password `rhs2025`, replaced at first sign-in). A fresh browser starts with this one account only. Colleagues are added under **Users & access** with their RHS.jo email: the platform generates a temporary password and an invitation text to copy or email; the person must set their own password at first sign-in, and the administrator can issue a new temporary password at any time. Single sign-on with the RHS.jo Microsoft 365 tenant is wired at deployment (the button is on the sign-in page); accounts are matched by email, so permissions set now carry over. "Load sample data" adds demo accounts (password `rhs2025`) for the sample dataset only.
+Sign in as the administrator: `babbassi@RHS.jo` (password `rhs2025`, replaced at first sign-in). A fresh browser starts with the RHS setup (`src/data/rhs.ts`): Bilal's administrator account, eight colleagues with their RHS.jo accounts and staff records (temporary password `rhs2025`, replaced at first sign-in), the org chart, the Humanity donor and the "In Hands That Heal" project (proposal narrative, budget with full basis, logframe, work plan, spending plan and reporting calendar) ready for testing. Colleagues are added under **Users & access** with their RHS.jo email: the platform generates a temporary password and an invitation text to copy or email; the person must set their own password at first sign-in, and the administrator can issue a new temporary password at any time. Single sign-on with the RHS.jo Microsoft 365 tenant is wired at deployment (the button is on the sign-in page); accounts are matched by email, so permissions set now carry over. "Load sample data" adds demo accounts (password `rhs2025`) for the sample dataset only.
 
 ## Interface: Classic / Modern, home screen, and the sidebar
 

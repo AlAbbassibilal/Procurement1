@@ -12,7 +12,7 @@ export default function BudgetDetail() {
   const { id } = useParams()
   const nav = useNavigate()
   const user = useCurrentUser()!
-  const { budgets, prs, pos, invoices, settings, upsertBudget, masterBudgets, trips } = useStore()
+  const { budgets, prs, pos, invoices, settings, upsertBudget, masterBudgets, trips, projects } = useStore()
   const masterLines = masterBudgets.flatMap((m) => m.lines)
   const b = budgets.find((x) => x.id === id)
   const [received, setReceived] = useState<string | null>(null)
@@ -20,6 +20,10 @@ export default function BudgetDetail() {
   const [view, setView] = useState<'budget' | 'bva'>(sp.get('view') === 'budget' ? 'budget' : 'bva')
   if (!b) return <Alert tone="danger">Budget not found. <Link to="/budgets" className="underline">Back</Link></Alert>
   const bva = computeBvA(b, prs, pos, invoices, trips)
+  // Spending plan (forecast typed on the project's Spending plan tab) per line
+  const project = projects.find((x) => x.budgetId === b.id)
+  const planned = (code: string) => project ? project.spendingPlan.filter((e) => e.lineCode === code).reduce((s, e) => s + e.amount, 0) : 0
+  const plannedTotal = project ? project.spendingPlan.reduce((s, e) => s + e.amount, 0) : 0
   const { totals: T, approvedTotal: A, unbudgetedTotal: U } = bva
   const canEdit = can(user, 'finance.budget.edit')
   const canBva = can(user, 'finance.bva.update')
@@ -32,6 +36,7 @@ export default function BudgetDetail() {
       <td className="table-td font-mono text-[12px] font-semibold text-brand-700">{total ? '' : r.code}</td>
       <td className="table-td"><div className={cx('text-ink-900', !total && 'font-medium')}>{r.description}</div>{!total && r.line?.unitCost != null && <div className="text-[11.5px] text-ink-500">{r.line.units ?? 1}{r.line.unit ? ` ${r.line.unit}` : ''} × {r.line.frequency ?? 1} × {fmtMoney(r.line.unitCost, c)}{r.line.pct != null && r.line.pct !== 1 ? ` × ${Math.round(r.line.pct * 1000) / 10}%` : ''}</div>}{!total && r.line && (r.line.location || r.line.masterLineId) && <div className="text-[11.5px] text-ink-500">{r.line.location}{r.line.accountNo && ` · acct ${r.line.accountNo}`}{r.line.masterLineId && <span className="ml-1 rounded bg-info-50 px-1 text-info-700">{masterLines.find((m) => m.id === r.line!.masterLineId)?.code}</span>}</div>}</td>
       <td className="table-td text-right tabular-nums">{money(r.budget)}</td>
+      {project && <td className="table-td text-right tabular-nums text-ink-600">{total ? (r.code === 'GRAND TOTAL' || r.code === 'TOTAL' ? money(r.line ? planned(r.code) : (r.description.startsWith('Grand') ? plannedTotal : b.lines.filter((l) => (l.category ?? (l.costType === 'admin' ? 'Admin / Indirect Cost' : 'Direct Cost')) === r.description.replace(/^Total /, '') || r.section === '').reduce((s, l) => s + planned(l.code), 0))) : '') : money(planned(r.code))}</td>}
       <td className="table-td text-right tabular-nums">{money(r.actual)}</td>
       <td className={cx('table-td text-right tabular-nums', r.remaining < 0 && 'text-accent-700')}>{money(r.remaining)}</td>
       <td className={cx('table-td text-right tabular-nums', pctCls(r.burnPct, r.budget))}>{r.budget ? `${r.burnPct}%` : r.line ? '—' : 'Unbudgeted'}</td>
@@ -82,7 +87,7 @@ export default function BudgetDetail() {
             <div className="flex flex-wrap items-start justify-between gap-4 border-b border-line bg-surface-muted px-5 py-4"><Logo size="sm" /><div className="text-right text-[12.5px] text-ink-600"><div className="text-[16px] font-semibold text-ink-900">BUDGET vs ACTUAL</div><div className="font-mono">{b.donorCode}</div><div>As at {fmtDate(new Date().toISOString())} · {c}</div></div></div>
             <div className="overflow-x-auto scrollbar-thin">
               <table className="w-full min-w-[1240px] text-[13px]">
-                <thead><tr><th className="table-th">Line</th><th className="table-th">Description</th><th className="table-th text-right">Total amount</th><th className="table-th text-right">Actual</th><th className="table-th text-right">Remaining</th><th className="table-th text-right">Burn rate</th><th className="table-th text-right">Forecast (PRs)</th><th className="table-th text-right">Commitments</th><th className="table-th text-right">Actual + commit. + forecast</th><th className="table-th text-right">Remaining with commit.</th><th className="table-th text-right">Burn with commit.</th></tr></thead>
+                <thead><tr><th className="table-th">Line</th><th className="table-th">Description</th><th className="table-th text-right">Total amount</th>{project && <th className="table-th text-right" title="Forecast typed on the project's Spending plan tab">Planned (spending plan)</th>}<th className="table-th text-right">Actual</th><th className="table-th text-right">Remaining</th><th className="table-th text-right">Burn rate</th><th className="table-th text-right">Forecast (PRs)</th><th className="table-th text-right">Commitments</th><th className="table-th text-right">Actual + commit. + forecast</th><th className="table-th text-right">Remaining with commit.</th><th className="table-th text-right">Burn with commit.</th></tr></thead>
                 <tbody>
                   {bva.sections.map((s) => (<Fragment key={s.name}>
                     <tr><td colSpan={11} className="px-4 pt-3 pb-1 text-[11.5px] font-semibold uppercase tracking-[0.05em] text-ink-500">{s.name}</td></tr>

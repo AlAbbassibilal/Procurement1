@@ -15,7 +15,7 @@ export const CONTRACT_LABEL = { full_time: 'Full-time', part_time: 'Part-time', 
 
 /** A budget line that pays a salary: explicit kind, or auto-detected from the template's personnel sections. */
 export const isSalaryLine = (l: BudgetLine) =>
-  l.kind === 'salary' || (l.kind !== 'other' && (/personnel|salar|staff|wages|payroll/i.test(l.category ?? '') || /^person/i.test(l.unit ?? '') || /^26\d\d$/.test(l.accountNo ?? '')))
+  l.kind === 'salary' || (l.kind !== 'other' && (/personnel|salar|staff|wages|payroll/i.test(l.category ?? '') || /^person/i.test(l.unit ?? '') || /^260[1-4]$/.test(l.accountNo ?? '')))
 /** Salary lines that still need an RHS number or a "new position" flag — blocks submission. */
 export const unassignedSalaryLines = (lines: BudgetLine[]) => lines.filter((l) => isSalaryLine(l) && !l.newStaff && !(l.staffIds?.length))
 /** Number of people a line pays: one per personnel line. Units on salary lines are months, not people — a second person gets a second line. */

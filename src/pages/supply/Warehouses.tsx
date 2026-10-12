@@ -11,7 +11,7 @@ import { saveWorkbook } from '@/lib/download'
 type Tab = 'stock' | 'warehouses' | 'movements' | 'items'
 
 export default function Warehouses() {
-  const { supplyManage, canIssue } = useSupplyContext()
+  const { canStock: supplyManage, canIssue } = useSupplyContext()
   const { warehouses, items, movements, staff, settings, country, upsertWarehouse, upsertItem, adjustStock, transferStock } = useStore()
   const [tab, setTab] = useState<Tab>('stock')
   const visible = warehouses.filter((w) => country === 'all' || w.country === country)

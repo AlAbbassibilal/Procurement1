@@ -3,7 +3,7 @@
 // Builds an approval chain from the configurable approval matrix, and applies
 // approve / reject / return / delegate decisions with full step tracking.
 // ---------------------------------------------------------------------------
-import type { ApprovalRule, ApprovalStep, DocType, Role, User } from '@/types'
+import type { StaffMember, ApprovalRule, ApprovalStep, DocType, Role, User } from '@/types'
 import { uid } from './format'
 
 export const ROLE_LABEL: Record<Role, string> = {
@@ -40,20 +40,42 @@ export function resolveApprover(users: User[], role: Role, department?: string):
   return active[0]
 }
 
-export function buildChain(rules: ApprovalRule[], users: User[], docType: DocType, amount: number, department?: string): ApprovalStep[] {
+export function buildChain(rules: ApprovalRule[], users: User[], docType: DocType, amount: number, department?: string, prefix: { role: Role; label: string; approverId?: string }[] = []): ApprovalStep[] {
   const rule = findRule(rules, docType, amount)
   if (!rule) return []
-  return chainFromSteps(rule.steps, users, department)
+  // Org-chart steps first; a matrix step naming the same person is then skipped
+  const ids = new Set(prefix.map((p) => p.approverId).filter(Boolean))
+  const matrix = rule.steps.filter((st) => { const u = resolveApprover(users, st.role, department); return !(u && ids.has(u.id)) })
+  return chainFromSteps([...prefix, ...matrix], users, department)
+}
+
+/**
+ * Org-chart escalation for a requester: the line manager (budget holder) approves first; when the
+ * amount exceeds that manager's approval limit the request also goes to the next manager up, and so on.
+ */
+export function lineManagerSteps(requesterId: string, staff: StaffMember[], users: User[], amountUSD: number): { role: Role; label: string; approverId: string }[] {
+  const out: { role: Role; label: string; approverId: string }[] = []
+  let cur = staff.find((s) => s.userId === requesterId)
+  const seen = new Set<string>()
+  while (cur?.lineManagerId && !seen.has(cur.lineManagerId)) {
+    seen.add(cur.lineManagerId)
+    const mgr = staff.find((s) => s.id === cur!.lineManagerId); if (!mgr) break
+    const u = users.find((x) => x.id === mgr.userId && x.active)
+    if (u && u.id !== requesterId) out.push({ role: u.role, label: `Line manager — ${mgr.name}${mgr.approvalLimitUSD !== undefined ? ` (limit USD ${mgr.approvalLimitUSD.toLocaleString()})` : ''}`, approverId: u.id })
+    if (mgr.approvalLimitUSD === undefined || amountUSD <= mgr.approvalLimitUSD) break
+    cur = mgr
+  }
+  return out
 }
 
 /** Build a chain from an explicit list of steps (e.g. a procurement tier's approval authority). */
-export function chainFromSteps(steps: { role: Role; label: string }[], users: User[], department?: string): ApprovalStep[] {
+export function chainFromSteps(steps: { role: Role; label: string; approverId?: string }[], users: User[], department?: string): ApprovalStep[] {
   return steps.map((s, i) => ({
     id: uid('step_'),
     order: i + 1,
     label: s.label,
     role: s.role,
-    approverId: resolveApprover(users, s.role, department)?.id,
+    approverId: s.approverId ?? resolveApprover(users, s.role, department)?.id,
     status: i === 0 ? 'current' : 'pending',
   }))
 }

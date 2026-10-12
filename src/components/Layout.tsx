@@ -2,9 +2,10 @@ import { useState, useMemo, useEffect } from 'react'
 import { NavLink, Outlet, useNavigate, Link, useLocation } from 'react-router-dom'
 import {
   LayoutGrid, FileText, CheckSquare, Search, ShoppingCart, FileSignature, Building2, Users, SlidersHorizontal,
-  History, Menu, Settings, ChevronsUpDown, PackageCheck, Receipt, Scale, Wallet, Gauge, Lock, PenLine, ListChecks, HandCoins, Building, FolderPlus, Table2, Landmark, Globe2, PanelLeftClose, PanelLeftOpen, Handshake, ShieldCheck, IdCard, UserRound, CalendarDays, Clock, MapPin, Banknote, BriefcaseBusiness, Warehouse, PackageOpen, Truck, Tag, Car, BookOpenText,
+  History, Menu, Settings, ChevronsUpDown, PackageCheck, Receipt, Scale, Wallet, Gauge, Lock, PenLine, ListChecks, HandCoins, Building, FolderPlus, Table2, Landmark, Globe2, PanelLeftClose, PanelLeftOpen, Handshake, ShieldCheck, IdCard, UserRound, CalendarDays, Clock, MapPin, Banknote, BriefcaseBusiness, Warehouse, PackageOpen, Truck, Tag, Car, BookOpenText, Network,
 } from 'lucide-react'
 import { DEPARTMENTS, deptForPath, canEnter, ACCESS_LABEL, accessOf } from '@/lib/departments'
+import { can } from '@/lib/permissions'
 import { DEPT_ICON } from '@/pages/Home'
 import { recipientTurn } from '@/lib/esign'
 import { useStore, useCurrentUser } from '@/store/useStore'
@@ -70,6 +71,7 @@ export default function Layout() {
     ...(dept ? [{ title: dept.name, items: deptItems }] : []),
     { title: 'Administration', items: [
       { to: '/admin/users', label: 'Users & access', icon: <Users size={17} />, roles: ['admin'] },
+      ...(user.role === 'admin' || can(user, 'hr.staff.manage') ? [{ to: '/admin/org-chart', label: 'Org chart', icon: <Network size={17} /> }] : []),
       { to: '/admin/settings', label: 'Settings', icon: <Settings size={17} />, roles: ['admin'] },
       { to: '/audit', label: 'Audit trail', icon: <History size={17} />, roles: ['admin', 'finance', 'finance_director', 'programs_director', 'procurement_manager', 'executive_director', 'legal'] },
     ] },

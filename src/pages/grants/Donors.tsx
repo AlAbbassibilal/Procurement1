@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Plus, Pencil, Trash2, Mail, Phone, Globe } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
+import { can } from '@/lib/permissions'
 import { Card, PageHeader, Modal, Field } from '@/components/ui'
 import { uid, nowIso, fmtMoney } from '@/lib/format'
 import type { Donor, DonorContact } from '@/types'
@@ -11,7 +12,7 @@ export default function Donors() {
   const user = useCurrentUser()!
   const { donors, projects, upsertDonor, deleteDonor, settings } = useStore()
   const [edit, setEdit] = useState<Donor | null>(null)
-  const canEdit = ['grants', 'admin'].length > 0 && ['admin', 'programs_director', 'executive_director', 'finance_director', 'procurement_manager'].includes(user.role)
+  const canEdit = can(user, 'grants.donors.edit')
   const blank = (): Donor => ({ id: uid('don_'), name: '', type: 'foundation', country: '', contacts: [{ id: uid('dc_'), name: '', title: '', email: '', phone: '', primary: true }], createdAt: nowIso() })
   const setC = (id: string, p: Partial<DonorContact>) => setEdit((d) => d && ({ ...d, contacts: d.contacts.map((c) => (c.id === id ? { ...c, ...p } : c)) }))
   return (

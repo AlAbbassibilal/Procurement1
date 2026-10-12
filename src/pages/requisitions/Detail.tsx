@@ -1,6 +1,7 @@
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Pencil, Send, Ban, ShoppingCart, Search, Printer } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
+import { can } from '@/lib/permissions'
 import { Card, PageHeader, StatusPill, KV, PriorityDot, Alert } from '@/components/ui'
 import { ApprovalChain, DecisionPanel, CommentThread, AttachmentList, LineItemsEditor, ProcessTracker, type Stage } from '@/components/workflow'
 import { fmtMoney, fmtDate, fmtDateTime, linesSubtotal } from '@/lib/format'
@@ -17,7 +18,7 @@ export default function RequisitionDetail() {
 
   const amount = linesSubtotal(pr.lines)
   const isOwner = pr.requesterId === user.id || user.role === 'admin'
-  const isProc = ['procurement_officer', 'procurement_manager', 'admin'].includes(user.role)
+  const isProc = can(user, 'supply.sourcing')
   const po = pr.poId ? pos.find((p) => p.id === pr.poId) : undefined
   const stage: Stage = pr.status === 'draft' || pr.status === 'returned' ? 'pr' : pr.status === 'pending_approval' || pr.status === 'rejected' ? 'pr_approval'
     : pr.status === 'approved' || pr.status === 'sourcing' ? 'sourcing' : pr.status === 'awarded' ? 'po' : po?.status === 'pending_approval' ? 'po_approval' : po?.contractId ? 'contract' : 'po'

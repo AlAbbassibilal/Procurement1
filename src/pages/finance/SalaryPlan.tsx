@@ -2,8 +2,8 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Download, Plus, Pencil, Trash2, UserCheck, Users, AlertTriangle } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
+import { can } from '@/lib/permissions'
 import { Card, PageHeader, Stat, Modal, Field, Alert } from '@/components/ui'
-import { accessOf } from '@/lib/departments'
 import { staffCoverage, staffMonthly, exportSalaryPlan, STAFF_STATUS_LABEL, STAFF_STATUS_TONE, CONTRACT_LABEL, nextRhsNumber } from '@/lib/salary'
 import type { StaffCoverage } from '@/lib/salary'
 import { monthLabel } from '@/lib/grants'
@@ -15,8 +15,7 @@ type Tab = 'coverage' | 'plan' | 'register'
 export default function SalaryPlanPage() {
   const user = useCurrentUser()!
   const { staff, budgets, projects, settings, country, upsertStaff, deleteStaff, confirmRecruitment } = useStore()
-  const fin = accessOf(user, 'finance'), hr = accessOf(user, 'hr')
-  const canEdit = user.role === 'admin' || fin === 'manage' || hr === 'manage'
+  const canEdit = can(user, 'finance.salary_plan.edit')
   const years = useMemo(() => { const y = new Date().getFullYear(); return [y - 1, y, y + 1, y + 2] }, [])
   const [year, setYear] = useState(new Date().getFullYear())
   const [tab, setTab] = useState<Tab>('coverage')

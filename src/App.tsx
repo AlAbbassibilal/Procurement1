@@ -51,6 +51,8 @@ import ContractList from '@/pages/contracts/List'
 import ContractDetail from '@/pages/contracts/Detail'
 import Vendors from '@/pages/Vendors'
 import Users from '@/pages/admin/Users'
+import OrgChart from '@/pages/admin/OrgChart'
+import { can } from '@/lib/permissions'
 import ApprovalMatrix from '@/pages/admin/ApprovalMatrix'
 import Settings from '@/pages/admin/Settings'
 import Audit from '@/pages/Audit'
@@ -85,6 +87,9 @@ function RequireAccess() {
   const lineManager = !!myStaff && staff.some((x) => x.lineManagerId === myStaff.id)
   const selfService = ['/stock-requests', '/fleet', '/waybills'].some((x) => pathname.startsWith(x))
   const hrSelf = selfService || pathname === '/hr/me' || (lineManager && /^\/hr\/(requests|timesheets|attendance|recruitment)/.test(pathname)) || (/^\/hr\/recruitment/.test(pathname) && !!user && ['dept_manager', 'programs_director', 'executive_director', 'finance_director', 'procurement_manager'].includes(user.role))
+  // Administration: user accounts and settings are for administrators; the org chart also for whoever may edit the staff register
+  if (user && /^\/admin\/(users|settings)/.test(pathname) && user.role !== 'admin') return <NoAccess />
+  if (user && pathname.startsWith('/admin/org-chart') && user.role !== 'admin' && !can(user, 'hr.staff.manage')) return <NoAccess />
   if (user && d && !canEnter(user, d.id) && !(holder && pathname.startsWith('/finance/master-budget')) && !hrPlan && !hrSelf) return <NoAccess />
   return <Outlet />
 }
@@ -160,6 +165,7 @@ export default function App() {
           <Route path="budgets/upload" element={<BudgetUpload />} />
           <Route path="budgets/:id" element={<BudgetDetail />} />
           <Route path="admin/users" element={<Users />} />
+          <Route path="admin/org-chart" element={<OrgChart />} />
           <Route path="admin/approval-matrix" element={<ApprovalMatrix />} />
           <Route path="admin/thresholds" element={<Thresholds />} />
           <Route path="admin/settings" element={<Settings />} />

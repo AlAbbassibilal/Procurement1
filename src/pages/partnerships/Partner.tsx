@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Download, Trash2, Save, ArrowRight, Share2, Copy, ExternalLink, XCircle, RotateCcw, Plus, ShieldCheck, CheckCircle2, PenLine, Clock, Info } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
+import { can } from '@/lib/permissions'
 import { Card, PageHeader, KV, Alert, Field, Modal, Stat } from '@/components/ui'
 import { accessOf } from '@/lib/departments'
 import { DD_CHECKLIST, DD_VETTING_QUESTIONS, DD_SEARCH_INSTRUCTIONS, PCA_SECTIONS, PCA_CATEGORY_LABELS, DD_RISK_GROUPS, DD_PURPOSE } from '@/data/dueDiligence'
@@ -25,8 +26,8 @@ export default function PartnerPage() {
   const { partners, projects, deletePartner, advancePartner, updateDueDiligence } = useStore()
   const p = partners.find((x) => x.id === id)
   const lvl = accessOf(user, 'partnerships')
-  const canEdit = lvl === 'edit' || lvl === 'manage' || user.role === 'admin'
-  const canManage = lvl === 'manage' || user.role === 'admin'
+  const canEdit = (lvl === 'edit' || lvl === 'manage' || user.role === 'admin') && can(user, 'partners.edit')
+  const canManage = can(user, 'partners.manage')
   const [stageModal, setStageModal] = useState<PartnerStage | null>(null)
   const [note, setNote] = useState('')
   const [err, setErr] = useState('')

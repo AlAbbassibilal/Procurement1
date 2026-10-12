@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { Plus, Trash2, Search, ArrowRight, ShieldCheck, Clock } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
+import { can } from '@/lib/permissions'
 import { Card, PageHeader, Modal, Field, EmptyState } from '@/components/ui'
 import { accessOf } from '@/lib/departments'
 import { PARTNER_STAGE_LABEL, PARTNER_TYPE_LABEL, partnerProjects, ddProgress } from '@/lib/partners'
@@ -17,8 +18,8 @@ export default function PartnerList() {
   const tracker = useLocation().pathname.endsWith('due-diligence')
   const { partners, projects, settings, createPartner, deletePartner, country } = useStore()
   const lvl = accessOf(user, 'partnerships')
-  const canEdit = lvl === 'edit' || lvl === 'manage' || user.role === 'admin'
-  const canManage = lvl === 'manage' || user.role === 'admin'
+  const canEdit = (lvl === 'edit' || lvl === 'manage' || user.role === 'admin') && can(user, 'partners.edit')
+  const canManage = can(user, 'partners.manage')
   const [q, setQ] = useState('')
   const [stage, setStage] = useState<PartnerStage | 'all'>(tracker ? 'due_diligence' : 'all')
   const [adding, setAdding] = useState(false)

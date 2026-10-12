@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Plus, Trophy, Trash2, Pencil, ShoppingCart, UserCheck, AlertTriangle, CheckCircle2, ShieldAlert, Users, FileCheck2, Gavel } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
+import { can } from '@/lib/permissions'
 import { Card, PageHeader, StatusPill, Field, Modal, Alert, KV, EmptyState } from '@/components/ui'
 import { AttachmentList, ProcessTracker, CommentThread } from '@/components/workflow'
 import { MethodBadge, TierCard } from '@/components/tier'
@@ -33,7 +34,7 @@ export default function SourcingDetail() {
   const [newMember, setNewMember] = useState<{ userId: string; role: CommitteeMember['role'] }>({ userId: '', role: 'member' })
 
   if (!pr) return <Alert tone="danger">Requisition not found.</Alert>
-  const isProc = ['procurement_officer', 'procurement_manager', 'admin'].includes(user.role)
+  const isProc = can(user, 'supply.sourcing')
   const isED = ['executive_director', 'admin'].includes(user.role)
   const isSupervisor = ['procurement_manager', 'finance_director', 'programs_director', 'executive_director', 'admin'].includes(user.role)
   const src = pr.sourcing

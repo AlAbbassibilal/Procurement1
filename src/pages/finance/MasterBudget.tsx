@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Pencil, Trash2, Download, CheckCircle2, Undo2, Copy, Landmark } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
+import { can } from '@/lib/permissions'
 import { Card, PageHeader, Modal, Field, Alert, Stat, StatusPill } from '@/components/ui'
 import { coverageFor, exportMasterBudget, masterCode, MASTER_CATEGORIES, type Coverage } from '@/lib/master'
 import { fmtMoney, fmtDate, fmtDateTime, uid, cx } from '@/lib/format'
@@ -16,7 +17,8 @@ export default function MasterBudgetPage() {
   const [edit, setEdit] = useState<MasterLine | null>(null)
   const [open, setOpen] = useState<Coverage | null>(null)
   const [err, setErr] = useState<string | null>(null)
-  const isFD = ['finance_director', 'executive_director', 'admin'].includes(user.role)
+  const isFD = can(user, 'finance.master_budget.edit')
+  const canApprove = can(user, 'finance.master_budget.approve')
   const cov = useMemo(() => (mb ? coverageFor(mb, budgets, projects, settings) : []), [mb, budgets, projects, settings])
   const shown = cov.filter((c) => country === 'all' || c.line.country === country)
   const total = shown.reduce((s, c) => s + c.line.amount, 0), covered = shown.reduce((s, c) => s + c.covered, 0), pipeline = shown.reduce((s, c) => s + c.pipeline, 0)
@@ -35,8 +37,8 @@ export default function MasterBudgetPage() {
           {isFD && <button className="btn-secondary" onClick={() => { const y = Number(prompt('Year for the new master budget', String(mb.year + 1))); if (y) setYearId(createMasterBudget(y, mb.id).id) }}><Copy size={15} /> New year from this</button>}
           <button className="btn-secondary" onClick={() => exportMasterBudget(mb, cov, settings)}><Download size={15} /> Export</button>
           {mb.status === 'draft' && <button className="btn-primary" onClick={() => { setErr(null); setEdit(newLine()) }}><Plus size={15} /> Add line</button>}
-          {isFD && mb.status === 'draft' && <button className="btn-primary" onClick={() => { const r = approveMasterBudget(mb.id); if (!r.ok) setErr(r.error ?? 'Failed') }}><CheckCircle2 size={15} /> Approve {mb.year}</button>}
-          {isFD && mb.status === 'approved' && <button className="btn-ghost" onClick={() => reopenMasterBudget(mb.id)}><Undo2 size={15} /> Re-open</button>}
+          {canApprove && mb.status === 'draft' && <button className="btn-primary" onClick={() => { const r = approveMasterBudget(mb.id); if (!r.ok) setErr(r.error ?? 'Failed') }}><CheckCircle2 size={15} /> Approve {mb.year}</button>}
+          {canApprove && mb.status === 'approved' && <button className="btn-ghost" onClick={() => reopenMasterBudget(mb.id)}><Undo2 size={15} /> Re-open</button>}
         </>} />
       {err && <div className="mb-4"><Alert tone="danger">{err}</Alert></div>}
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

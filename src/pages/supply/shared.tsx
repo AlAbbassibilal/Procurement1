@@ -1,5 +1,5 @@
 import { useStore, useCurrentUser } from '@/store/useStore'
-import { accessOf } from '@/lib/departments'
+import { can } from '@/lib/permissions'
 import { cx } from '@/lib/format'
 import type { TwoStepApproval } from '@/types'
 
@@ -8,9 +8,17 @@ export function useSupplyContext() {
   const user = useCurrentUser()!
   const { staff, warehouses } = useStore()
   const me = staff.find((s) => s.userId === user.id)
-  const supplyManage = user.role === 'admin' || ['procurement_manager', 'procurement_officer', 'logistics'].includes(user.role) || accessOf(user, 'procurement') === 'manage'
-  const managedWarehouses = warehouses.filter((w) => supplyManage || (me && w.managerStaffId === me.id))
-  return { user, me, supplyManage, managedWarehouses, canIssue: (warehouseId: string) => managedWarehouses.some((w) => w.id === warehouseId) }
+  // Function-level rights (Users & access → Permissions)
+  const canStock = can(user, 'supply.stock.manage')
+  const canRelease = can(user, 'supply.release.issue')
+  const canAssets = can(user, 'supply.assets.manage')
+  const canFleet = can(user, 'supply.fleet.manage')
+  const canWaybills = can(user, 'supply.waybills.manage')
+  const supplyManage = canStock || canRelease || canAssets || canFleet || canWaybills
+  const managedWarehouses = warehouses.filter((w) => canStock || (me && w.managerStaffId === me.id))
+  /** Issue stock from a warehouse: the release function, or the warehouse's own manager. */
+  const canIssue = (warehouseId: string) => (canRelease || (!!me && warehouses.some((w) => w.id === warehouseId && w.managerStaffId === me.id)))
+  return { user, me, supplyManage, managedWarehouses, canIssue, canStock, canRelease, canAssets, canFleet, canWaybills }
 }
 
 export function TwoStepTrail({ approvals }: { approvals: TwoStepApproval[] }) {

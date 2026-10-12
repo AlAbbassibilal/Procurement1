@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, PenLine, Scale, Plus, Trash2, Printer, CheckCircle2, Undo2 } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
+import { can } from '@/lib/permissions'
 import { Card, PageHeader, StatusPill, KV, Alert, Field, Modal } from '@/components/ui'
 import { CommentThread, AttachmentList, ProcessTracker } from '@/components/workflow'
 import { fmtMoney, fmtDate, fmtDateTime, uid, cx } from '@/lib/format'
@@ -19,7 +20,7 @@ export default function ContractDetail() {
   const [notes, setNotes] = useState('')
   if (!ct) return <Alert tone="danger">Contract not found.</Alert>
 
-  const isProc = ['procurement_officer', 'procurement_manager', 'admin'].includes(user.role)
+  const isProc = can(user, 'supply.sourcing')
   const isLegal = user.role === 'legal' || user.role === 'admin'
   const canSignRHS = ['executive_director', 'admin'].includes(user.role)
   const editable = isProc && ct.status === 'drafting'

@@ -8,7 +8,7 @@ import { useSupplyContext } from './shared'
 import type { Waybill, WaybillLine } from '@/types'
 
 export default function Waybills() {
-  const { supplyManage } = useSupplyContext()
+  const { canWaybills: supplyManage } = useSupplyContext()
   const { waybills, settings, createWaybill, receiveWaybill } = useStore()
   const [view, setView] = useState<Waybill | null>(null)
   const [nw, setNw] = useState<{ kind: Waybill['kind']; from: string; to: string; date: string; carrier: string; driverName: string; vehiclePlate: string; projectCode: string; notes: string; lines: WaybillLine[] } | null>(null)

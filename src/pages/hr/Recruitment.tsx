@@ -8,9 +8,9 @@ import { useHrContext } from './shared'
 
 export default function Recruitment() {
   const user = useCurrentUser()!
-  const { hrManage, isManager } = useHrContext()
+  const { isManager, canRaise: mayRaise } = useHrContext()
   const { vacancies, applicants } = useStore()
-  const canRaise = hrManage || isManager || ['dept_manager', 'programs_director', 'executive_director', 'finance_director', 'procurement_manager'].includes(user.role)
+  const canRaise = mayRaise || isManager
   const list = [...vacancies].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
   const forMe = vacancies.filter((v) => canDecideVacancy(v, user))
   return (

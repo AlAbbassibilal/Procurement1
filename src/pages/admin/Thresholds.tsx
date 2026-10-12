@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Pencil, Plus, Trash2, ArrowDown, Save } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
+import { can } from '@/lib/permissions'
 import { Card, PageHeader, Modal, Field, Alert } from '@/components/ui'
 import { MethodBadge } from '@/components/tier'
 import { ROLE_LABEL } from '@/lib/workflow'
@@ -17,7 +18,7 @@ export default function Thresholds() {
   const [edit, setEdit] = useState<ProcurementTier | null>(null)
   const [policy, setPolicy] = useState<Pick<OrgSettings, 'fxToUSD' | 'contractThresholdUSD' | 'legalReviewThresholdUSD' | 'soleSourceEdThresholdUSD' | 'dualAuthThresholdUSD'>>({ fxToUSD: settings.fxToUSD, contractThresholdUSD: settings.contractThresholdUSD, legalReviewThresholdUSD: settings.legalReviewThresholdUSD, soleSourceEdThresholdUSD: settings.soleSourceEdThresholdUSD, dualAuthThresholdUSD: settings.dualAuthThresholdUSD })
   const [saved, setSaved] = useState(false)
-  const canEdit = user.role === 'admin'
+  const canEdit = can(user, 'supply.thresholds.edit')
   const ccy = settings.defaultCurrency
   const tiers = [...settings.tiers].sort((a, b) => a.minUSD - b.minUSD)
   const saveTier = () => {
@@ -33,7 +34,7 @@ export default function Thresholds() {
     <>
       <PageHeader title="Procurement thresholds & methods" subtitle="RHS Procurement SOPs v1.0 §3 — thresholds apply to the total value of a single transaction and must not be split. The tier sets the sourcing method, minimum quotations and the approval authority."
         actions={canEdit && <button className="btn-primary" onClick={() => { updateSettings(policy); setSaved(true); setTimeout(() => setSaved(false), 2000) }}><Save size={15} /> Save policy parameters</button>} />
-      {!canEdit && <div className="mb-4"><Alert tone="info">Read-only view. Only administrators can change thresholds.</Alert></div>}
+      {!canEdit && <div className="mb-4"><Alert tone="info">Read-only view. Your account does not have the “Edit procurement thresholds” function (Users & access → Permissions).</Alert></div>}
       {saved && <div className="mb-4"><Alert tone="success">Policy parameters saved.</Alert></div>}
 
       <div className="space-y-6">

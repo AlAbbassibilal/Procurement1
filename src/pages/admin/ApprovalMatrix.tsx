@@ -3,6 +3,7 @@ import { Plus, Pencil, Trash2, ArrowDown } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { MethodBadge } from '@/components/tier'
 import { useStore, useCurrentUser } from '@/store/useStore'
+import { can } from '@/lib/permissions'
 import { Card, PageHeader, Modal, Field, Alert } from '@/components/ui'
 import { ROLE_LABEL } from '@/lib/workflow'
 import { fmtMoney, uid } from '@/lib/format'
@@ -14,7 +15,7 @@ export default function ApprovalMatrix() {
   const user = useCurrentUser()!
   const { rules, upsertRule, deleteRule, settings } = useStore()
   const [edit, setEdit] = useState<ApprovalRule | null>(null)
-  const canEdit = user.role === 'admin'
+  const canEdit = can(user, 'finance.approval_matrix.edit')
   const ccy = settings.defaultCurrency
 
   const Section = ({ docType, title }: { docType: DocType; title: string }) => {
@@ -40,7 +41,7 @@ export default function ApprovalMatrix() {
   return (
     <>
       <PageHeader title="Approval matrix" subtitle="Configure who approves what, by document type and value band. Chains are generated at submission time." />
-      {!canEdit && <div className="mb-4"><Alert tone="info">Read-only view. Only administrators can change the approval matrix.</Alert></div>}
+      {!canEdit && <div className="mb-4"><Alert tone="info">Read-only view. Your account does not have the “Edit the approval matrix” function (Users & access → Permissions).</Alert></div>}
       <div className="space-y-6">
         <Section docType="PR" title="Purchase requisitions (SOP-PRO-01)" />
         <Card title="Purchase orders — approval authority by procurement tier (SOP §3)" description="PO chains are generated from the tier that the PO value falls into. Edit tiers under Procurement thresholds." padded={false}

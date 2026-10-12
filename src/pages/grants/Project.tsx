@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Send, Award, Play, Archive, Undo2, PenLine, Plus, Paperclip, Download, Users, MessageSquare, CheckCircle2 } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
+import { can } from '@/lib/permissions'
 import { Card, PageHeader, Stat, StatusPill, KV, Alert, Field, Modal } from '@/components/ui'
 import { AttachmentList } from '@/components/workflow'
 import { computeBvA } from '@/lib/budget'
@@ -35,8 +36,10 @@ export default function ProjectPage() {
   const budget = budgets.find((b) => b.id === p.budgetId)
   const bva = budget ? computeBvA(budget, prs, pos, invoices, trips) : undefined
   const lvl = accessOf(user, 'grants'); const isTeam = p.managerId === user.id || p.teamIds.includes(user.id)
-  const canEdit = lvl === 'manage' || (lvl === 'edit' && isTeam) || user.role === 'admin'
-  const canStage = lvl === 'manage' || user.role === 'admin'
+  const inScope = lvl === 'manage' || (lvl === 'edit' && isTeam) || user.role === 'admin'
+  const canEdit = inScope && can(user, 'grants.project.edit')
+  const canStage = can(user, 'grants.project.stage') && (lvl === 'manage' || user.role === 'admin')
+  const canBudget = inScope && can(user, 'grants.budget.edit')
   const ip = ipttProgress(p), wpp = workplanProgress(p)
   const reports = p.reports.map((r) => ({ ...r, live: reportLiveStatus(r) })).sort((a, b) => a.dueDate.localeCompare(b.dueDate))
   const projTasks = tasks.filter((t) => t.projectId === p.id)
@@ -120,7 +123,7 @@ export default function ProjectPage() {
       )}
       {tab === 'logframe' && <LogframeTab p={p} canEdit={canEdit} />}
       {tab === 'workplan' && <WorkplanTab p={p} budget={budget} canEdit={canEdit} />}
-      {tab === 'budget' && <BudgetTab p={p} budget={budget} canEdit={canEdit} />}
+      {tab === 'budget' && <BudgetTab p={p} budget={budget} canEdit={canBudget} />}
       {tab === 'spending' && <SpendingTab p={p} budget={budget} canEdit={canEdit} />}
       {tab === 'iptt' && <IPTTTab p={p} canEdit={canEdit} />}
 

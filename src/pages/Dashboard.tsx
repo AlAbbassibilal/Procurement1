@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { FileText, CheckSquare, Search, ShoppingCart, FileSignature, Plus, ArrowRight, Clock, Receipt } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
+import { can } from '@/lib/permissions'
 import { Card, PageHeader, Stat, StatusPill, EmptyState, PriorityDot } from '@/components/ui'
 import { fmtMoney, fmtDate, linesSubtotal, timeAgo } from '@/lib/format'
 import { canApprove, ROLE_LABEL } from '@/lib/workflow'
@@ -23,7 +24,7 @@ export default function Dashboard() {
   const committed = pos.filter((p) => ['issued', 'contracted', 'received'].includes(p.status)).reduce((s, p) => s + linesSubtotal(p.lines) * (1 + p.taxRate / 100), 0)
   const pipeline = prs.filter((p) => ['pending_approval', 'approved', 'sourcing', 'awarded'].includes(p.status)).reduce((s, p) => s + linesSubtotal(p.lines), 0)
 
-  const isProc = ['procurement_officer', 'procurement_manager', 'admin'].includes(user.role)
+  const isProc = can(user, 'supply.sourcing')
   const hour = new Date().getHours()
   const greet = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
 

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Plus, Building2, Pencil, Search as SearchIcon } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
+import { can } from '@/lib/permissions'
 import { Card, PageHeader, StatusPill, EmptyState, Modal, Field } from '@/components/ui'
 import { CATEGORIES } from '@/data/seed'
 import { fmtDate } from '@/lib/format'
@@ -11,7 +12,7 @@ export default function Vendors() {
   const { vendors, upsertVendor, prs, pos } = useStore()
   const [q, setQ] = useState('')
   const [edit, setEdit] = useState<Partial<Vendor> | null>(null)
-  const canEdit = ['procurement_officer', 'procurement_manager', 'admin'].includes(user.role)
+  const canEdit = can(user, 'supply.vendors.edit')
   const rows = vendors.filter((v) => !q || `${v.name} ${v.code} ${v.category} ${v.contactName}`.toLowerCase().includes(q.toLowerCase()))
 
   return (

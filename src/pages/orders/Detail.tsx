@@ -1,6 +1,7 @@
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Send, SendHorizontal, FileSignature, Ban, Printer, PackageCheck, Receipt, PenLine } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
+import { can } from '@/lib/permissions'
 import { Card, PageHeader, StatusPill, KV, Alert, Field } from '@/components/ui'
 import { ApprovalChain, DecisionPanel, CommentThread, AttachmentList, LineItemsEditor, ProcessTracker } from '@/components/workflow'
 import { fmtMoney, fmtDate, fmtDateTime, linesSubtotal } from '@/lib/format'
@@ -16,7 +17,7 @@ export default function OrderDetail() {
   if (!po) return <Alert tone="danger">Purchase order not found.</Alert>
   const pr = prs.find((p) => p.id === po.prId)
   const vendor = vendors.find((v) => v.id === po.vendorId)
-  const isProc = ['procurement_officer', 'procurement_manager', 'admin'].includes(user.role)
+  const isProc = can(user, 'supply.sourcing')
   const editable = isProc && ['draft', 'returned'].includes(po.status)
   const sub = linesSubtotal(po.lines), tax = sub * po.taxRate / 100, total = sub + tax
   const prog = receiptProgress(po, grns)

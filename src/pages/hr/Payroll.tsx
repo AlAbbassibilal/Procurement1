@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Play, Download } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
+import { can } from '@/lib/permissions'
 import { Card, PageHeader, Stat, Alert } from '@/components/ui'
-import { accessOf } from '@/lib/departments'
 import { downloadPayslip, hrSettings } from '@/lib/hr'
 import { monthLabel } from '@/lib/grants'
 import { fmtMoney, fmtDate } from '@/lib/format'
@@ -12,7 +12,7 @@ export default function HrPayroll() {
   const user = useCurrentUser()!
   const { hrManage, visibleStaff } = useHrContext()
   const { staff, payslips, settings, runPayroll } = useStore()
-  const canRun = user.role === 'admin' || accessOf(user, 'finance') === 'manage'
+  const canRun = can(user, 'finance.payroll.run')
   const ym = (o: number) => { const x = new Date(); x.setMonth(x.getMonth() + o); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}` }
   const [period, setPeriod] = useState(ym(0))
   const [msg, setMsg] = useState('')

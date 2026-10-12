@@ -9,7 +9,7 @@ import type { StockRelease, StockReleaseLine } from '@/types'
 
 export default function StockRequests() {
   const user = useCurrentUser()!
-  const { supplyManage, canIssue } = useSupplyContext()
+  const { canRelease: supplyManage, canIssue } = useSupplyContext()
   const { releases, warehouses, items, movements, projects, budgets, staff, createRelease, decideRelease, issueRelease } = useStore()
   const me = staff.find((s) => s.userId === user.id)
   const [filter, setFilter] = useState<'open' | 'mine' | 'all'>('open')

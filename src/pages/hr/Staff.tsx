@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Pencil, Plus, Landmark, AlertTriangle } from 'lucide-react'
+import { Pencil, Plus, Landmark, AlertTriangle, Network } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { Card, PageHeader, Modal, Field, Stat } from '@/components/ui'
 import { balances, contractDaysLeft, hrSettings } from '@/lib/hr'
@@ -10,7 +10,7 @@ import { useHrContext } from './shared'
 import type { StaffMember, StaffStatus, Currency } from '@/types'
 
 export default function HrStaff() {
-  const { hrManage, visibleStaff } = useHrContext()
+  const { canStaff: hrManage, visibleStaff } = useHrContext()
   const { staff, leaveRequests, settings, users, upsertStaff } = useStore()
   const hr = hrSettings(settings)
   const [edit, setEdit] = useState<Partial<StaffMember> | null>(null)
@@ -20,7 +20,7 @@ export default function HrStaff() {
   return (
     <>
       <PageHeader title="Staff register" subtitle="Contracts, line managers and leave / work-from-home balances. Salaries and project coverage live on the master salary plan."
-        actions={<div className="flex gap-2"><Link to="/finance/salary-plan" className="btn-secondary"><Landmark size={15} /> Master salary plan</Link>{hrManage && <button className="btn-primary" onClick={() => setEdit({ rhsNumber: nextRhsNumber(staff), status: 'active', contractType: 'full_time', currency: settings.defaultCurrency, country: settings.countries[0], startDate: new Date().toISOString().slice(0, 10) })}><Plus size={15} /> Add staff</button>}</div>} />
+        actions={<div className="flex gap-2"><Link to="/admin/org-chart" className="btn-secondary"><Network size={15} /> Org chart</Link><Link to="/finance/salary-plan" className="btn-secondary"><Landmark size={15} /> Master salary plan</Link>{hrManage && <button className="btn-primary" onClick={() => setEdit({ rhsNumber: nextRhsNumber(staff), status: 'active', contractType: 'full_time', currency: settings.defaultCurrency, country: settings.countries[0], startDate: new Date().toISOString().slice(0, 10) })}><Plus size={15} /> Add staff</button>}</div>} />
       <div className="mb-5 grid gap-4 sm:grid-cols-3"><Stat label="Active staff" value={staff.filter((s) => s.status === 'active').length} tone="brand" /><Stat label="Contracts ending within 60 days" value={ending.length} hint={ending.map((s) => s.name).join(', ') || undefined} tone={ending.length ? 'accent' : 'default'} /><Stat label="Entitlements" value={`${hr.annualLeaveDays} + ${hr.wfhDays}`} hint="annual leave days + work-from-home days per year" /></div>
       <input className="input mb-3 w-72" placeholder="Search RHS no., name, position…" value={q} onChange={(e) => setQ(e.target.value)} />
       <Card padded={false}><div className="overflow-x-auto"><table className="w-full min-w-[1150px] text-[13px]">
@@ -49,6 +49,7 @@ export default function HrStaff() {
           <Field label="Country"><input className="input" list="hr-countries" value={edit.country ?? ''} onChange={(e) => setEdit({ ...edit, country: e.target.value })} /><datalist id="hr-countries">{settings.countries.map((c) => <option key={c} value={c} />)}</datalist></Field>
           <Field label="Line manager"><select className="input" value={edit.lineManagerId ?? ''} onChange={(e) => setEdit({ ...edit, lineManagerId: e.target.value || undefined })}><option value="">—</option>{staff.filter((s) => s.id !== edit.id && s.status === 'active').map((s) => <option key={s.id} value={s.id}>{s.name} · {s.position}</option>)}</select></Field>
           <Field label="Platform account"><select className="input" value={edit.userId ?? ''} onChange={(e) => setEdit({ ...edit, userId: e.target.value || undefined })}><option value="">— none —</option>{users.filter((u) => u.active).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></Field>
+          <Field label="Budget holder" hint="Approves requisitions from reports; limit in USD"><div className="flex items-center gap-2"><input type="checkbox" checked={!!edit.budgetHolder} onChange={(e) => setEdit({ ...edit, budgetHolder: e.target.checked, approvalLimitUSD: e.target.checked ? edit.approvalLimitUSD : undefined })} /><input type="number" className="input" placeholder="no limit" disabled={!edit.budgetHolder} value={edit.approvalLimitUSD ?? ''} onChange={(e) => setEdit({ ...edit, approvalLimitUSD: e.target.value === '' ? undefined : Number(e.target.value) })} /></div></Field>
           <Field label="Contract type"><select className="input" value={edit.contractType ?? 'full_time'} onChange={(e) => setEdit({ ...edit, contractType: e.target.value as StaffMember['contractType'] })}>{(Object.keys(CONTRACT_LABEL) as StaffMember['contractType'][]).map((c) => <option key={c} value={c}>{CONTRACT_LABEL[c]}</option>)}</select></Field>
           <Field label="Contract ref."><input className="input" value={edit.contractRef ?? ''} onChange={(e) => setEdit({ ...edit, contractRef: e.target.value })} /></Field>
           <Field label="Contract start" required><input type="date" className="input" value={edit.startDate ?? ''} onChange={(e) => setEdit({ ...edit, startDate: e.target.value })} /></Field>

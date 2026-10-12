@@ -10,7 +10,7 @@ import { hasBlockingIssues, receiptProgress, runMatch, invoiceTotals } from '@/l
 import { newEvent, recipientTurn } from '@/lib/esign'
 import { generateIPTT, generateReportingCalendar, generateSpendingPlan, monthsOf, parseMentions, reportLiveStatus, allIndicators } from '@/lib/grants'
 import { blockingFailures, emptySourcing, isBidMethod, sourcingRequirements, tierForPR, toUSD, resolveTier } from '@/lib/tiers'
-import { applyDecision, buildChain, currentStep, resetChain, resolveApprover, chainFromSteps } from '@/lib/workflow'
+import { applyDecision, buildChain, currentStep, resetChain, resolveApprover, chainFromSteps, lineManagerSteps } from '@/lib/workflow'
 import { linesSubtotal, nowIso, uid } from '@/lib/format'
 import { emptyDueDiligence } from '@/lib/partners'
 import { unassignedSalaryLines, isSalaryLine, headcount, nextRhsNumber } from '@/lib/salary'
@@ -226,6 +226,7 @@ interface Actions {
   // masters / admin
   upsertVendor: (v: Partial<Vendor> & { id?: string }) => void
   upsertUser: (u: Partial<User> & { id?: string }) => void
+  deleteUser: (id: string) => { ok: boolean; error?: string }
   upsertRule: (r: ApprovalRule) => void
   deleteRule: (id: string) => void
   updateSettings: (patch: Partial<OrgSettings>) => void
@@ -380,7 +381,9 @@ export const useStore = create<State & Actions>()(
           if (!pr.donorCode) return { ok: false, error: 'Select the project / donor code the requisition is charged to.' }
           if (pr.lines.some((l) => !l.budgetLine)) return { ok: false, error: 'Every line item needs a budget line.' }
           const amount = linesSubtotal(pr.lines)
-          const chain = pr.status === 'returned' && pr.approvalChain.length ? resetChain(pr.approvalChain) : buildChain(get().rules, get().users, 'PR', amount, pr.department)
+          // Org chart first: the requester's line manager (budget holder) approves, escalating up the chart while the amount exceeds each manager's limit; then the approval matrix.
+          const orgSteps = lineManagerSteps(pr.requesterId, get().staff, get().users, toUSD(amount, pr.currency, get().settings))
+          const chain = pr.status === 'returned' && pr.approvalChain.length ? resetChain(pr.approvalChain) : buildChain(get().rules, get().users, 'PR', amount, pr.department, orgSteps)
           if (!chain.length) return { ok: false, error: 'No approval rule matches this amount. Ask an administrator to configure the approval matrix.' }
           const upd = { ...pr, status: 'pending_approval' as const, approvalChain: chain, submittedAt: nowIso(), updatedAt: nowIso() }
           set((s) => ({ prs: s.prs.map((p) => (p.id === id ? upd : p)) }))
@@ -1391,6 +1394,19 @@ export const useStore = create<State & Actions>()(
           if (existing) set((s) => ({ users: s.users.map((x) => (x.id === u.id ? { ...x, ...u } : x)) }))
           else set((s) => ({ users: [...s.users, { id: uid('u_'), name: '', email: '', password: 'rhs2025', role: 'requester', department: 'Operations', title: '', avatarColor: 'bg-ink-600', active: true, ...u }] }))
           log('USER', existing ? 'User updated' : 'User created', undefined, u.name)
+        },
+        deleteUser: (id) => {
+          const u = get().users.find((x) => x.id === id)
+          if (!u) return { ok: false, error: 'Not found' }
+          if (id === get().currentUserId) return { ok: false, error: 'You cannot delete the account you are signed in with.' }
+          if (u.role === 'admin' && get().users.filter((x) => x.role === 'admin' && x.active && x.id !== id).length === 0) return { ok: false, error: 'At least one active administrator must remain.' }
+          set((s) => ({
+            users: s.users.filter((x) => x.id !== id),
+            staff: s.staff.map((st) => (st.userId === id ? { ...st, userId: undefined, updatedAt: nowIso() } : st)),
+            notifications: s.notifications.filter((n) => n.userId !== id),
+          }))
+          log('USER', 'User account deleted', undefined, `${u.name} · ${u.email}`)
+          return { ok: true }
         },
         upsertRule: (r) => {
           const exists = get().rules.some((x) => x.id === r.id)

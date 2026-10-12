@@ -9,7 +9,7 @@ import type { TripRequest, TripPassenger, Vehicle } from '@/types'
 
 export default function Fleet() {
   const user = useCurrentUser()!
-  const { supplyManage } = useSupplyContext()
+  const { canFleet: supplyManage } = useSupplyContext()
   const { trips, vehicles, staff, projects, budgets, settings, country, createTrip, decideTrip, assignTrip, startTrip, closeTrip, upsertVehicle } = useStore()
   const me = staff.find((s) => s.userId === user.id)
   const [tab, setTab] = useState<'trips' | 'vehicles'>('trips')

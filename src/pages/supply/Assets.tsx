@@ -13,7 +13,7 @@ type Action = 'assigned' | 'returned' | 'transferred' | 'repair' | 'verified' | 
 const ACTION_LABEL: Record<Action, string> = { assigned: 'Hand over to staff', returned: 'Return to store', transferred: 'Transfer location', repair: 'Send for repair', verified: 'Verify (physical check)', lost: 'Report lost / stolen', disposed: 'Dispose' }
 
 export default function Assets() {
-  const { supplyManage, me } = useSupplyContext()
+  const { canAssets: supplyManage, me } = useSupplyContext()
   const { assets, staff, warehouses, projects, settings, country, registerAsset, assetEvent } = useStore()
   const [q, setQ] = useState('')
   const [status, setStatus] = useState<AssetStatus | 'all'>('all')

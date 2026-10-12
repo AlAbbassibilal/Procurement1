@@ -16,7 +16,7 @@ export default function VacancyPage() {
   const { id = '' } = useParams()
   const nav = useNavigate()
   const user = useCurrentUser()!
-  const { hrManage } = useHrContext()
+  const { canAdvertise: hrManage } = useHrContext()
   const [sp, setSp] = useSearchParams()
   const tab = (sp.get('tab') as Tab) || 'request'
   const { vacancies, applicants, projects, settings, decideVacancy, publishVacancy, closeVacancy, setApplicantStatus } = useStore()

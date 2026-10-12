@@ -2,6 +2,7 @@ import { Fragment, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Download, FileSpreadsheet, Printer } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
+import { can } from '@/lib/permissions'
 import { Card, PageHeader, KV, Alert, StatusPill, Field } from '@/components/ui'
 import { Logo } from '@/components/Logo'
 import { fmtMoney, fmtDate, fmtDateTime, cx } from '@/lib/format'
@@ -18,7 +19,8 @@ export default function BudgetDetail() {
   if (!b) return <Alert tone="danger">Budget not found. <Link to="/budgets" className="underline">Back</Link></Alert>
   const bva = computeBvA(b, prs, pos, invoices, trips)
   const { totals: T, approvedTotal: A, unbudgetedTotal: U } = bva
-  const canEdit = ['finance', 'finance_director', 'programs_director', 'admin'].includes(user.role)
+  const canEdit = can(user, 'finance.budget.edit')
+  const canBva = can(user, 'finance.bva.update')
   const projectPRs = prs.filter((p) => p.donorCode === b.donorCode)
   const c = b.currency
   const pctCls = (p: number, budget: number) => (!budget ? 'text-accent-700' : p > 100 ? 'text-accent-700 font-semibold' : p > 90 ? 'text-sun-700' : 'text-ink-700')
@@ -84,7 +86,7 @@ export default function BudgetDetail() {
         </div>
         <div className="space-y-6">
           <Card title="Financial summary" description="As in the BvA template">
-            {canEdit ? (
+            {canBva ? (
               <Field label={`Donation received from ${b.donor || 'donor'} (${c})`}><div className="flex gap-2"><input type="number" className="input" value={received ?? (b.fundsReceived ?? '')} onChange={(e) => setReceived(e.target.value)} placeholder="0" />{received !== null && <button className="btn-secondary btn-sm" onClick={() => { upsertBudget({ ...b, fundsReceived: Number(received) || 0 }); setReceived(null) }}>Save</button>}</div></Field>
             ) : <KV k="Donation received" v={money(b.fundsReceived ?? 0)} />}
             <div className="mt-3 space-y-0.5">

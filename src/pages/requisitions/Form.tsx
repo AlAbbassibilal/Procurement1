@@ -6,7 +6,8 @@ import { Card, PageHeader, Field, Alert } from '@/components/ui'
 import { LineItemsEditor, AttachmentList, newLine, ProcessTracker } from '@/components/workflow'
 import { DEPARTMENTS } from '@/data/seed'
 import { fmtMoney, linesSubtotal } from '@/lib/format'
-import { findRule } from '@/lib/workflow'
+import { findRule, lineManagerSteps } from '@/lib/workflow'
+import { toUSD } from '@/lib/tiers'
 import { TierCard } from '@/components/tier'
 import type { PurchaseRequisition } from '@/types'
 
@@ -14,7 +15,7 @@ export default function RequisitionForm() {
   const { id } = useParams()
   const nav = useNavigate()
   const user = useCurrentUser()!
-  const { prs, createPR, updatePR, submitPR, rules, settings, budgets } = useStore()
+  const { prs, createPR, updatePR, submitPR, rules, settings, budgets, staff, users } = useStore()
   const existing = id ? prs.find((p) => p.id === id) : undefined
   const [draft, setDraft] = useState<Partial<PurchaseRequisition>>(() => existing ?? {
     title: '', justification: '', department: user.department, priority: 'normal', procurementType: 'goods', donorCode: '', neededBy: '', currency: settings.defaultCurrency, lines: [newLine()], attachments: [],
@@ -24,6 +25,7 @@ export default function RequisitionForm() {
 
   const amount = linesSubtotal(draft.lines ?? [])
   const rule = useMemo(() => findRule(rules, 'PR', amount), [rules, amount])
+  const orgSteps = useMemo(() => lineManagerSteps(user.id, staff, users, toUSD(amount, draft.currency ?? settings.defaultCurrency, settings)), [user.id, staff, users, amount, draft.currency, settings])
   const set = (patch: Partial<PurchaseRequisition>) => setDraft((d) => ({ ...d, ...patch }))
   const editable = !existing || ['draft', 'returned'].includes(existing.status)
   const project = budgets.find((b) => b.donorCode === draft.donorCode && b.status === 'active')
@@ -95,10 +97,10 @@ export default function RequisitionForm() {
             <div className="flex items-start gap-2 text-[12.5px] text-ink-600"><Info size={14} className="mt-0.5 shrink-0 text-brand-600" />
               <div>Document owner: <b>{settings.orgShort} — Bilal Abbassi</b>. Requester: <b>{user.name}</b>.</div></div>
           </Card>
-          <Card title="Approval route" description="Predicted from the approval matrix">
+          <Card title="Approval route" description="Org chart first (line manager, escalating above each approval limit), then the approval matrix">
             {rule ? (
-              <ol className="space-y-2">
-                {rule.steps.map((s, i) => (
+              <ol className="space-y-2" data-testid="route-preview">
+                {[...orgSteps, ...rule.steps].map((s, i) => (
                   <li key={i} className="flex items-center gap-3 text-[13px]">
                     <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-[11px] font-bold text-brand-800">{i + 1}</span>
                     <span className="text-ink-800">{s.label}</span>

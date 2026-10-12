@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Send, RefreshCw, ShieldAlert, Banknote, XCircle, Printer } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
+import { can } from '@/lib/permissions'
 import { Card, PageHeader, StatusPill, KV, Alert, Field, Modal } from '@/components/ui'
 import { ApprovalChain, DecisionPanel, CommentThread, AttachmentList, ProcessTracker } from '@/components/workflow'
 import { fmtMoney, fmtDate, fmtDateTime, toInputDate, cx } from '@/lib/format'
@@ -22,8 +23,8 @@ export default function InvoiceDetail() {
   if (!inv) return <Alert tone="danger">Invoice not found.</Alert>
   const po = pos.find((p) => p.id === inv.poId)
   const t = invoiceTotals(inv.lines, inv.taxRate)
-  const isFinance = ['finance', 'finance_director', 'admin'].includes(user.role)
-  const isAP = ['finance', 'finance_director', 'procurement_officer', 'procurement_manager', 'admin'].includes(user.role)
+  const isFinance = can(user, 'finance.invoice.pay')
+  const isAP = can(user, 'finance.invoice.register')
   const blocks = inv.matchIssues.filter((i) => i.severity === 'block')
   const warns = inv.matchIssues.filter((i) => i.severity === 'warn')
 

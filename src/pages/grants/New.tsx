@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, FolderPlus } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
-import { Card, PageHeader, Field, Alert } from '@/components/ui'
+import { Card, PageHeader, Field, Alert, DateInput } from '@/components/ui'
 import { SECTORS, DEFAULT_SECTIONS, STAGE_LABEL, STAGE_DESC } from '@/lib/grants'
 import { uid } from '@/lib/format'
 import type { Currency } from '@/types'
@@ -36,11 +36,11 @@ export default function ProjectNew() {
               <Field label="Programme summary" className="sm:col-span-2"><textarea className="input min-h-[80px]" value={f.summary} onChange={(e) => setF({ ...f, summary: e.target.value })} placeholder="One paragraph — what, for whom, where, how many" /></Field>
               <Field label="Locations"><input className="input" value={f.locations} onChange={(e) => setF({ ...f, locations: e.target.value })} placeholder="Gaza (field) & Amman (support)" /></Field>
               <Field label="Duration"><input className="input" value={f.duration} onChange={(e) => setF({ ...f, duration: e.target.value })} placeholder="18 Months" /></Field>
-              <Field label="Planned start"><input type="date" className="input" value={f.startDate} onChange={(e) => setF({ ...f, startDate: e.target.value })} /></Field>
-              <Field label="Planned end"><input type="date" className="input" value={f.endDate} onChange={(e) => setF({ ...f, endDate: e.target.value })} /></Field>
+              <Field label="Planned start"><DateInput className="input" value={f.startDate} onChange={(e) => setF({ ...f, startDate: e.target.value })} /></Field>
+              <Field label="Planned end"><DateInput className="input" value={f.endDate} onChange={(e) => setF({ ...f, endDate: e.target.value })} /></Field>
               <Field label="Currency"><select className="input" value={f.currency} onChange={(e) => setF({ ...f, currency: e.target.value as Currency })}><option>USD</option><option>JOD</option><option>EUR</option></select></Field>
               <Field label="Requested amount (optional)" hint="Defaults to the budget total at submission"><input type="number" className="input" value={f.requestedAmount} onChange={(e) => setF({ ...f, requestedAmount: e.target.value })} /></Field>
-              <Field label="Submission deadline"><input type="date" className="input" value={f.submissionDeadline} onChange={(e) => setF({ ...f, submissionDeadline: e.target.value })} /></Field>
+              <Field label="Submission deadline"><DateInput className="input" value={f.submissionDeadline} onChange={(e) => setF({ ...f, submissionDeadline: e.target.value })} /></Field>
             </div>
             <div className="mt-4"><div className="label">Countries</div><div className="flex flex-wrap gap-1.5">{settings.countries.map((c) => <button key={c} type="button" className={`rounded-pill px-2.5 py-1 text-[12px] ring-1 ring-inset ${f.countries.includes(c) ? 'bg-info-500 text-white ring-info-500' : 'bg-surface text-ink-700 ring-ink-200 hover:bg-surface-muted'}`} onClick={() => setF({ ...f, countries: f.countries.includes(c) ? f.countries.filter((x) => x !== c) : [...f.countries, c] })}>{c}</button>)}</div><div className="mt-1 text-[11.5px] text-ink-500">{settings.countries[0]} is the regional office and supports every country programme.</div></div>
             <div className="mt-4"><div className="label">Sectors</div><div className="flex flex-wrap gap-1.5">{SECTORS.map((s) => <button key={s} type="button" className={`rounded-pill px-2.5 py-1 text-[12px] ring-1 ring-inset ${f.sectors.includes(s) ? 'bg-brand-600 text-white ring-brand-600' : 'bg-surface text-ink-700 ring-ink-200 hover:bg-surface-muted'}`} onClick={() => setF({ ...f, sectors: f.sectors.includes(s) ? f.sectors.filter((x) => x !== s) : [...f.sectors, s] })}>{s}</button>)}</div></div>

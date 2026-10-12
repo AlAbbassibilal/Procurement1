@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, CheckCircle2, Circle, Clock } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
-import { Card, PageHeader, Tabs, Modal, Field, Stat } from '@/components/ui'
+import { Card, PageHeader, Tabs, Modal, Field, Stat, DateInput } from '@/components/ui'
 import { fmtDate, cx } from '@/lib/format'
 import type { Task } from '@/types'
 
@@ -17,7 +17,7 @@ export function TaskModal({ open, onClose, projectId, projectCode, link }: { ope
         <Field label="Details"><textarea className="input min-h-[64px]" value={t.description} onChange={(e) => setT({ ...t, description: e.target.value })} /></Field>
         <div className="grid grid-cols-3 gap-3">
           <Field label="Assign to"><select className="input" value={t.assigneeId} onChange={(e) => setT({ ...t, assigneeId: e.target.value })}>{users.filter((u) => u.active).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></Field>
-          <Field label="Due"><input type="date" className="input" value={t.dueDate} onChange={(e) => setT({ ...t, dueDate: e.target.value })} /></Field>
+          <Field label="Due"><DateInput className="input" value={t.dueDate} onChange={(e) => setT({ ...t, dueDate: e.target.value })} /></Field>
           <Field label="Priority"><select className="input" value={t.priority} onChange={(e) => setT({ ...t, priority: e.target.value as Task['priority'] })}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option></select></Field>
         </div>
         {projectCode && <div className="text-[12px] text-ink-500">Linked to project {projectCode}. The assignee is notified and sees it on their profile.</div>}

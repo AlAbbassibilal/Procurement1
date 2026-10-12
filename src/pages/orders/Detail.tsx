@@ -2,7 +2,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Send, SendHorizontal, FileSignature, Ban, Printer, PackageCheck, Receipt, PenLine } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
 import { can } from '@/lib/permissions'
-import { Card, PageHeader, StatusPill, KV, Alert, Field } from '@/components/ui'
+import { Card, PageHeader, StatusPill, KV, Alert, Field, DateInput } from '@/components/ui'
 import { ApprovalChain, DecisionPanel, CommentThread, AttachmentList, LineItemsEditor, ProcessTracker } from '@/components/workflow'
 import { fmtMoney, fmtDate, fmtDateTime, linesSubtotal } from '@/lib/format'
 import { Logo } from '@/components/Logo'
@@ -79,7 +79,7 @@ export default function OrderDetail() {
 
           <Card title="Order terms">
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Delivery date" required><input type="date" className="input" disabled={!editable} value={po.deliveryDate} onChange={(e) => updatePO(po.id, { deliveryDate: e.target.value })} /></Field>
+              <Field label="Delivery date" required><DateInput className="input" disabled={!editable} value={po.deliveryDate} onChange={(e) => updatePO(po.id, { deliveryDate: e.target.value })} /></Field>
               <Field label="Incoterms"><select className="input" disabled={!editable} value={po.incoterms} onChange={(e) => updatePO(po.id, { incoterms: e.target.value })}>{['DAP', 'DDP', 'EXW', 'FOB', 'CIF', 'N/A (services)'].map((i) => <option key={i}>{i}</option>)}</select></Field>
               <Field label="Payment terms"><input className="input" disabled={!editable} value={po.paymentTerms} onChange={(e) => updatePO(po.id, { paymentTerms: e.target.value })} /></Field>
               <Field label="Tax rate %"><input type="number" className="input" disabled={!editable} value={po.taxRate} onChange={(e) => updatePO(po.id, { taxRate: Number(e.target.value) })} /></Field>

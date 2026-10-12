@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Send, Save, Upload, X, Wand2 } from 'lucide-react'
 import { useStore, useCurrentUser, attachmentFromFile } from '@/store/useStore'
-import { Card, PageHeader, Field, Alert } from '@/components/ui'
+import { Card, PageHeader, Field, Alert, DateInput } from '@/components/ui'
 import { extractText, parseKeywords } from '@/lib/recruitment'
 import { CONTRACT_LABEL } from '@/lib/salary'
 import { cx } from '@/lib/format'
@@ -44,7 +44,7 @@ export default function VacancyForm() {
               <Field label="Country / duty station"><input className="input" list="vac-countries" value={v.country ?? ''} onChange={(e) => setV({ ...v, country: e.target.value })} /><datalist id="vac-countries">{settings.countries.map((c) => <option key={c} value={c} />)}</datalist></Field>
               <Field label="Contract"><select className="input" value={v.contractType ?? 'full_time'} onChange={(e) => setV({ ...v, contractType: e.target.value as Vacancy['contractType'] })}>{(Object.keys(CONTRACT_LABEL) as Vacancy['contractType'][]).map((c) => <option key={c} value={c}>{CONTRACT_LABEL[c]}</option>)}</select></Field>
               <Field label="Salary range"><input className="input" value={v.salaryRange ?? ''} onChange={(e) => setV({ ...v, salaryRange: e.target.value })} placeholder="JOD 900 – 1,100" /></Field>
-              <Field label="Expected start"><input type="date" className="input" value={v.startDate ?? ''} onChange={(e) => setV({ ...v, startDate: e.target.value })} /></Field>
+              <Field label="Expected start"><DateInput className="input" value={v.startDate ?? ''} onChange={(e) => setV({ ...v, startDate: e.target.value })} /></Field>
               <Field label="Duration"><input className="input" value={v.duration ?? ''} onChange={(e) => setV({ ...v, duration: e.target.value })} /></Field>
               <Field label="Funding project" hint="Finance checks the budget against this project"><select className="input" value={v.projectId ?? ''} onChange={(e) => setV({ ...v, projectId: e.target.value || undefined })}><option value="">Core / unrestricted</option>{projects.filter((p) => ['granted', 'active', 'submitted'].includes(p.stage)).map((p) => <option key={p.id} value={p.id}>{p.code} · {p.title.slice(0, 40)}</option>)}</select></Field>
               <Field label="Planned position (salary plan)" hint="A 'to recruit' position created by an approved budget" className="sm:col-span-2"><select className="input" value={v.plannedStaffId ?? ''} onChange={(e) => setV({ ...v, plannedStaffId: e.target.value || undefined })}><option value="">— none —</option>{planned.map((s) => <option key={s.id} value={s.id}>{s.rhsNumber} · {s.position} ({s.sourceProjectCode})</option>)}</select></Field>

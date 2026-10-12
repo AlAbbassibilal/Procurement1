@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Pencil, Plus, Landmark, AlertTriangle, Network } from 'lucide-react'
 import { useStore } from '@/store/useStore'
-import { Card, PageHeader, Modal, Field, Stat } from '@/components/ui'
+import { Card, PageHeader, Modal, Field, Stat, DateInput } from '@/components/ui'
 import { balances, contractDaysLeft, hrSettings } from '@/lib/hr'
 import { STAFF_STATUS_LABEL, STAFF_STATUS_TONE, CONTRACT_LABEL, nextRhsNumber } from '@/lib/salary'
 import { fmtDate, cx } from '@/lib/format'
@@ -53,8 +53,8 @@ export default function HrStaff() {
           <Field label="Budget holder" hint="Approves requisitions from reports; limit in USD"><div className="flex items-center gap-2"><input type="checkbox" checked={!!edit.budgetHolder} onChange={(e) => setEdit({ ...edit, budgetHolder: e.target.checked, approvalLimitUSD: e.target.checked ? edit.approvalLimitUSD : undefined })} /><input type="number" className="input" placeholder="no limit" disabled={!edit.budgetHolder} value={edit.approvalLimitUSD ?? ''} onChange={(e) => setEdit({ ...edit, approvalLimitUSD: e.target.value === '' ? undefined : Number(e.target.value) })} /></div></Field>
           <Field label="Contract type"><select className="input" value={edit.contractType ?? 'full_time'} onChange={(e) => setEdit({ ...edit, contractType: e.target.value as StaffMember['contractType'] })}>{(Object.keys(CONTRACT_LABEL) as StaffMember['contractType'][]).map((c) => <option key={c} value={c}>{CONTRACT_LABEL[c]}</option>)}</select></Field>
           <Field label="Contract ref."><input className="input" value={edit.contractRef ?? ''} onChange={(e) => setEdit({ ...edit, contractRef: e.target.value })} /></Field>
-          <Field label="Contract start" required><input type="date" className="input" value={edit.startDate ?? ''} onChange={(e) => setEdit({ ...edit, startDate: e.target.value })} /></Field>
-          <Field label="Contract end"><input type="date" className="input" value={edit.endDate ?? ''} onChange={(e) => setEdit({ ...edit, endDate: e.target.value || undefined })} /></Field>
+          <Field label="Contract start" required><DateInput className="input" value={edit.startDate ?? ''} onChange={(e) => setEdit({ ...edit, startDate: e.target.value })} /></Field>
+          <Field label="Contract end"><DateInput className="input" value={edit.endDate ?? ''} onChange={(e) => setEdit({ ...edit, endDate: e.target.value || undefined })} /></Field>
           <Field label="Monthly salary"><div className="flex gap-2"><input type="number" className="input" value={edit.monthlySalary ?? 0} onChange={(e) => setEdit({ ...edit, monthlySalary: Number(e.target.value) })} /><select className="input w-24" value={edit.currency ?? settings.defaultCurrency} onChange={(e) => setEdit({ ...edit, currency: e.target.value as Currency })}><option>JOD</option><option>USD</option><option>EUR</option></select></div></Field>
           <Field label={`Annual leave days / year (default ${hr.annualLeaveDays})`}><input type="number" className="input" value={edit.annualLeaveDays ?? ''} placeholder={String(hr.annualLeaveDays)} onChange={(e) => setEdit({ ...edit, annualLeaveDays: e.target.value === '' ? undefined : Number(e.target.value) })} /></Field>
           <Field label={`WFH days / year (default ${hr.wfhDays})`}><input type="number" className="input" value={edit.wfhDays ?? ''} placeholder={String(hr.wfhDays)} onChange={(e) => setEdit({ ...edit, wfhDays: e.target.value === '' ? undefined : Number(e.target.value) })} /></Field>

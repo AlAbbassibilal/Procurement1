@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Download, Plus, Pencil, Trash2, UserCheck, Users, AlertTriangle } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
 import { can } from '@/lib/permissions'
-import { Card, PageHeader, Stat, Modal, Field, Alert } from '@/components/ui'
+import { Card, PageHeader, Stat, Modal, Field, Alert, DateInput } from '@/components/ui'
 import { staffCoverage, staffMonthly, exportSalaryPlan, STAFF_STATUS_LABEL, STAFF_STATUS_TONE, CONTRACT_LABEL, nextRhsNumber } from '@/lib/salary'
 import type { StaffCoverage } from '@/lib/salary'
 import { monthLabel } from '@/lib/grants'
@@ -127,8 +127,8 @@ export default function SalaryPlanPage() {
             <Field label="Country"><input className="input" list="stf-countries" value={edit.country ?? ''} onChange={(e) => setEdit({ ...edit, country: e.target.value })} /><datalist id="stf-countries">{settings.countries.map((c) => <option key={c} value={c} />)}</datalist></Field>
             <Field label="Contract"><select className="input" value={edit.contractType ?? 'full_time'} onChange={(e) => setEdit({ ...edit, contractType: e.target.value as StaffMember['contractType'] })}>{(Object.keys(CONTRACT_LABEL) as StaffMember['contractType'][]).map((c) => <option key={c} value={c}>{CONTRACT_LABEL[c]}</option>)}</select></Field>
             <Field label="Monthly salary (gross cost)" required><div className="flex gap-2"><input type="number" className="input" value={edit.monthlySalary ?? 0} onChange={(e) => setEdit({ ...edit, monthlySalary: Number(e.target.value) })} /><select className="input w-24" value={edit.currency ?? ccy} onChange={(e) => setEdit({ ...edit, currency: e.target.value as Currency })}><option>JOD</option><option>USD</option><option>EUR</option></select></div></Field>
-            <Field label="Start date"><input type="date" className="input" value={edit.startDate ?? ''} onChange={(e) => setEdit({ ...edit, startDate: e.target.value })} /></Field>
-            <Field label="End date (if fixed term)"><input type="date" className="input" value={edit.endDate ?? ''} onChange={(e) => setEdit({ ...edit, endDate: e.target.value || undefined })} /></Field>
+            <Field label="Start date"><DateInput className="input" value={edit.startDate ?? ''} onChange={(e) => setEdit({ ...edit, startDate: e.target.value })} /></Field>
+            <Field label="End date (if fixed term)"><DateInput className="input" value={edit.endDate ?? ''} onChange={(e) => setEdit({ ...edit, endDate: e.target.value || undefined })} /></Field>
             <Field label="Notes" className="sm:col-span-3"><input className="input" value={edit.notes ?? ''} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} /></Field>
           </div>
         )}
@@ -136,7 +136,7 @@ export default function SalaryPlanPage() {
 
       {/* Fill a planned position */}
       <Modal open={!!fill} onClose={() => setFill(null)} title={fill ? `Fill position ${fill.st.rhsNumber} — ${fill.st.position}` : ''} footer={<><button className="btn-secondary" onClick={() => setFill(null)}>Cancel</button><button className="btn-primary" disabled={!fill?.name.trim()} onClick={() => { if (fill) confirmRecruitment(fill.st.id, fill.name.trim(), fill.startDate); setFill(null) }}><UserCheck size={14} /> Confirm recruitment</button></>}>
-        {fill && <div className="space-y-3"><p className="text-[13px] text-ink-600">Created from approved budget <b>{fill.st.sourceProjectCode}</b> line <b>{fill.st.sourceLineCode}</b>. The RHS number stays the same; the person becomes active on the plan.</p><Field label="Recruited person" required><input className="input" autoFocus value={fill.name} onChange={(e) => setFill({ ...fill, name: e.target.value })} /></Field><Field label="Start date"><input type="date" className="input" value={fill.startDate} onChange={(e) => setFill({ ...fill, startDate: e.target.value })} /></Field></div>}
+        {fill && <div className="space-y-3"><p className="text-[13px] text-ink-600">Created from approved budget <b>{fill.st.sourceProjectCode}</b> line <b>{fill.st.sourceLineCode}</b>. The RHS number stays the same; the person becomes active on the plan.</p><Field label="Recruited person" required><input className="input" autoFocus value={fill.name} onChange={(e) => setFill({ ...fill, name: e.target.value })} /></Field><Field label="Start date"><DateInput className="input" value={fill.startDate} onChange={(e) => setFill({ ...fill, startDate: e.target.value })} /></Field></div>}
       </Modal>
     </>
   )

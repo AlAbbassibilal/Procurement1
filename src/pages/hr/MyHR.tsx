@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { MapPin, LogIn, LogOut, CalendarDays, Download, FileCheck2, Send, XCircle, Users, Briefcase, Home } from 'lucide-react'
 import { useStore } from '@/store/useStore'
-import { Card, PageHeader, Stat, Field, Alert, Modal, KV } from '@/components/ui'
+import { Card, PageHeader, Stat, Field, Alert, Modal, KV, DateInput } from '@/components/ui'
 import { balances, hrSettings, workingDaysBetween, LEAVE_LABEL, LEAVE_TONE, LEAVE_STATUS_TONE, TS_STATUS_LABEL, TS_STATUS_TONE, MODE_LABEL, mapLink, hoursWorked, capturePosition, today, contractDaysLeft, downloadPayslip, timesheetTotal, onLeaveToday } from '@/lib/hr'
 import { monthLabel } from '@/lib/grants'
 import { fmtDate, fmtDateTime, fmtMoney, cx } from '@/lib/format'
@@ -72,8 +72,8 @@ export default function MyHR() {
           <Card title={<span className="flex items-center gap-2"><CalendarDays size={16} /> Leave & work-from-home requests</span>} description={`Approved by ${manager?.name ?? 'HR & Admin'} · weekend ${hr.weekend.map((d) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d]).join(' / ')} is not counted`}>
             <div className="grid gap-3 rounded-control border border-line bg-surface-muted p-3 sm:grid-cols-[1fr_1fr_1fr_2fr_auto] sm:items-end">
               <Field label="Type"><select className="input" value={req.type} onChange={(e) => setReq({ ...req, type: e.target.value as LeaveType })}>{(Object.keys(LEAVE_LABEL) as LeaveType[]).map((t) => <option key={t} value={t}>{LEAVE_LABEL[t]}</option>)}</select></Field>
-              <Field label="From"><input type="date" className="input" value={req.startDate} onChange={(e) => setReq({ ...req, startDate: e.target.value, endDate: req.endDate || e.target.value })} /></Field>
-              <Field label="To"><input type="date" className="input" value={req.endDate} min={req.startDate} onChange={(e) => setReq({ ...req, endDate: e.target.value })} /></Field>
+              <Field label="From"><DateInput className="input" value={req.startDate} onChange={(e) => setReq({ ...req, startDate: e.target.value, endDate: req.endDate || e.target.value })} /></Field>
+              <Field label="To"><DateInput className="input" value={req.endDate} min={req.startDate} onChange={(e) => setReq({ ...req, endDate: e.target.value })} /></Field>
               <Field label={`Reason${reqDays ? ` · ${reqDays} working day(s)` : ''}`}><input className="input" value={req.reason} onChange={(e) => setReq({ ...req, reason: e.target.value })} placeholder={req.type === 'wfh' ? 'What you will work on' : 'Optional'} /></Field>
               <button className="btn-primary" data-testid="submit-request" disabled={!reqDays} onClick={submit}><Send size={14} /> Submit</button>
             </div>

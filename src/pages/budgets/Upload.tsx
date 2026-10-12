@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useMemo, useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, FileSpreadsheet, Upload, Save, Plus, Trash2, Sparkles } from 'lucide-react'
 import { useStore, useCurrentUser, attachmentFromFile } from '@/store/useStore'
-import { Card, PageHeader, Field, Alert } from '@/components/ui'
+import { Card, PageHeader, Field, Alert, DateInput, dateProblem } from '@/components/ui'
 import { readWorkbook, detectHeaderRow, guessMapping, extractLines, sheetScore, detectMeta, isRhsTemplate, extractRhsTemplate, currencyFromHeader, emptyMapping, MAP_KEYS, type ParsedSheet, type Mapping, type MapKey } from '@/lib/budget'
 import { fmtMoney, uid, nowIso, toInputDate } from '@/lib/format'
 import { DOC_OWNER } from '@/data/seed'
@@ -14,7 +14,12 @@ const colLetter = (i: number) => (i >= 26 ? String.fromCharCode(64 + Math.floor(
 export default function BudgetUpload() {
   const nav = useNavigate()
   const user = useCurrentUser()!
-  const { upsertBudget, budgets, settings } = useStore()
+  const { upsertBudget, budgets, settings, projects } = useStore()
+  const [sp] = useSearchParams()
+  /** Importing INTO an existing budget (a project's own budget from its Budget tab): keep its id and code, replace the lines. */
+  const target = budgets.find((b) => b.id === sp.get('budget'))
+  const targetProject = target ? projects.find((x) => x.budgetId === target.id) : undefined
+  const back = sp.get('back')
   const [meta, setMeta] = useState({ donorCode: '', name: '', donor: '', currency: settings.defaultCurrency as Currency, startDate: '', endDate: '', approvedAt: toInputDate(new Date()), duration: '', locations: '', notes: '' })
   const [file, setFile] = useState<Attachment | null>(null)
   const [sheets, setSheets] = useState<ParsedSheet[]>([])
@@ -24,6 +29,7 @@ export default function BudgetUpload() {
   const [mapping, setMapping] = useState<Mapping>(emptyMapping())
   const [lines, setLines] = useState<BudgetLine[] | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  useEffect(() => { if (target) setMeta((m) => ({ ...m, donorCode: target.donorCode, name: target.name, donor: target.donor, currency: target.currency, startDate: target.startDate ?? '', endDate: target.endDate ?? '', approvedAt: target.approvedAt ?? m.approvedAt, duration: target.duration ?? '', locations: target.locations ?? '', notes: target.notes ?? '' })) }, [target?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const sheet = sheets[sheetIdx]
   const header = sheet?.rows[headerRow] ?? []
@@ -52,19 +58,23 @@ export default function BudgetUpload() {
   const setHeader = (h: number) => { setHeaderRow(h); setMapping(guessMapping(sheet?.rows[h] ?? [])); setLines(null) }
   const save = () => {
     if (!meta.donorCode.trim()) return setErr('Project / donor code is required — requesters pick it on the requisition.')
-    if (budgets.some((b) => b.donorCode.toLowerCase() === meta.donorCode.trim().toLowerCase())) return setErr('A budget with this project code already exists. Remove it first or use a new code.')
+    // Same code as an existing budget (e.g. the project's own, still empty): import into it instead of creating a duplicate
+    const existing = target ?? budgets.find((b) => b.donorCode.toLowerCase() === meta.donorCode.trim().toLowerCase())
+    if (existing && existing.lines.length && !confirm(`${existing.donorCode} already has ${existing.lines.length} budget line(s). Replace them with the ${shown.length} imported line(s)?`)) return
     if (!meta.name.trim()) return setErr('Budget name is required.')
     if (!shown.length) return setErr('No budget lines extracted — adjust the header row and column mapping.')
     if (shown.some((l) => !l.code.trim())) return setErr('Every budget line needs a code.')
-    const b: ProjectBudget = { id: uid('bud_'), donorCode: meta.donorCode.trim(), name: meta.name.trim(), donor: meta.donor.trim(), currency: meta.currency, startDate: meta.startDate || undefined, endDate: meta.endDate || undefined, approvedAt: meta.approvedAt || undefined, duration: meta.duration || undefined, locations: meta.locations || undefined, status: 'active', lines: shown, sourceFile: file ?? undefined, sourceSheet: mode === 'rhs' ? 'Direct Cost + Admin Cost' : sheet?.name, uploadedBy: user.id, uploadedByName: user.name, uploadedAt: nowIso(), ownerName: DOC_OWNER, notes: meta.notes }
-    upsertBudget(b); nav(`/budgets/${b.id}`)
+    for (const [k, v] of [['Start date', meta.startDate], ['End date', meta.endDate], ['Approval date', meta.approvedAt]] as const) { const pr = dateProblem(v); if (pr) return setErr(`${k}: ${pr}`) }
+    if (meta.startDate && meta.endDate && meta.endDate < meta.startDate) return setErr('End date is before the start date.')
+    const b: ProjectBudget = { ...(existing ?? {}), id: existing?.id ?? uid('bud_'), donorCode: existing?.donorCode ?? meta.donorCode.trim(), name: meta.name.trim(), donor: meta.donor.trim(), currency: meta.currency, startDate: meta.startDate || undefined, endDate: meta.endDate || undefined, approvedAt: meta.approvedAt || undefined, duration: meta.duration || undefined, locations: meta.locations || undefined, status: existing?.status ?? 'active', lines: shown.map((l) => ({ ...l, costType: l.costType ?? (/admin|indirect|overhead|support cost|management cost/i.test(l.category ?? '') ? 'admin' : 'direct') })), sourceFile: file ?? undefined, sourceSheet: mode === 'rhs' ? 'Direct Cost + Admin Cost' : sheet?.name, uploadedBy: user.id, uploadedByName: user.name, uploadedAt: nowIso(), ownerName: DOC_OWNER, notes: meta.notes }
+    upsertBudget(b); nav(back || `/budgets/${b.id}`)
   }
   const editLine = (id: string, patch: Partial<BudgetLine>) => setLines(shown.map((l) => (l.id === id ? { ...l, ...patch } : l)))
   const direct = shown.filter((l) => l.costType === 'direct').reduce((s, l) => s + l.amount, 0), admin = shown.filter((l) => l.costType === 'admin').reduce((s, l) => s + l.amount, 0)
 
   return (
     <>
-      <PageHeader eyebrow="New document" title="Upload approved budget" subtitle={`Uploaded by ${user.name} · Owner ${DOC_OWNER}`}
+      <PageHeader eyebrow={target ? `Budget ${target.donorCode}` : 'New document'} title={target ? `Import approved budget into ${target.donorCode}` : 'Upload approved budget'} subtitle={`${targetProject ? `Project ${targetProject.title} · ` : ''}Uploaded by ${user.name} · Owner ${DOC_OWNER}`}
         actions={<><button className="btn-ghost" onClick={() => nav(-1)}><ArrowLeft size={15} /> Back</button><button className="btn-primary" onClick={save} disabled={!sheets.length}><Save size={15} /> Save budget ({shown.length} lines)</button></>} />
       {err && <div className="mb-4"><Alert tone="danger">{err}</Alert></div>}
       <div className="grid gap-6 xl:grid-cols-3">
@@ -128,13 +138,13 @@ export default function BudgetUpload() {
         <div className="space-y-6">
           <Card title="Project / grant" description="Pre-filled from the file's Summary / header block where found">
             <div className="space-y-4">
-              <Field label="Project / donor code" required hint="Shown to requesters in the requisition dropdown"><input className="input font-mono" value={meta.donorCode} onChange={(e) => setMeta({ ...meta, donorCode: e.target.value })} placeholder="e.g. RHS202600XXX" /></Field>
+              <Field label="Project / donor code" required hint="Shown to requesters in the requisition dropdown"><input className="input font-mono" data-testid="budget-code" value={meta.donorCode} readOnly={!!target} onChange={(e) => setMeta({ ...meta, donorCode: e.target.value })} placeholder="e.g. RHS202600XXX" />{!target && budgets.some((b) => b.donorCode.toLowerCase() === meta.donorCode.trim().toLowerCase()) && <div className="mt-1 text-[11.5px] text-sun-700">A budget with this code exists — the imported lines will go into it.</div>}</Field>
               <Field label="Project title" required><input className="input" value={meta.name} onChange={(e) => setMeta({ ...meta, name: e.target.value })} /></Field>
               <Field label="Donor / funding source"><input className="input" value={meta.donor} onChange={(e) => setMeta({ ...meta, donor: e.target.value })} /></Field>
               <div className="grid grid-cols-2 gap-3"><Field label="Currency"><select className="input" value={meta.currency} onChange={(e) => setMeta({ ...meta, currency: e.target.value as Currency })}><option>JOD</option><option>USD</option><option>EUR</option></select></Field><Field label="Duration"><input className="input" value={meta.duration} onChange={(e) => setMeta({ ...meta, duration: e.target.value })} placeholder="18 Months" /></Field></div>
               <Field label="Locations"><input className="input" value={meta.locations} onChange={(e) => setMeta({ ...meta, locations: e.target.value })} /></Field>
-              <div className="grid grid-cols-2 gap-3"><Field label="Start"><input type="date" className="input" value={meta.startDate} onChange={(e) => setMeta({ ...meta, startDate: e.target.value })} /></Field><Field label="End"><input type="date" className="input" value={meta.endDate} onChange={(e) => setMeta({ ...meta, endDate: e.target.value })} /></Field></div>
-              <Field label="Approved on"><input type="date" className="input" value={meta.approvedAt} onChange={(e) => setMeta({ ...meta, approvedAt: e.target.value })} /></Field>
+              <div className="grid grid-cols-2 gap-3"><Field label="Start"><DateInput className="input" value={meta.startDate} onChange={(e) => setMeta({ ...meta, startDate: e.target.value })} /></Field><Field label="End"><DateInput className="input" value={meta.endDate} onChange={(e) => setMeta({ ...meta, endDate: e.target.value })} /></Field></div>
+              <Field label="Approved on"><DateInput className="input" value={meta.approvedAt} onChange={(e) => setMeta({ ...meta, approvedAt: e.target.value })} /></Field>
               <Field label="Notes"><textarea className="input min-h-[64px]" value={meta.notes} onChange={(e) => setMeta({ ...meta, notes: e.target.value })} placeholder="Approval reference, grant agreement annex…" /></Field>
             </div>
           </Card>

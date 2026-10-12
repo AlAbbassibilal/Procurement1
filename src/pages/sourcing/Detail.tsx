@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Plus, Trophy, Trash2, Pencil, ShoppingCart, UserCheck, AlertTriangle, CheckCircle2, ShieldAlert, Users, FileCheck2, Gavel } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
 import { can } from '@/lib/permissions'
-import { Card, PageHeader, StatusPill, Field, Modal, Alert, KV, EmptyState } from '@/components/ui'
+import { Card, PageHeader, StatusPill, Field, Modal, Alert, KV, EmptyState, DateInput } from '@/components/ui'
 import { AttachmentList, ProcessTracker, CommentThread } from '@/components/workflow'
 import { MethodBadge, TierCard } from '@/components/tier'
 import { fmtMoney, fmtDate, fmtDateTime, linesSubtotal, toInputDate, addDays, cx } from '@/lib/format'
@@ -137,8 +137,8 @@ export default function SourcingDetail() {
           {competitive && (method === 'rfq' || method === 'rfq_formal') && (
             <Card title="Request for Quotation" description="SOP-PRO-03 — same RFQ, to all suppliers, at the same time">
               <div className="grid gap-4 sm:grid-cols-3">
-                <Field label="RFQ issued on"><input type="date" className="input" disabled={!canEdit} value={src.issuedAt ?? ''} onChange={(e) => updateSourcing(pr.id, { issuedAt: e.target.value })} /></Field>
-                <Field label="Quotation deadline"><input type="date" className="input" disabled={!canEdit} value={src.deadline ?? ''} onChange={(e) => updateSourcing(pr.id, { deadline: e.target.value })} /></Field>
+                <Field label="RFQ issued on"><DateInput className="input" disabled={!canEdit} value={src.issuedAt ?? ''} onChange={(e) => updateSourcing(pr.id, { issuedAt: e.target.value })} /></Field>
+                <Field label="Quotation deadline"><DateInput className="input" disabled={!canEdit} value={src.deadline ?? ''} onChange={(e) => updateSourcing(pr.id, { deadline: e.target.value })} /></Field>
                 <Field label="Opening witness" hint="Second staff member present at opening"><select className="input" disabled={!canEdit} value={src.openingWitnessId ?? ''} onChange={(e) => updateSourcing(pr.id, { openingWitnessId: e.target.value || undefined, openedAt: e.target.value ? (src.openedAt ?? new Date().toISOString()) : undefined })}><option value="">Select…</option>{users.filter((u) => u.active && u.id !== user.id).map((u) => <option key={u.id} value={u.id}>{u.name} — {u.title}</option>)}</select></Field>
               </div>
               <div className="mt-4"><div className="label">Suppliers invited ({src.invitedVendorIds.length} of min. {tier?.invitedSuppliersMin})</div>
@@ -158,8 +158,8 @@ export default function SourcingDetail() {
             <>
               <Card title={method === 'open_bid' ? 'Open tender (ICB)' : 'Closed bid — RFP / ITB'} description="SOP-PRO-04 — sealed bids, formal opening, technical then financial evaluation">
                 <div className="grid gap-4 sm:grid-cols-3">
-                  <Field label="Tender issued / advertised on"><input type="date" className="input" disabled={!canEdit} value={src.issuedAt ?? ''} onChange={(e) => updateSourcing(pr.id, { issuedAt: e.target.value })} /></Field>
-                  <Field label="Submission deadline" hint={src.issuedAt && src.deadline ? `${wd} working days (min. ${tier?.deadlineWorkingDays})` : `Min. ${tier?.deadlineWorkingDays} working days`}><input type="date" className="input" disabled={!canEdit} value={src.deadline ?? ''} onChange={(e) => updateSourcing(pr.id, { deadline: e.target.value })} /></Field>
+                  <Field label="Tender issued / advertised on"><DateInput className="input" disabled={!canEdit} value={src.issuedAt ?? ''} onChange={(e) => updateSourcing(pr.id, { issuedAt: e.target.value })} /></Field>
+                  <Field label="Submission deadline" hint={src.issuedAt && src.deadline ? `${wd} working days (min. ${tier?.deadlineWorkingDays})` : `Min. ${tier?.deadlineWorkingDays} working days`}><DateInput className="input" disabled={!canEdit} value={src.deadline ?? ''} onChange={(e) => updateSourcing(pr.id, { deadline: e.target.value })} /></Field>
                   <Field label="Technical pass mark (of 100)"><input type="number" min={0} max={100} className="input" disabled={!canEdit} value={passMark} onChange={(e) => updateSourcing(pr.id, { technicalPassMark: Number(e.target.value) })} /></Field>
                   {method === 'open_bid' && <Field label="Public advertisement reference" className="sm:col-span-3" hint="Newspaper, RHS website, donor platform — and ITB reference"><input className="input" disabled={!canEdit} value={src.advertisementRef ?? ''} onChange={(e) => updateSourcing(pr.id, { advertisementRef: e.target.value })} /></Field>}
                   {tier?.donorApproval && <Field label="Donor approval / no-objection reference" className="sm:col-span-3"><input className="input" disabled={!canEdit} value={src.donorApprovalRef ?? ''} onChange={(e) => updateSourcing(pr.id, { donorApprovalRef: e.target.value })} placeholder="Required before the purchase order is raised" /></Field>}
@@ -293,8 +293,8 @@ export default function SourcingDetail() {
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Vendor" required><select className="input" value={editing.q.vendorId} onChange={(e) => { const v = vendors.find((x) => x.id === e.target.value); setEditing({ ...editing, q: { ...editing.q, vendorId: e.target.value, vendorName: v?.name ?? '' } }) }}><option value="">Select vendor…</option>{vendors.filter((v) => v.status !== 'blocked').map((v) => <option key={v.id} value={v.id}>{v.name} ({v.code}){competitive && method !== 'direct' && method !== 'open_bid' && !src.invitedVendorIds.includes(v.id) ? ' — not invited' : ''}</option>)}</select></Field>
               <Field label={bid ? 'Bid reference' : 'Vendor quotation ref.'} required><input className="input" value={editing.q.reference} onChange={(e) => setEditing({ ...editing, q: { ...editing.q, reference: e.target.value } })} /></Field>
-              <Field label="Received on"><input type="date" className="input" value={editing.q.receivedAt.slice(0, 10)} onChange={(e) => { const late = !!src.deadline && e.target.value > src.deadline; setEditing({ ...editing, q: { ...editing.q, receivedAt: new Date(e.target.value).toISOString(), late } }) }} /></Field>
-              <Field label="Valid until"><input type="date" className="input" value={editing.q.validUntil} onChange={(e) => setEditing({ ...editing, q: { ...editing.q, validUntil: e.target.value } })} /></Field>
+              <Field label="Received on"><DateInput className="input" value={editing.q.receivedAt.slice(0, 10)} onChange={(e) => { const late = !!src.deadline && e.target.value > src.deadline; setEditing({ ...editing, q: { ...editing.q, receivedAt: new Date(e.target.value).toISOString(), late } }) }} /></Field>
+              <Field label="Valid until"><DateInput className="input" value={editing.q.validUntil} onChange={(e) => setEditing({ ...editing, q: { ...editing.q, validUntil: e.target.value } })} /></Field>
               <Field label="Delivery lead time (days)"><input type="number" className="input" value={editing.q.deliveryDays} onChange={(e) => setEditing({ ...editing, q: { ...editing.q, deliveryDays: Number(e.target.value) } })} /></Field>
               <Field label="Payment terms"><input className="input" value={editing.q.paymentTerms} onChange={(e) => setEditing({ ...editing, q: { ...editing.q, paymentTerms: e.target.value } })} /></Field>
               <Field label="Warranty"><input className="input" value={editing.q.warranty} onChange={(e) => setEditing({ ...editing, q: { ...editing.q, warranty: e.target.value } })} /></Field>

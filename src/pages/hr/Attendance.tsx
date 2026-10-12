@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { MapPin, Download } from 'lucide-react'
 import { useStore } from '@/store/useStore'
-import { Card, PageHeader, Stat } from '@/components/ui'
+import { Card, PageHeader, Stat, DateInput } from '@/components/ui'
 import { mapLink, hoursWorked, MODE_LABEL, today, onLeaveToday, hrSettings } from '@/lib/hr'
 import { fmtDate, cx } from '@/lib/format'
 import { useHrContext } from './shared'
@@ -17,7 +17,7 @@ export default function HrAttendance() {
   const exportX = async () => { const X = await import('xlsx'); const aoa = [['Date', 'RHS no.', 'Name', 'Mode', 'Check-in', 'Check-out', 'Hours', 'Latitude', 'Longitude', 'Accuracy (m)', 'Location', 'Leave'], ...rows.map(({ s, a, leave }) => [day, s.rhsNumber, s.name, a ? MODE_LABEL[a.mode] : '', a ? a.checkInAt.slice(11, 16) : '', a?.checkOutAt ? a.checkOutAt.slice(11, 16) : '', a ? hoursWorked(a) ?? '' : '', a?.lat ?? '', a?.lng ?? '', a?.accuracy ?? '', a?.locationStatus ?? '', leave?.number ?? ''])]; const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(aoa), 'Attendance'); saveWorkbook(X, wb, `Attendance_${day}.xlsx`) }
   return (
     <>
-      <PageHeader title="Attendance" subtitle="Daily check-ins with the captured location. Staff check in from My HR; the browser location is stored with the time." actions={<div className="flex gap-2"><input type="date" className="input w-44" value={day} onChange={(e) => setDay(e.target.value)} /><button className="btn-secondary" onClick={exportX}><Download size={15} /> Export</button></div>} />
+      <PageHeader title="Attendance" subtitle="Daily check-ins with the captured location. Staff check in from My HR; the browser location is stored with the time." actions={<div className="flex gap-2"><DateInput className="input w-44" value={day} onChange={(e) => setDay(e.target.value)} /><button className="btn-secondary" onClick={exportX}><Download size={15} /> Export</button></div>} />
       <div className="mb-5 grid gap-4 sm:grid-cols-4"><Stat label="Checked in" value={rows.filter((r) => r.a).length} tone="brand" /><Stat label="On approved leave / WFH" value={rows.filter((r) => r.leave).length} /><Stat label="No check-in" value={rows.filter((r) => !r.a && !r.leave).length} tone={rows.some((r) => !r.a && !r.leave) ? 'sun' : 'default'} /><Stat label={`Late (after ${hr.checkInEnd})`} value={rows.filter((r) => r.a && late(r.a.checkInAt)).length} tone={rows.some((r) => r.a && late(r.a.checkInAt)) ? 'accent' : 'default'} /></div>
       <Card padded={false} title={fmtDate(day)}><div className="overflow-x-auto"><table className="w-full min-w-[900px] text-[13px]">
         <thead><tr><th className="table-th">Staff</th><th className="table-th">Mode</th><th className="table-th">Check-in</th><th className="table-th">Check-out</th><th className="table-th text-right">Hours</th><th className="table-th">Location</th><th className="table-th">Note</th></tr></thead>

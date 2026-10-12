@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Send, RefreshCw, ShieldAlert, Banknote, XCircle, Printer } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
 import { can } from '@/lib/permissions'
-import { Card, PageHeader, StatusPill, KV, Alert, Field, Modal } from '@/components/ui'
+import { Card, PageHeader, StatusPill, KV, Alert, Field, Modal, DateInput } from '@/components/ui'
 import { ApprovalChain, DecisionPanel, CommentThread, AttachmentList, ProcessTracker } from '@/components/workflow'
 import { fmtMoney, fmtDate, fmtDateTime, toInputDate, cx } from '@/lib/format'
 import { invoiceTotals, receivedQty, invoicedQty } from '@/lib/match'
@@ -105,7 +105,7 @@ export default function InvoiceDetail() {
         {err && <div className="mb-3"><Alert tone="danger">{err}</Alert></div>}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Payment method"><select className="input" value={pay.method} onChange={(e) => setPay({ ...pay, method: e.target.value as typeof pay.method })}><option value="bank_transfer">Bank transfer</option><option value="cheque">Cheque</option><option value="cash">Cash</option></select></Field>
-          <Field label="Payment date"><input type="date" className="input" value={pay.paidAt} onChange={(e) => setPay({ ...pay, paidAt: e.target.value })} /></Field>
+          <Field label="Payment date"><DateInput className="input" value={pay.paidAt} onChange={(e) => setPay({ ...pay, paidAt: e.target.value })} /></Field>
           <Field label="Bank / cheque reference" required className="sm:col-span-2"><input className="input" value={pay.reference} onChange={(e) => setPay({ ...pay, reference: e.target.value })} placeholder="e.g. TRF-2025-00931" /></Field>
         </div>
       </Modal>

@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, PenLine, Scale, Plus, Trash2, Printer, CheckCircle2, Undo2 } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
 import { can } from '@/lib/permissions'
-import { Card, PageHeader, StatusPill, KV, Alert, Field, Modal } from '@/components/ui'
+import { Card, PageHeader, StatusPill, KV, Alert, Field, Modal, DateInput } from '@/components/ui'
 import { CommentThread, AttachmentList, ProcessTracker } from '@/components/workflow'
 import { fmtMoney, fmtDate, fmtDateTime, uid, cx } from '@/lib/format'
 import { STANDARD_CLAUSES } from '@/data/seed'
@@ -69,8 +69,8 @@ export default function ContractDetail() {
               <Field label="Contract title" className="sm:col-span-2"><input className="input" disabled={!editable} value={ct.title} onChange={(e) => set({ title: e.target.value })} /></Field>
               <Field label="Type"><select className="input" disabled={!editable} value={ct.type} onChange={(e) => set({ type: e.target.value as Contract['type'] })}><option value="supply">Supply</option><option value="service">Service</option><option value="framework">Framework</option><option value="works">Works</option></select></Field>
               <Field label="Contract value"><input type="number" className="input" disabled={!editable} value={ct.value} onChange={(e) => set({ value: Number(e.target.value) })} /></Field>
-              <Field label="Start date"><input type="date" className="input" disabled={!editable} value={ct.startDate} onChange={(e) => set({ startDate: e.target.value })} /></Field>
-              <Field label="End date"><input type="date" className="input" disabled={!editable} value={ct.endDate} onChange={(e) => set({ endDate: e.target.value })} /></Field>
+              <Field label="Start date"><DateInput className="input" disabled={!editable} value={ct.startDate} onChange={(e) => set({ startDate: e.target.value })} /></Field>
+              <Field label="End date"><DateInput className="input" disabled={!editable} value={ct.endDate} onChange={(e) => set({ endDate: e.target.value })} /></Field>
             </div>
           </Card>
 
@@ -99,7 +99,7 @@ export default function ContractDetail() {
               <tbody>{ct.milestones.map((m) => (
                 <tr key={m.id}>
                   <td className="table-td">{editable ? <input className="input" value={m.title} onChange={(e) => set({ milestones: ct.milestones.map((x) => (x.id === m.id ? { ...x, title: e.target.value } : x)) })} /> : m.title}</td>
-                  <td className="table-td">{editable ? <input type="date" className="input" value={m.dueDate} onChange={(e) => set({ milestones: ct.milestones.map((x) => (x.id === m.id ? { ...x, dueDate: e.target.value } : x)) })} /> : fmtDate(m.dueDate)}</td>
+                  <td className="table-td">{editable ? <DateInput className="input" value={m.dueDate} onChange={(e) => set({ milestones: ct.milestones.map((x) => (x.id === m.id ? { ...x, dueDate: e.target.value } : x)) })} /> : fmtDate(m.dueDate)}</td>
                   <td className="table-td text-right tabular-nums">{editable ? <input type="number" className="input text-right" value={m.amount} onChange={(e) => set({ milestones: ct.milestones.map((x) => (x.id === m.id ? { ...x, amount: Number(e.target.value) } : x)) })} /> : fmtMoney(m.amount, ct.currency)}</td>
                   <td className="table-td">{ct.status === 'active' && isProc ? <select className="input" value={m.status} onChange={(e) => set({ milestones: ct.milestones.map((x) => (x.id === m.id ? { ...x, status: e.target.value as typeof m.status } : x)) })}><option value="pending">Pending</option><option value="completed">Completed</option><option value="invoiced">Invoiced</option><option value="paid">Paid</option></select> : <StatusPill status={m.status} />}</td>
                   {editable && <td className="table-td"><button className="btn-ghost btn-sm text-accent-700" onClick={() => set({ milestones: ct.milestones.filter((x) => x.id !== m.id) })}><Trash2 size={13} /></button></td>}

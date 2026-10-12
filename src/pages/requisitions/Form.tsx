@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Save, Send, ArrowLeft, Info } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
-import { Card, PageHeader, Field, Alert } from '@/components/ui'
+import { Card, PageHeader, Field, Alert, DateInput } from '@/components/ui'
 import { LineItemsEditor, AttachmentList, newLine, ProcessTracker } from '@/components/workflow'
 import { DEPARTMENTS } from '@/data/seed'
 import { fmtMoney, linesSubtotal } from '@/lib/format'
@@ -74,7 +74,7 @@ export default function RequisitionForm() {
               <Field label="Procurement type" required hint="Services and works above USD 2,500 need a formal contract"><select className="input" value={draft.procurementType ?? 'goods'} onChange={(e) => set({ procurementType: e.target.value as PurchaseRequisition['procurementType'] })}><option value="goods">Goods</option><option value="services">Services</option><option value="works">Works</option></select></Field>
               <Field label="Project / donor code" required hint={project ? `${project.donor} · ${project.lines.length} budget lines` : 'Budget lines below come from the selected project budget'}><select className="input" value={draft.donorCode ?? ''} onChange={(e) => pickProject(e.target.value)}><option value="">Select project…</option>{budgets.filter((b) => b.status === 'active').map((b) => <option key={b.id} value={b.donorCode}>{b.donorCode} — {b.name}</option>)}</select></Field>
               <Field label="Priority"><select className="input" value={draft.priority} onChange={(e) => set({ priority: e.target.value as PurchaseRequisition['priority'] })}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option></select></Field>
-              <Field label="Needed by" required><input type="date" className="input" value={draft.neededBy ?? ''} onChange={(e) => set({ neededBy: e.target.value })} /></Field>
+              <Field label="Needed by" required><DateInput className="input" value={draft.neededBy ?? ''} onChange={(e) => set({ neededBy: e.target.value })} /></Field>
               <Field label="Currency"><select className="input" value={draft.currency} onChange={(e) => set({ currency: e.target.value as PurchaseRequisition['currency'] })}><option>JOD</option><option>USD</option><option>EUR</option></select></Field>
             </div>
           </Card>

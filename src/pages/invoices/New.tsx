@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Receipt } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
-import { Card, PageHeader, Field, Alert, KV } from '@/components/ui'
+import { Card, PageHeader, Field, Alert, KV, DateInput } from '@/components/ui'
 import { AttachmentList, ProcessTracker } from '@/components/workflow'
 import { fmtMoney, toInputDate, addDays } from '@/lib/format'
 import { invoiceTotals, invoicedQty, receivedQty, runMatch } from '@/lib/match'
@@ -55,8 +55,8 @@ export default function InvoiceNew() {
               <Field label="Purchase order" required className="sm:col-span-2"><select className="input" value={poId} onChange={(e) => pickPO(e.target.value)}><option value="">Select an issued purchase order…</option>{eligible.map((p) => <option key={p.id} value={p.id}>{p.number} · {p.vendorName} · {p.title}</option>)}</select></Field>
               <Field label="Vendor" ><input className="input" disabled value={po?.vendorName ?? ''} /></Field>
               <Field label="Vendor invoice number" required><input className="input" value={vendorInvoiceNo} onChange={(e) => setVendorInvoiceNo(e.target.value)} placeholder="As printed on the invoice" /></Field>
-              <Field label="Invoice date"><input type="date" className="input" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} /></Field>
-              <Field label="Due date"><input type="date" className="input" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></Field>
+              <Field label="Invoice date"><DateInput className="input" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} /></Field>
+              <Field label="Due date"><DateInput className="input" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></Field>
               <Field label="Tax rate %"><input type="number" className="input" value={taxRate} onChange={(e) => setTaxRate(Number(e.target.value))} /></Field>
             </div>
           </Card>

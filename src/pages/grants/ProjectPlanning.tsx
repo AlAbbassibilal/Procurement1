@@ -127,7 +127,7 @@ export function BudgetTab({ p, budget, canEdit }: { p: Project; budget?: Project
   const add = (costType: 'direct' | 'admin') => { const n = lines.filter((l) => l.costType === costType).length + 1; set([...lines, { id: uid('bl_'), code: `${costType === 'direct' ? 'D' : 'A'}-${String(n).padStart(2, '0')}`, description: '', category: costType === 'direct' ? 'A. Personnel (Direct Cost)' : 'A. Amman Support Personnel (Indirect / Admin)', amount: 0, costType, units: 1, frequency: 1, unitCost: 0, pct: 1, unit: 'Person' }]) }
   const direct = lines.filter((l) => l.costType !== 'admin').reduce((s, l) => s + l.amount, 0), admin = lines.filter((l) => l.costType === 'admin').reduce((s, l) => s + l.amount, 0)
   const open = unassignedSalaryLines(lines)
-  /** Salary lines: one RHS number per unit, or "new position" (joins the master salary plan when the project is granted). */
+  /** Salary lines: one RHS number per personnel line (units are months), or "new position" (joins the master salary plan when the project is granted). */
   const renderStaffCell = (l: BudgetLine, locked: boolean) => {
     const salary = isSalaryLine(l)
     if (!salary) return <button className="text-[11px] text-ink-400 hover:text-brand-700 hover:underline" disabled={locked} onClick={() => setL(l.id, { kind: 'salary' })} title="Treat this line as a salary line">not a salary line{!locked && ' · mark as salary'}</button>
@@ -136,7 +136,7 @@ export function BudgetTab({ p, budget, canEdit }: { p: Project; budget?: Project
     return (
       <div className="space-y-1">
         {Array.from({ length: n }, (_, i) => { const cur = ids[i] ?? ''; const st = staff.find((x) => x.id === cur); return (
-          <select key={i} className={cx('input text-[11.5px]', cur ? 'text-brand-800' : 'border-sun-300 bg-sun-50 text-sun-700')} disabled={locked} value={cur} title={st ? `${st.rhsNumber} · ${st.name || '(to recruit)'} · ${st.position}` : 'Assign the staff member this line pays'}
+          <select key={i} className={cx('input text-[11.5px]', cur ? 'text-brand-800' : 'border-sun-300 bg-sun-50 text-sun-700')} disabled={locked} value={cur} title={st ? `${st.rhsNumber} · ${st.name || '(to recruit)'} · ${st.position}` : 'Assign the staff member this line pays (one person per line — add a line for a second person)'}
             onChange={(e) => { const v = e.target.value; if (v === '__new') return setL(l.id, { kind: 'salary', newStaff: true, staffIds: [] }); if (v === '__none') return setL(l.id, { kind: 'other', newStaff: false, staffIds: [] }); const next = [...ids]; next[i] = v; setL(l.id, { kind: 'salary', staffIds: next.filter(Boolean) }) }}>
             <option value="">— assign staff (RHS no.) —</option>
             <option value="__new">New position — to recruit</option>

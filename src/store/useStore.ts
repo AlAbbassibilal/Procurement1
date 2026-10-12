@@ -1226,7 +1226,7 @@ export const useStore = create<State & Actions>()(
             patch = { ...patch, grantedAt: nowIso(), outcome: 'funded', awardedAmount: opts.awardedAmount ?? p.requestedAmount ?? budget?.lines.reduce((s2, l) => s2 + l.amount, 0), startDate: start, endDate: end,
               iptt: generateIPTT(p), ipttGeneratedAt: p.ipttGeneratedAt ?? nowIso(), spendingPlan: p.spendingPlan.length ? p.spendingPlan : generateSpendingPlan(budget?.lines ?? [], months), reports: p.reports.length ? p.reports : generateReportingCalendar({ ...p, startDate: start, endDate: end }) }
             if (budget) {
-              // New positions in the approved budget join the master salary plan as "to recruit", one per unit, with an RHS number
+              // New positions in the approved budget join the master salary plan as "to recruit", one per line, with an RHS number
               const created: StaffMember[] = []; const lineStaff: Record<string, string[]> = {}
               for (const l of budget.lines) {
                 if (!isSalaryLine(l) || !l.newStaff) continue

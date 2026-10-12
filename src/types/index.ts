@@ -454,7 +454,7 @@ export interface BudgetLine {
   masterLineId?: string   // which organisation master-budget line this project line funds
   // Salary lines — linked to the master salary plan
   kind?: 'salary' | 'other'   // explicit; when absent the line is auto-detected (personnel section / "Person" unit / 26xx account)
-  staffIds?: string[]         // StaffMember ids (RHS numbers) this line pays, one per unit
+  staffIds?: string[]         // StaffMember ids (RHS numbers) this line pays, one per personnel line
   newStaff?: boolean          // position to be recruited — added to the master salary plan when the project is granted
 }
 

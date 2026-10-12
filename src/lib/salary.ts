@@ -18,8 +18,8 @@ export const isSalaryLine = (l: BudgetLine) =>
   l.kind === 'salary' || (l.kind !== 'other' && (/personnel|salar|staff|wages|payroll/i.test(l.category ?? '') || /^person/i.test(l.unit ?? '') || /^26\d\d$/.test(l.accountNo ?? '')))
 /** Salary lines that still need an RHS number or a "new position" flag — blocks submission. */
 export const unassignedSalaryLines = (lines: BudgetLine[]) => lines.filter((l) => isSalaryLine(l) && !l.newStaff && !(l.staffIds?.length))
-/** Number of people a line pays (one per unit). */
-export const headcount = (l: BudgetLine) => Math.max(1, Math.min(20, Math.round(l.units ?? 1)))
+/** Number of people a line pays: one per personnel line. Units on salary lines are months, not people — a second person gets a second line. */
+export const headcount = (_l: BudgetLine) => 1
 
 export const rhsNumber = (n: number) => `RHS-${String(n).padStart(4, '0')}`
 export const nextRhsNumber = (staff: StaffMember[]) => rhsNumber(staff.reduce((m, s) => Math.max(m, Number(s.rhsNumber.replace(/\D/g, '')) || 0), 0) + 1)

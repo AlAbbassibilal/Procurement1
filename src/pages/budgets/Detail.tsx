@@ -1,6 +1,6 @@
 import { Fragment, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Download, FileSpreadsheet, Printer } from 'lucide-react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { ArrowLeft, Download, FileSpreadsheet, Printer, Table2, BarChart3 } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
 import { can } from '@/lib/permissions'
 import { Card, PageHeader, KV, Alert, StatusPill, Field } from '@/components/ui'
@@ -16,6 +16,8 @@ export default function BudgetDetail() {
   const masterLines = masterBudgets.flatMap((m) => m.lines)
   const b = budgets.find((x) => x.id === id)
   const [received, setReceived] = useState<string | null>(null)
+  const [sp] = useSearchParams()
+  const [view, setView] = useState<'budget' | 'bva'>(sp.get('view') === 'budget' ? 'budget' : 'bva')
   if (!b) return <Alert tone="danger">Budget not found. <Link to="/budgets" className="underline">Back</Link></Alert>
   const bva = computeBvA(b, prs, pos, invoices, trips)
   const { totals: T, approvedTotal: A, unbudgetedTotal: U } = bva
@@ -28,7 +30,7 @@ export default function BudgetDetail() {
   const Row = ({ r, total }: { r: BvARow; total?: boolean }) => (
     <tr className={cx(total ? 'bg-surface-muted font-semibold' : !r.line && 'bg-danger-50/50')}>
       <td className="table-td font-mono text-[12px] font-semibold text-brand-700">{total ? '' : r.code}</td>
-      <td className="table-td"><div className={cx('text-ink-900', !total && 'font-medium')}>{r.description}</div>{!total && r.line && (r.line.location || r.line.masterLineId) && <div className="text-[11.5px] text-ink-500">{r.line.location}{r.line.accountNo && ` · acct ${r.line.accountNo}`}{r.line.masterLineId && <span className="ml-1 rounded bg-info-50 px-1 text-info-700">{masterLines.find((m) => m.id === r.line!.masterLineId)?.code}</span>}</div>}</td>
+      <td className="table-td"><div className={cx('text-ink-900', !total && 'font-medium')}>{r.description}</div>{!total && r.line?.unitCost != null && <div className="text-[11.5px] text-ink-500">{r.line.units ?? 1}{r.line.unit ? ` ${r.line.unit}` : ''} × {r.line.frequency ?? 1} × {fmtMoney(r.line.unitCost, c)}{r.line.pct != null && r.line.pct !== 1 ? ` × ${Math.round(r.line.pct * 1000) / 10}%` : ''}</div>}{!total && r.line && (r.line.location || r.line.masterLineId) && <div className="text-[11.5px] text-ink-500">{r.line.location}{r.line.accountNo && ` · acct ${r.line.accountNo}`}{r.line.masterLineId && <span className="ml-1 rounded bg-info-50 px-1 text-info-700">{masterLines.find((m) => m.id === r.line!.masterLineId)?.code}</span>}</div>}</td>
       <td className="table-td text-right tabular-nums">{money(r.budget)}</td>
       <td className="table-td text-right tabular-nums">{money(r.actual)}</td>
       <td className={cx('table-td text-right tabular-nums', r.remaining < 0 && 'text-accent-700')}>{money(r.remaining)}</td>
@@ -47,6 +49,7 @@ export default function BudgetDetail() {
         subtitle={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><StatusPill status={b.status} /><span>{b.donor}</span>{b.duration && <span>· {b.duration}</span>}{(b.startDate || b.endDate) && <span>· {fmtDate(b.startDate)} – {fmtDate(b.endDate)}</span>}<span>· Owner {b.ownerName}</span></span>}
         actions={<>
           <button className="btn-ghost" onClick={() => nav(-1)}><ArrowLeft size={15} /> Back</button>
+          <div className="flex rounded-control bg-surface-muted p-0.5" role="radiogroup" aria-label="View"><button role="radio" aria-checked={view === 'budget'} data-testid="view-budget" className={cx('flex items-center gap-1 rounded-control px-2.5 py-1 text-[12.5px] font-medium', view === 'budget' ? 'bg-surface shadow-card text-ink-900' : 'text-ink-600')} onClick={() => setView('budget')}><Table2 size={13} /> Approved budget</button><button role="radio" aria-checked={view === 'bva'} data-testid="view-bva" className={cx('flex items-center gap-1 rounded-control px-2.5 py-1 text-[12.5px] font-medium', view === 'bva' ? 'bg-surface shadow-card text-ink-900' : 'text-ink-600')} onClick={() => setView('bva')}><BarChart3 size={13} /> Budget vs Actual</button></div>
           <button className="btn-ghost" onClick={() => window.print()}><Printer size={15} /> Print</button>
           <button className="btn-primary" onClick={() => exportBvA(b, bva, prs, pos, invoices, settings, user.name)}><Download size={15} /> Export BvA (Excel)</button>
           {canEdit && <button className="btn-secondary" onClick={() => upsertBudget({ ...b, status: b.status === 'active' ? 'closed' : 'active' })}>{b.status === 'active' ? 'Close budget' : 'Re-open'}</button>}
@@ -54,7 +57,28 @@ export default function BudgetDetail() {
 
       <div className="grid gap-6 xl:grid-cols-4">
         <div className="space-y-6 xl:col-span-3">
-          <Card padded={false}>
+          {view === 'budget' && (
+            <Card padded={false} title="Approved budget — full lines" description="As imported from the budget template: unit, number of units, frequency (months), unit cost and LoE / allocation % for every line.">
+              <div className="overflow-x-auto scrollbar-thin">
+                <table className="w-full min-w-[1180px] text-[12.5px]" data-testid="approved-budget">
+                  <thead><tr><th className="table-th w-20">Code</th><th className="table-th w-20">Activity</th><th className="table-th w-16">Acct</th><th className="table-th w-24">Location</th><th className="table-th">Position / line item</th><th className="table-th w-16">Unit</th><th className="table-th w-16 text-right"># units</th><th className="table-th w-14 text-right">Freq</th><th className="table-th w-24 text-right">Unit cost</th><th className="table-th w-16 text-right">LoE %</th><th className="table-th w-28 text-right">Total ({c})</th></tr></thead>
+                  <tbody>
+                    {(['direct', 'admin'] as const).map((ct) => { const ls = b.lines.filter((l) => (l.costType ?? 'direct') === ct); if (!ls.length) return null; const secs = [...new Set(ls.map((l) => l.category ?? ''))]; return (<Fragment key={ct}>
+                      <tr><td colSpan={11} className="bg-surface-muted px-4 py-2 text-[11.5px] font-bold uppercase tracking-[0.05em] text-ink-700">{ct === 'direct' ? 'Direct cost' : 'Admin / indirect cost'}</td></tr>
+                      {secs.map((sec) => (<Fragment key={sec || '_'}>
+                        {sec && <tr><td colSpan={11} className="px-4 pt-2 pb-1 text-[11.5px] font-semibold text-ink-500">{sec}</td></tr>}
+                        {ls.filter((l) => (l.category ?? '') === sec).map((l) => (
+                          <tr key={l.id} className="border-t border-line hover:bg-surface-muted/60"><td className="table-td font-mono text-[12px] text-brand-700">{l.code}</td><td className="table-td text-ink-600">{l.activityCode ?? ''}</td><td className="table-td font-mono text-[11.5px] text-ink-600">{l.accountNo ?? ''}</td><td className="table-td text-ink-600">{l.location ?? ''}</td><td className="table-td font-medium text-ink-900">{l.description}</td><td className="table-td text-ink-600">{l.unit ?? ''}</td><td className="table-td text-right tabular-nums">{l.units ?? ''}</td><td className="table-td text-right tabular-nums">{l.frequency ?? ''}</td><td className="table-td text-right tabular-nums">{l.unitCost != null ? money(l.unitCost) : ''}</td><td className="table-td text-right tabular-nums">{l.pct != null ? `${Math.round(l.pct * 1000) / 10}%` : ''}</td><td className="table-td text-right font-semibold tabular-nums">{money(l.amount)}</td></tr>))}
+                      </Fragment>))}
+                      <tr className="bg-surface-muted font-semibold"><td colSpan={10} className="table-td text-right">Total {ct === 'direct' ? 'direct' : 'admin / indirect'}</td><td className="table-td text-right tabular-nums">{money(ls.reduce((t, l) => t + l.amount, 0))}</td></tr>
+                    </Fragment>) })}
+                  </tbody>
+                  <tfoot><tr className="font-bold"><td colSpan={10} className="table-td text-right">Total project budget</td><td className="table-td text-right tabular-nums">{money(b.lines.reduce((t, l) => t + l.amount, 0))}</td></tr></tfoot>
+                </table>
+              </div>
+            </Card>
+          )}
+          {view === 'bva' && <Card padded={false}>
             <div className="flex flex-wrap items-start justify-between gap-4 border-b border-line bg-surface-muted px-5 py-4"><Logo size="sm" /><div className="text-right text-[12.5px] text-ink-600"><div className="text-[16px] font-semibold text-ink-900">BUDGET vs ACTUAL</div><div className="font-mono">{b.donorCode}</div><div>As at {fmtDate(new Date().toISOString())} · {c}</div></div></div>
             <div className="overflow-x-auto scrollbar-thin">
               <table className="w-full min-w-[1240px] text-[13px]">
@@ -75,7 +99,7 @@ export default function BudgetDetail() {
               </table>
             </div>
             <div className="border-t border-line px-5 py-3 text-[11.5px] text-ink-500">Columns follow the RHS BvA sheet (Annex 1). Actual = paid invoices · Commitments = approved / issued purchase orders not yet paid · Forecast = requisitions in approval or sourcing · Remaining = Total − Actual · Remaining with commitments = Total − (Actual + Commitments + Forecast). Rows shaded red are charged to codes that are not in the approved budget.</div>
-          </Card>
+          </Card>}
 
           <Card title="Transactions charged to this budget" padded={false}>
             {projectPRs.length === 0 ? <div className="px-5 py-6 text-center text-[13px] text-ink-500">No requisitions yet.</div> : (

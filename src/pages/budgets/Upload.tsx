@@ -67,7 +67,7 @@ export default function BudgetUpload() {
     for (const [k, v] of [['Start date', meta.startDate], ['End date', meta.endDate], ['Approval date', meta.approvedAt]] as const) { const pr = dateProblem(v); if (pr) return setErr(`${k}: ${pr}`) }
     if (meta.startDate && meta.endDate && meta.endDate < meta.startDate) return setErr('End date is before the start date.')
     const b: ProjectBudget = { ...(existing ?? {}), id: existing?.id ?? uid('bud_'), donorCode: existing?.donorCode ?? meta.donorCode.trim(), name: meta.name.trim(), donor: meta.donor.trim(), currency: meta.currency, startDate: meta.startDate || undefined, endDate: meta.endDate || undefined, approvedAt: meta.approvedAt || undefined, duration: meta.duration || undefined, locations: meta.locations || undefined, status: existing?.status ?? 'active', lines: shown.map((l) => ({ ...l, costType: l.costType ?? (/admin|indirect|overhead|support cost|management cost/i.test(l.category ?? '') ? 'admin' : 'direct') })), sourceFile: file ?? undefined, sourceSheet: mode === 'rhs' ? 'Direct Cost + Admin Cost' : sheet?.name, uploadedBy: user.id, uploadedByName: user.name, uploadedAt: nowIso(), ownerName: DOC_OWNER, notes: meta.notes }
-    upsertBudget(b); nav(back || `/budgets/${b.id}`)
+    upsertBudget(b); nav(back || `/budgets/${b.id}?view=budget`)
   }
   const editLine = (id: string, patch: Partial<BudgetLine>) => setLines(shown.map((l) => (l.id === id ? { ...l, ...patch } : l)))
   /** Edit the calculation basis of a line; the approved total follows units × frequency × unit cost × LoE % once a unit cost is given. */

@@ -8,9 +8,9 @@ import { ROLE_LABEL } from '@/lib/workflow'
 
 export default function Login() {
   const nav = useNavigate()
-  const { login, users, settings } = useStore()
-  const [email, setEmail] = useState('AlAbbassi.bilal@icloud.com')
-  const [password, setPassword] = useState('rhs2025')
+  const { login, users, settings, dataMode } = useStore()
+  const [email, setEmail] = useState(dataMode === 'demo' ? 'babbassi@RHS.jo' : '')
+  const [password, setPassword] = useState(dataMode === 'demo' ? 'rhs2025' : '')
   const [show, setShow] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -22,7 +22,8 @@ export default function Login() {
       const r = login(email, password)
       setBusy(false)
       if (!r.ok) return setErr(r.error ?? 'Sign-in failed')
-      nav('/')
+      const u = users.find((x) => x.email.toLowerCase() === email.trim().toLowerCase())
+      nav(u?.mustChangePassword ? '/account?first=1' : '/')
     }, 350)
   }
 
@@ -60,7 +61,7 @@ export default function Login() {
             {err && <Alert tone="danger">{err}</Alert>}
             <label className="block">
               <span className="label">Email</span>
-              <input className="input" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <input className="input" type="email" autoComplete="username" placeholder="name@rhs.jo" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </label>
             <label className="block">
               <span className="label">Password</span>
@@ -71,13 +72,17 @@ export default function Login() {
             </label>
             <div className="flex items-center justify-between text-[12.5px]">
               <label className="flex items-center gap-2 text-ink-600"><input type="checkbox" className="accent-brand-600" defaultChecked /> Keep me signed in</label>
-              <a className="text-brand-700 hover:underline" href="#" onClick={(e) => e.preventDefault()}>Forgot password?</a>
+              <span className="text-ink-500" title="Ask the administrator (Bilal Abbassi) to issue a new temporary password">Forgot password? Ask the administrator.</span>
             </div>
             <button className="btn-primary btn-lg w-full" type="submit" disabled={busy}><LogIn size={16} /> {busy ? 'Signing in…' : 'Sign in'}</button>
           </form>
 
-          <div className="mt-8 rounded-card border border-line bg-surface-muted p-4">
-            <div className="mb-2 text-[11.5px] font-semibold uppercase tracking-[0.08em] text-ink-500">Demo accounts · password <span className="kbd">rhs2025</span></div>
+          <div className="mt-5 rounded-card border border-dashed border-line p-4 text-[12.5px] text-ink-600">
+            <button type="button" className="btn-secondary w-full" disabled title="Available once the platform is deployed with the RHS Microsoft 365 tenant"><ShieldCheck size={15} /> Sign in with your RHS.jo account</button>
+            <div className="mt-2 text-[11.5px] text-ink-500">Single sign-on with RHS.jo (Microsoft 365) is enabled at deployment. Until then, use the temporary password the administrator shared with you and set your own at first sign-in.</div>
+          </div>
+          {dataMode === 'demo' && <div className="mt-6 rounded-card border border-line bg-surface-muted p-4">
+            <div className="mb-2 text-[11.5px] font-semibold uppercase tracking-[0.08em] text-ink-500">Sample-data accounts · password <span className="kbd">rhs2025</span></div>
             <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
               {users.filter((u) => u.active).map((u) => (
                 <button key={u.id} type="button" onClick={() => { setEmail(u.email); setPassword(u.password); setErr(null) }}
@@ -86,7 +91,7 @@ export default function Login() {
                 </button>
               ))}
             </div>
-          </div>
+          </div>}
         </div>
       </div>
     </div>

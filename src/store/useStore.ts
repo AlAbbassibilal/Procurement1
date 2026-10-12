@@ -5,13 +5,14 @@ import type {
   PurchaseOrder, PurchaseRequisition, Quotation, User, Vendor, DocType, Role, GoodsReceipt, GoodsReceiptLine, Invoice, InvoiceLine, SourcingRecord, ExceptionType, ProjectBudget, Envelope, EnvelopeRecipient, EnvelopeField, Project, ProjectStage, Donor, Task, ProjectReport, ProjectComment, MasterBudget, MasterLine,
   UiTheme, Partner, PartnerStage, DueDiligence, PartnerSubmission, PartnerAgreement, StaffMember, LeaveRequest, LeaveType, Timesheet, Payslip, AttendanceRecord, AttendanceMode, Vacancy, Applicant, Advertisement, ApplicantStatus, Warehouse, StockItem, StockMovement, StockRelease, StockReleaseLine, Waybill, Asset, AssetEvent, AssetCategory, Vehicle, TripRequest, TripPassenger,
 } from '@/types'
-import { DOC_OWNER, SEED_PARTNERS, SEED_STAFF, SEED_LEAVE, SEED_TIMESHEETS, SEED_PAYSLIPS, SEED_ATTENDANCE, SEED_VACANCIES, SEED_APPLICANTS, SEED_WAREHOUSES, SEED_ITEMS, SEED_MOVEMENTS, SEED_RELEASES, SEED_WAYBILLS, SEED_ASSETS, SEED_VEHICLES, SEED_TRIPS, SEED_BUDGETS, SEED_DONORS, SEED_PROJECTS, SEED_TASKS, SEED_MASTER, SEED_CONTRACTS, SEED_GRNS, SEED_INVOICES, SEED_POS, SEED_PRS, SEED_RULES, SEED_SETTINGS, SEED_USERS, SEED_VENDORS, STANDARD_CLAUSES } from '@/data/seed'
+import { DOC_OWNER, CORE_USER, SEED_PARTNERS, SEED_STAFF, SEED_LEAVE, SEED_TIMESHEETS, SEED_PAYSLIPS, SEED_ATTENDANCE, SEED_VACANCIES, SEED_APPLICANTS, SEED_WAREHOUSES, SEED_ITEMS, SEED_MOVEMENTS, SEED_RELEASES, SEED_WAYBILLS, SEED_ASSETS, SEED_VEHICLES, SEED_TRIPS, SEED_BUDGETS, SEED_DONORS, SEED_PROJECTS, SEED_TASKS, SEED_MASTER, SEED_CONTRACTS, SEED_GRNS, SEED_INVOICES, SEED_POS, SEED_PRS, SEED_RULES, SEED_SETTINGS, SEED_USERS, SEED_VENDORS, STANDARD_CLAUSES } from '@/data/seed'
 import { hasBlockingIssues, receiptProgress, runMatch, invoiceTotals } from '@/lib/match'
 import { newEvent, recipientTurn } from '@/lib/esign'
 import { generateIPTT, generateReportingCalendar, generateSpendingPlan, monthsOf, parseMentions, reportLiveStatus, allIndicators } from '@/lib/grants'
 import { blockingFailures, emptySourcing, isBidMethod, sourcingRequirements, tierForPR, toUSD, resolveTier } from '@/lib/tiers'
 import { applyDecision, buildChain, currentStep, resetChain, resolveApprover, chainFromSteps, lineManagerSteps } from '@/lib/workflow'
 import { linesSubtotal, nowIso, uid } from '@/lib/format'
+import { passwordProblem, tempPassword } from '@/lib/auth'
 import { emptyDueDiligence } from '@/lib/partners'
 import { unassignedSalaryLines, isSalaryLine, headcount, nextRhsNumber } from '@/lib/salary'
 import { buildVacancyChain, canDecideVacancy, scoreApplicant } from '@/lib/recruitment'
@@ -227,6 +228,8 @@ interface Actions {
   upsertVendor: (v: Partial<Vendor> & { id?: string }) => void
   upsertUser: (u: Partial<User> & { id?: string }) => void
   deleteUser: (id: string) => { ok: boolean; error?: string }
+  changePassword: (current: string, next: string) => { ok: boolean; error?: string }
+  issueTempPassword: (userId: string) => string | undefined
   upsertRule: (r: ApprovalRule) => void
   deleteRule: (id: string) => void
   updateSettings: (patch: Partial<OrgSettings>) => void
@@ -243,11 +246,12 @@ export type DataMode = 'clean' | 'demo'
 /** Which dataset a fresh browser starts with: clean (accounts + policy only) unless a demo flag is set. */
 export const startupMode = (): DataMode => { try { return localStorage.getItem('rhs-platform-mode') === 'demo' ? 'demo' : 'clean' } catch { return 'clean' } }
 /** Staff records for the platform accounts only — positions and line managers kept, salaries and contracts cleared. */
-const cleanStaff = (): StaffMember[] => SEED_STAFF.filter((s) => s.userId).map((s) => ({ ...s, monthlySalary: 0, endDate: undefined, contractRef: undefined, notes: '', sourceProjectId: undefined, sourceProjectCode: undefined, sourceLineCode: undefined, status: 'active' as const }))
+/** Clean start: only Bilal's own staff record (top of the org chart); colleagues are added from the org chart / staff register. */
+const cleanStaff = (): StaffMember[] => SEED_STAFF.filter((s) => s.userId === CORE_USER.id).map((s) => ({ ...s, monthlySalary: 0, endDate: undefined, contractRef: undefined, notes: '', lineManagerId: undefined, budgetHolder: true, approvalLimitUSD: undefined, sourceProjectId: undefined, sourceProjectCode: undefined, sourceLineCode: undefined, status: 'active' as const }))
 const EMPTY_COUNTERS = { PR: 0, PO: 0, CT: 0, GRN: 0, INV: 0, ENV: 0, PT: 0, LR: 0, WFH: 0, PS: 0, REC: 0, APP: 0, SM: 0, SR: 0, WB: 0, TR: 0 }
 /** Clean start: user accounts, approval matrix, policy settings and minimal staff records; every register and document empty. */
 const cleanInitial = (): State => ({
-  ...demoInitial(), vendors: [], prs: [], pos: [], contracts: [], grns: [], invoices: [], budgets: [], envelopes: [], projects: [], donors: [], tasks: [], masterBudgets: [], partners: [],
+  ...demoInitial(), users: [CORE_USER], vendors: [], prs: [], pos: [], contracts: [], grns: [], invoices: [], budgets: [], envelopes: [], projects: [], donors: [], tasks: [], masterBudgets: [], partners: [],
   staff: cleanStaff(), leaveRequests: [], timesheets: [], payslips: [], attendance: [], vacancies: [], applicants: [], warehouses: [], items: [], movements: [], releases: [], waybills: [], assets: [], vehicles: [], trips: [],
   notifications: [], audit: [{ id: 'a1', at: nowIso(), actorId: 'u_bilal', actorName: DOC_OWNER, docType: 'SYSTEM', action: 'System initialised', detail: 'Clean start — no sample data' }], counters: { ...EMPTY_COUNTERS }, dataMode: 'clean',
 })
@@ -1395,6 +1399,22 @@ export const useStore = create<State & Actions>()(
           else set((s) => ({ users: [...s.users, { id: uid('u_'), name: '', email: '', password: 'rhs2025', role: 'requester', department: 'Operations', title: '', avatarColor: 'bg-ink-600', active: true, ...u }] }))
           log('USER', existing ? 'User updated' : 'User created', undefined, u.name)
         },
+        changePassword: (current, next) => {
+          const u = actor()
+          if (u.password !== current) return { ok: false, error: 'The current password is not correct.' }
+          const problem = passwordProblem(next); if (problem) return { ok: false, error: problem }
+          if (next === current) return { ok: false, error: 'Choose a different password.' }
+          set((s) => ({ users: s.users.map((x) => (x.id === u.id ? { ...x, password: next, mustChangePassword: false, passwordChangedAt: nowIso() } : x)) }))
+          log('USER', 'Password changed')
+          return { ok: true }
+        },
+        issueTempPassword: (userId) => {
+          const u = get().users.find((x) => x.id === userId); if (!u) return undefined
+          const pw = tempPassword()
+          set((s) => ({ users: s.users.map((x) => (x.id === userId ? { ...x, password: pw, mustChangePassword: true, invitedAt: nowIso() } : x)) }))
+          log('USER', 'Temporary password issued', undefined, u.email)
+          return pw
+        },
         deleteUser: (id) => {
           const u = get().users.find((x) => x.id === id)
           if (!u) return { ok: false, error: 'Not found' }
@@ -1421,10 +1441,31 @@ export const useStore = create<State & Actions>()(
         markAllRead: () => { const me = get().currentUserId; set((s) => ({ notifications: s.notifications.map((n) => (n.userId === me ? { ...n, read: true } : n)) })) },
 
         resetDemo: () => get().resetData('demo'),
-        resetData: (mode) => { try { localStorage.setItem('rhs-platform-mode', mode) } catch { /* private window */ } set({ ...initial(mode), currentUserId: get().currentUserId, uiTheme: get().uiTheme, homeLayout: get().homeLayout, favorites: get().favorites, sidebarCollapsed: get().sidebarCollapsed }) },
+        resetData: (mode) => {
+          try { localStorage.setItem('rhs-platform-mode', mode) } catch { /* private window */ }
+          // A clean start wipes documents and registers but keeps the real accounts, their permissions and the org chart
+          const keep = mode === 'clean' ? { users: get().users, staff: get().staff.map((st) => ({ ...st, monthlySalary: 0, sourceProjectId: undefined, sourceProjectCode: undefined, sourceLineCode: undefined })) } : {}
+          set({ ...initial(mode), ...keep, currentUserId: get().currentUserId, uiTheme: get().uiTheme, homeLayout: get().homeLayout, favorites: get().favorites, sidebarCollapsed: get().sidebarCollapsed })
+        },
       }
     },
-    { name: 'rhs-platform-v8', version: 8 },
+    {
+      name: 'rhs-platform-v8', version: 9,
+      migrate: (persisted: unknown, version: number) => {
+        const st = persisted as State
+        if (version < 9 && st?.users) {
+          // Bilal's real account; sample accounts stay only in demo mode
+          const demoIds = new Set(SEED_USERS.map((u) => u.id))
+          st.users = st.users.map((u) => (u.id === CORE_USER.id ? { ...u, email: CORE_USER.email, approverRoles: CORE_USER.approverRoles, title: CORE_USER.title } : u))
+          if (st.dataMode !== 'demo') {
+            st.users = st.users.filter((u) => u.id === CORE_USER.id || !demoIds.has(u.id))
+            st.staff = (st.staff ?? []).filter((x) => !x.userId || !demoIds.has(x.userId) || x.userId === CORE_USER.id).map((x) => (x.userId === CORE_USER.id ? { ...x, lineManagerId: undefined, budgetHolder: true } : x))
+          }
+          if (st.currentUserId && !st.users.some((u) => u.id === st.currentUserId)) st.currentUserId = null
+        }
+        return st
+      },
+    },
   ),
 )
 

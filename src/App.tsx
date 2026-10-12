@@ -52,6 +52,7 @@ import ContractDetail from '@/pages/contracts/Detail'
 import Vendors from '@/pages/Vendors'
 import Users from '@/pages/admin/Users'
 import OrgChart from '@/pages/admin/OrgChart'
+import Account from '@/pages/Account'
 import { can } from '@/lib/permissions'
 import ApprovalMatrix from '@/pages/admin/ApprovalMatrix'
 import Settings from '@/pages/admin/Settings'
@@ -67,8 +68,12 @@ import InvoiceNew from '@/pages/invoices/New'
 import InvoiceDetail from '@/pages/invoices/Detail'
 
 function RequireAuth() {
-  const authed = useStore((s) => !!s.currentUserId)
-  return authed ? <Outlet /> : <Navigate to="/login" replace />
+  const user = useCurrentUser()
+  const { pathname } = useLocation()
+  if (!user) return <Navigate to="/login" replace />
+  // A temporary password must be replaced before anything else
+  if (user.mustChangePassword && pathname !== '/account') return <Navigate to="/account?first=1" replace />
+  return <Outlet />
 }
 
 /** Workspace gate: routes owned by a department require access to it. */
@@ -164,6 +169,7 @@ export default function App() {
           <Route path="budgets" element={<BudgetList />} />
           <Route path="budgets/upload" element={<BudgetUpload />} />
           <Route path="budgets/:id" element={<BudgetDetail />} />
+          <Route path="account" element={<Account />} />
           <Route path="admin/users" element={<Users />} />
           <Route path="admin/org-chart" element={<OrgChart />} />
           <Route path="admin/approval-matrix" element={<ApprovalMatrix />} />

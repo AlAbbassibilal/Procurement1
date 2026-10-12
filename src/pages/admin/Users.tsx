@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Pencil, Trash2, KeyRound, Network } from 'lucide-react'
+import { Plus, Pencil, Trash2, KeyRound, Network, Copy, Mail, RefreshCw } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { Card, PageHeader, Modal, Field, Avatar, StatusPill, Alert } from '@/components/ui'
 import { ROLE_LABEL } from '@/lib/workflow'
@@ -8,7 +8,8 @@ import { DEPARTMENTS } from '@/data/seed'
 import type { Role, User, Department, AccessLevel } from '@/types'
 import { DEPARTMENTS as WORKSPACES, ACCESS_LABEL, effectiveAccess, defaultAccess } from '@/lib/departments'
 import { PERMISSIONS, ROLE_PERMISSIONS, customCount } from '@/lib/permissions'
-import { cx } from '@/lib/format'
+import { cx, fmtDateTime } from '@/lib/format'
+import { tempPassword, invitationText, isOrgEmail } from '@/lib/auth'
 
 const ROLES = Object.keys(ROLE_LABEL) as Role[]
 const COLORS = ['bg-brand-600', 'bg-brand-800', 'bg-accent-600', 'bg-accent-700', 'bg-ink-600', 'bg-ink-700', 'bg-ink-900', 'bg-sun-700', 'bg-info-700']
@@ -54,8 +55,10 @@ function PermissionsEditor({ user, onChange }: { user: User; onChange: (perms: R
 }
 
 export default function Users() {
-  const { users, staff, upsertUser, deleteUser, currentUserId } = useStore()
+  const { users, staff, upsertUser, deleteUser, issueTempPassword, currentUserId, settings } = useStore()
   const [edit, setEdit] = useState<Partial<User> | null>(null)
+  const [invite, setInvite] = useState<{ user: User; password: string } | null>(null)
+  const [copied, setCopied] = useState(false)
   const [perm, setPerm] = useState<User | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const remove = (u: User) => {
@@ -65,7 +68,7 @@ export default function Users() {
   return (
     <>
       <PageHeader title="Users & access" subtitle="Roles drive approval chains; workspace access decides which department cards a person can open; function permissions decide exactly what they can do inside. Line managers, budget holders and approval limits live in the org chart."
-        actions={<div className="flex gap-2"><Link to="/admin/org-chart" className="btn-secondary"><Network size={15} /> Org chart</Link><button className="btn-primary" onClick={() => setEdit({ role: 'requester', department: DEPARTMENTS[0], active: true, avatarColor: COLORS[Math.floor(Math.random() * COLORS.length)] })}><Plus size={15} /> Add user</button></div>} />
+        actions={<div className="flex gap-2"><Link to="/admin/org-chart" className="btn-secondary"><Network size={15} /> Org chart</Link><button className="btn-primary" onClick={() => setEdit({ role: 'requester', department: DEPARTMENTS[0], active: true, avatarColor: COLORS[Math.floor(Math.random() * COLORS.length)], password: tempPassword(), mustChangePassword: true, email: '' })}><Plus size={15} /> Add user</button></div>} />
       {err && <div className="mb-4"><Alert tone="danger">{err}</Alert></div>}
       <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {ROLES.map((r) => <div key={r} className="card px-4 py-3"><div className="text-[11.5px] uppercase tracking-[0.05em] text-ink-500">{ROLE_LABEL[r]}</div><div className="text-[18px] font-semibold text-ink-900">{users.filter((u) => u.role === r && u.active).length}</div></div>)}
@@ -80,22 +83,26 @@ export default function Users() {
               <td className="table-td text-[12px]">{st ? <><div className="font-mono text-ink-700">{st.rhsNumber}</div><div className="text-ink-500">{mgr ? `reports to ${mgr.name || mgr.position}` : 'no line manager'}{st.budgetHolder && <span className="ml-1 rounded-pill bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold text-brand-800">budget holder{st.approvalLimitUSD !== undefined ? ` · USD ${st.approvalLimitUSD.toLocaleString()}` : ''}</span>}</div></> : <Link to="/admin/org-chart" className="text-ink-400 hover:underline">not in org chart</Link>}</td>
               <td className="table-td"><div className="flex flex-wrap gap-1">{WORKSPACES.filter((w) => effectiveAccess(u)[w.id] !== 'none').map((w) => <span key={w.id} className={`rounded-pill px-1.5 py-0.5 text-[10.5px] font-medium ${effectiveAccess(u)[w.id] === 'manage' ? 'bg-brand-50 text-brand-800' : effectiveAccess(u)[w.id] === 'edit' ? 'bg-info-50 text-info-700' : 'bg-surface-sunken text-ink-600'}`}>{w.name} · {ACCESS_LABEL[effectiveAccess(u)[w.id]]}</span>)}</div></td>
               <td className="table-td"><button className="btn-secondary btn-sm" data-testid={`perms-${u.email}`} onClick={() => setPerm(u)}><KeyRound size={13} /> {u.role === 'admin' ? 'All' : custom ? `${custom} custom` : 'Role defaults'}</button></td>
-              <td className="table-td"><StatusPill status={u.active ? 'active' : 'blocked'} /></td>
+              <td className="table-td"><StatusPill status={u.active ? 'active' : 'blocked'} />{u.mustChangePassword && <div className="mt-1 text-[10.5px] text-sun-700">temporary password{u.invitedAt ? ` · ${fmtDateTime(u.invitedAt)}` : ''}</div>}{u.passwordChangedAt && !u.mustChangePassword && <div className="mt-1 text-[10.5px] text-ink-400">own password set</div>}</td>
               <td className="table-td"><div className="flex justify-end gap-1"><button className="btn-ghost btn-sm" title="Edit" onClick={() => setEdit(u)}><Pencil size={14} /></button><button className="btn-ghost btn-sm text-accent-700 disabled:opacity-40" title={u.id === currentUserId ? 'You cannot delete your own account' : 'Delete account'} data-testid={`delete-${u.email}`} disabled={u.id === currentUserId} onClick={() => remove(u)}><Trash2 size={14} /></button></div></td>
             </tr>) })}</tbody>
         </table></div>
       </Card>
 
       <Modal open={!!edit} onClose={() => setEdit(null)} title={edit?.id ? 'Edit user' : 'Add user'}
-        footer={<><button className="btn-secondary" onClick={() => setEdit(null)}>Cancel</button><button className="btn-primary" onClick={() => { if (!edit?.name || !edit?.email) return alert('Name and email are required.'); upsertUser(edit!); setEdit(null) }}>Save</button></>}>
+        footer={<><button className="btn-secondary" onClick={() => setEdit(null)}>Cancel</button><button className="btn-primary" data-testid="user-save" onClick={() => { if (!edit?.name || !edit?.email) return alert('Name and email are required.'); if (users.some((u) => u.email.toLowerCase() === edit.email!.trim().toLowerCase() && u.id !== edit.id)) return alert('An account with this email already exists.'); const isNew = !edit.id; const id = edit.id ?? `u_${edit.email!.trim().toLowerCase().split('@')[0]!.replace(/[^a-z0-9]/g, '')}_${Date.now().toString(36)}`; upsertUser({ ...edit, id, email: edit.email!.trim() }); setEdit(null); if (isNew) { const u = useStore.getState().users.find((x) => x.id === id); if (u) { setCopied(false); setInvite({ user: u, password: u.password }) } } }}>Save</button></>}>
         {edit && (
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Full name" required><input className="input" value={edit.name ?? ''} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></Field>
-            <Field label="Email" required><input className="input" value={edit.email ?? ''} onChange={(e) => setEdit({ ...edit, email: e.target.value })} /></Field>
+            <Field label="RHS.jo email" required hint={edit.email && !isOrgEmail(edit.email) ? 'Not an @rhs.jo address — single sign-on will not match it later.' : 'The person’s work account, e.g. name@rhs.jo'}><input className="input" data-testid="user-email" placeholder="name@rhs.jo" value={edit.email ?? ''} onChange={(e) => setEdit({ ...edit, email: e.target.value })} /></Field>
             <Field label="Role"><select className="input" value={edit.role} onChange={(e) => setEdit({ ...edit, role: e.target.value as Role })}>{ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}</select></Field>
             <Field label="Department"><select className="input" value={edit.department} onChange={(e) => setEdit({ ...edit, department: e.target.value })}>{DEPARTMENTS.map((d) => <option key={d}>{d}</option>)}</select></Field>
             <Field label="Job title" className="sm:col-span-2"><input className="input" value={edit.title ?? ''} onChange={(e) => setEdit({ ...edit, title: e.target.value })} /></Field>
-            <Field label="Password (demo)"><input className="input" value={edit.password ?? 'rhs2025'} onChange={(e) => setEdit({ ...edit, password: e.target.value })} /></Field>
+            {edit.id ? (
+              <Field label="Password" hint={edit.mustChangePassword ? 'Temporary — the person must set their own at next sign-in.' : 'Set by the person. Issue a new temporary password if they forgot it.'}><button type="button" className="btn-secondary btn-sm" data-testid="reset-password" onClick={() => { const pw = issueTempPassword(edit.id!); if (pw) { const u = useStore.getState().users.find((x) => x.id === edit.id)!; setEdit(null); setCopied(false); setInvite({ user: u, password: pw }) } }}><RefreshCw size={13} /> Issue new temporary password</button></Field>
+            ) : (
+              <Field label="Temporary password" hint="Share it with the person; they set their own at first sign-in."><div className="flex gap-2"><input className="input font-mono" data-testid="user-temp-pw" value={edit.password ?? ''} onChange={(e) => setEdit({ ...edit, password: e.target.value })} /><button type="button" className="btn-secondary btn-sm" onClick={() => setEdit({ ...edit, password: tempPassword() })}><RefreshCw size={13} /></button></div><label className="mt-1.5 flex items-center gap-2 text-[12px] text-ink-700"><input type="checkbox" checked={edit.mustChangePassword !== false} onChange={(e) => setEdit({ ...edit, mustChangePassword: e.target.checked })} /> Must change it at first sign-in</label></Field>
+            )}
             <Field label="Status"><select className="input" value={edit.active ? '1' : '0'} onChange={(e) => setEdit({ ...edit, active: e.target.value === '1' })}><option value="1">Active</option><option value="0">Deactivated</option></select></Field>
             <div className="sm:col-span-2 rounded-card border border-line bg-surface-muted p-3">
               <div className="mb-2 flex items-center justify-between"><div className="text-[12px] font-semibold uppercase tracking-[0.05em] text-ink-600">Workspace access</div><button className="text-[12px] text-brand-700 hover:underline" onClick={() => setEdit({ ...edit, access: undefined })}>Reset to role default</button></div>
@@ -112,6 +119,16 @@ export default function Users() {
       <Modal open={!!perm} onClose={() => setPerm(null)} width="max-w-3xl" title={perm ? `Function permissions — ${perm.name}` : ''}
         footer={<><button className="btn-secondary" onClick={() => setPerm(null)}>Cancel</button><button className="btn-primary" data-testid="perm-save" onClick={() => { if (perm) upsertUser({ id: perm.id, permissions: perm.permissions }); setPerm(null) }}>Save permissions</button></>}>
         {perm && <PermissionsEditor user={perm} onChange={(permissions) => setPerm({ ...perm, permissions })} />}
+      </Modal>
+
+      <Modal open={!!invite} onClose={() => setInvite(null)} width="max-w-2xl" title={invite ? `Invitation — ${invite.user.name}` : ''}
+        footer={<><button className="btn-secondary" onClick={() => setInvite(null)}>Close</button>{invite && <a className="btn-secondary" href={`mailto:${invite.user.email}?subject=${encodeURIComponent('Your account on the RHS PCM & Grants Management Platform')}&body=${encodeURIComponent(invitationText(invite.user, invite.password, settings.orgName))}`}><Mail size={15} /> Open in email</a>}<button className="btn-primary" data-testid="copy-invite" onClick={async () => { if (!invite) return; try { await navigator.clipboard.writeText(invitationText(invite.user, invite.password, settings.orgName)); setCopied(true) } catch { setCopied(false); alert('Copy is blocked here — select the text and copy it manually.') } }}><Copy size={15} /> {copied ? 'Copied' : 'Copy invitation'}</button></>}>
+        {invite && (
+          <div className="space-y-3">
+            <Alert tone="info">Account created with a temporary password. Share this invitation with {invite.user.name.split(' ')[0]} by email, chat or in person — they will be asked to set their own password at first sign-in. Set their function permissions from the <b>Functions</b> button on the list.</Alert>
+            <textarea readOnly className="input min-h-[300px] font-mono text-[12px]" data-testid="invite-text" value={invitationText(invite.user, invite.password, settings.orgName)} onFocus={(e) => e.currentTarget.select()} />
+          </div>
+        )}
       </Modal>
     </>
   )

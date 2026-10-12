@@ -47,9 +47,9 @@ npm run dev        # http://localhost:5173
 npm run build      # production bundle in dist/
 ```
 
-**Data modes.** A fresh browser starts **clean**: user accounts, the approval matrix and policy settings only, every register empty. Load the sample dataset or reset to clean from the account menu or Settings → Data. **Downloads** go through the host save dialog inside the claude.ai viewer and through a normal browser download elsewhere (`src/lib/download.ts`).
+**Data modes.** A fresh browser starts **clean**: Bilal's administrator account, the approval matrix and policy settings only, every register empty. "Reset — clean start" wipes documents and registers but keeps the accounts you created, their permissions and the org chart; "Load sample data" replaces everything with the demo dataset (account menu or Settings → Data). **Downloads** go through the host save dialog inside the claude.ai viewer and through a normal browser download elsewhere (`src/lib/download.ts`).
 
-Sign in with any account (password `rhs2025`), e.g. `AlAbbassi.bilal@icloud.com` (administrator). The user menu lets you switch account to walk a document through every role, and reset the demo data.
+Sign in as the administrator: `babbassi@RHS.jo` (password `rhs2025`, replaced at first sign-in). A fresh browser starts with this one account only. Colleagues are added under **Users & access** with their RHS.jo email: the platform generates a temporary password and an invitation text to copy or email; the person must set their own password at first sign-in, and the administrator can issue a new temporary password at any time. Single sign-on with the RHS.jo Microsoft 365 tenant is wired at deployment (the button is on the sign-in page); accounts are matched by email, so permissions set now carry over. "Load sample data" adds demo accounts (password `rhs2025`) for the sample dataset only.
 
 ## Interface: Classic / Modern, home screen, and the sidebar
 

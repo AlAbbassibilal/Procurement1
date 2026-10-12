@@ -32,6 +32,9 @@ export interface User {
   approverRoles?: Role[]   // additional approval capacities this user holds (e.g. admin acting as Director of Programs)
   access?: Partial<Record<Department, AccessLevel>>   // explicit workspace access; falls back to the role default
   permissions?: Record<string, boolean>               // per-function overrides (true = granted, false = denied) on top of the role defaults — see src/lib/permissions.ts
+  mustChangePassword?: boolean                        // set when an administrator issues a temporary password; cleared when the person sets their own
+  passwordChangedAt?: string
+  invitedAt?: string
   signature?: { dataUrl: string; method: 'drawn' | 'typed'; adoptedAt: string }   // adopted e-signature
   initials?: string
   department: string

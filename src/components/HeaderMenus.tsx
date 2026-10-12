@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, LogOut, ChevronDown, RotateCcw, ChevronsUpDown, Sparkles, Monitor, LayoutGrid, Grid2x2, Database } from 'lucide-react'
+import { Bell, LogOut, ChevronDown, RotateCcw, ChevronsUpDown, Sparkles, Monitor, LayoutGrid, Grid2x2, Database, KeyRound } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
 import { Avatar } from './ui'
 import { cx, timeAgo } from '@/lib/format'
@@ -74,8 +74,9 @@ export function UserMenu() {
               <div className="text-[12px] text-ink-500">{user.title} · {user.department}</div>
               <div className="text-[12px] text-ink-500">{user.email}</div>
             </div>
-            <div className="border-b border-line px-2 py-2">
-              <div className="flex items-center gap-1 px-2 pb-1 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-ink-400"><ChevronsUpDown size={11} /> Switch account (demo)</div>
+            <div className="border-b border-line p-2"><button className="btn-ghost btn-sm w-full justify-start" data-testid="my-account" onClick={() => { setOpen(false); nav('/account') }}><KeyRound size={14} /> My account & password</button></div>
+            {(dataMode === 'demo' || user.role === 'admin') && users.filter((u) => u.active).length > 1 && <div className="border-b border-line px-2 py-2">
+              <div className="flex items-center gap-1 px-2 pb-1 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-ink-400"><ChevronsUpDown size={11} /> {dataMode === 'demo' ? 'Switch account (demo)' : 'Switch account (administrator test)'}</div>
               <div className="max-h-52 overflow-y-auto scrollbar-thin">
                 {users.filter((u) => u.active).map((u) => (
                   <button key={u.id} onClick={() => { switchUser(u.id); setOpen(false); nav('/') }}
@@ -86,7 +87,7 @@ export function UserMenu() {
                   </button>
                 ))}
               </div>
-            </div>
+            </div>}
             <div className="border-b border-line px-4 py-2.5">
               <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-ink-400">Interface</div>
               <div className="grid grid-cols-2 gap-1 rounded-control bg-surface-muted p-1" role="radiogroup" aria-label="Interface">

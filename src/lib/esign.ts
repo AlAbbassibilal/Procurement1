@@ -150,6 +150,26 @@ export const recipientTurn = (env: Envelope): EnvelopeRecipient[] => {
   const minOrder = Math.min(...open.map((r) => r.order)); return open.filter((r) => r.order === minOrder)
 }
 
+/** Lines with their font size and weight — used by the proposal importer to tell headings from body text. */
+export async function pdfLines(bytes: Uint8Array): Promise<{ text: string; size: number; bold: boolean }[]> {
+  await ensureWorker()
+  const doc = await pdfjs.getDocument({ data: bytes.slice() }).promise
+  const out: { text: string; size: number; bold: boolean }[] = []
+  for (let i = 1; i <= doc.numPages; i++) {
+    const page = await doc.getPage(i); const c = await page.getTextContent()
+    let cur: { text: string; size: number; bold: boolean; y: number } | null = null
+    for (const it of c.items) {
+      if (!('str' in it)) continue
+      const y = Math.round(it.transform[5]!); const size = Math.round(Math.hypot(it.transform[0]!, it.transform[1]!) * 10) / 10
+      const bold = /bold|black|heavy|semibold/i.test((c.styles[it.fontName]?.fontFamily ?? '') + it.fontName)
+      if (cur && Math.abs(cur.y - y) <= 2) { cur.text += (it.str.startsWith(' ') || cur.text.endsWith(' ') ? '' : ' ') + it.str; cur.size = Math.max(cur.size, size); cur.bold = cur.bold && bold }
+      else { if (cur) out.push({ text: cur.text, size: cur.size, bold: cur.bold }); cur = { text: it.str, size, bold, y } }
+    }
+    if (cur) out.push({ text: cur.text, size: cur.size, bold: cur.bold })
+  }
+  return out
+}
+
 /** Plain text of every page (used by recruitment to read CVs). */
 export async function pdfText(bytes: Uint8Array): Promise<string> {
   await ensureWorker()

@@ -11,6 +11,7 @@ import { accessOf } from '@/lib/departments'
 import { fmtMoney, fmtDate, fmtDateTime, timeAgo, cx, uid } from '@/lib/format'
 import { StagePill } from './Overview'
 import { LogframeTab, WorkplanTab, BudgetTab, SpendingTab, IPTTTab } from './ProjectPlanning'
+import { ProposalImportButton } from './ProposalImport'
 import { TaskModal, TaskList } from '@/pages/Tasks'
 import { PartnerStagePill } from '@/pages/partnerships/shared'
 import type { ProjectStage, ProjectReport, Attachment } from '@/types'
@@ -111,6 +112,7 @@ export default function ProjectPage() {
       {tab === 'proposal' && (
         <div className="grid gap-6 xl:grid-cols-3">
           <div className="space-y-4 xl:col-span-2">
+            {canEdit && <div className="flex flex-wrap items-center justify-between gap-2 rounded-card border border-dashed border-line bg-surface-muted px-4 py-3"><div className="text-[12.5px] text-ink-600"><b className="text-ink-900">Have the proposal as a file?</b> Attach the Word, PDF or text document and the sections below are filled from its headings — you review the mapping first.</div><ProposalImportButton p={p} canEdit={canEdit} /></div>}
             {p.proposal.sections.map((s) => <Card key={s.id} title={s.title}><textarea className="input min-h-[110px]" value={s.content} disabled={!canEdit} placeholder="Write this section…" onChange={(e) => updateProject(p.id, { proposal: { ...p.proposal, sections: p.proposal.sections.map((x) => (x.id === s.id ? { ...x, content: e.target.value } : x)) } })} /></Card>)}
             {canEdit && <button className="btn-secondary btn-sm" onClick={() => { const t = prompt('Section title'); if (t) updateProject(p.id, { proposal: { ...p.proposal, sections: [...p.proposal.sections, { id: uid('ps_'), title: t, content: '' }] } }) }}><Plus size={13} /> Add section</button>}
           </div>

@@ -10,7 +10,8 @@
 // ---------------------------------------------------------------------------
 import type { Project, OrgSettings } from '@/types'
 
-const TEMPLATE_PATH = 'templates/RHS_Proposal_Template.docx'
+// The hosted single-page build cannot serve .docx files, so the template travels as base64 text (public/templates/*.b64.txt)
+const TEMPLATE_PATH = 'templates/RHS_Proposal_Template.b64.txt'
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 const unesc = (s: string) => s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
 
@@ -19,7 +20,10 @@ export async function loadProposalTemplate(): Promise<ArrayBuffer> {
   const url = new URL(TEMPLATE_PATH, document.baseURI).toString()
   const r = await fetch(url)
   if (!r.ok) throw new Error(`The RHS proposal template could not be loaded (${r.status}).`)
-  return r.arrayBuffer()
+  const b64 = (await r.text()).trim()
+  const bin = atob(b64); const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return bytes.buffer
 }
 
 const topLevel = (body: string) => body.match(/<w:p[ >][\s\S]*?<\/w:p>|<w:tbl>[\s\S]*?<\/w:tbl>|<w:sectPr[\s\S]*?<\/w:sectPr>|<w:sdt>[\s\S]*?<\/w:sdt>/g) ?? []

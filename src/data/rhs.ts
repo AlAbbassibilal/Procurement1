@@ -30,6 +30,38 @@ export const RHS_USERS: User[] = [
 const S = (n: number, userId: string, name: string, position: string, department: string, monthlySalary: number, extra: Partial<StaffMember> = {}): StaffMember => ({
   id: `stf_${n}`, rhsNumber: `RHS-${String(n).padStart(4, '0')}`, name, position, department, country: 'Amman (Regional Office)', contractType: 'full_time', monthlySalary, currency: 'USD', startDate: '2025-01-01', status: 'active', userId, lineManagerId: 'stf_2', createdAt: T0, updatedAt: T0, ...extra,
 })
+/** Executive Director position, held in an acting capacity by Bilal (no separate account — Bilal signs in as Director of Programs). */
+export const RHS_ED: StaffMember = { id: 'stf_1', rhsNumber: 'RHS-0001', name: 'Bilal Abbassi', position: 'Executive Director', department: 'Executive Office', country: 'Amman (Regional Office)', contractType: 'full_time', monthlySalary: 0, currency: 'USD', startDate: '2025-01-01', status: 'active', acting: true, budgetHolder: true, createdAt: T0, updatedAt: T0 }
+const V = (n: number, position: string, department: string, lineManagerId: string, country = 'Amman (Regional Office)', name = ''): StaffMember => ({ id: `stf_${n}`, rhsNumber: `RHS-${String(n).padStart(4, '0')}`, name, position, department, country, contractType: 'full_time', monthlySalary: 0, currency: 'USD', startDate: '2026-10-01', status: name ? 'active' : 'planned', lineManagerId, createdAt: T0, updatedAt: T0 })
+/** Positions from the RHS organogram deck (Amman vacancies and the Gaza country office); vacant ones are "planned" with no name. */
+export const RHS_POSITIONS: StaffMember[] = [
+  V(11, 'MEAL Officer', 'Programs', 'stf_2', 'Amman (Regional Office)', 'Ahmad Gharaibeh'),
+  V(12, 'Video Editor', 'Communication & Advocacy', 'stf_6'),
+  V(13, 'Software Developer', 'Digital Innovation Hub', 'stf_9'),
+  V(14, 'Software Developer', 'Digital Innovation Hub', 'stf_9'),
+  V(15, 'Senior Finance Officer', 'Finance', 'stf_3'),
+  V(16, 'Logistic Assistant', 'Supply Chain', 'stf_4'),
+  V(20, 'Program Manager (Overall Operations Manager)', 'Gaza Country Office', 'stf_2', 'Gaza', 'Rami Basheer'),
+  V(21, 'Logistic Officer', 'Gaza Country Office', 'stf_3', 'Gaza', 'Yehya Abo Qara'),
+  V(22, 'HR Officer', 'Gaza Country Office', 'stf_3', 'Gaza'),
+  V(23, 'Videographer', 'Gaza Country Office', 'stf_20', 'Gaza', 'AbdAlrahman Albaba'),
+  V(24, 'MEAL Assistant', 'Gaza Country Office', 'stf_20', 'Gaza'),
+  V(25, 'Physiotherapy Officer', 'Mobile & Rehabilitation Centre Team', 'stf_20', 'Gaza'),
+  V(26, 'MHPSS Officer', 'Mobile & Rehabilitation Centre Team', 'stf_20', 'Gaza', 'Rafat Alsalem'),
+  V(27, 'Nutrition Officer', 'Mobile & Rehabilitation Centre Team', 'stf_20', 'Gaza'),
+  V(28, 'P&O Specialist (expatriate)', 'Technical Unit', 'stf_10', 'Gaza'),
+  V(29, 'P&O Specialist (expatriate)', 'Technical Unit', 'stf_10', 'Gaza'),
+  V(30, 'Physiotherapist Assistant (mobile team)', 'Mobile Team', 'stf_25', 'Gaza'),
+  V(31, 'Physiotherapist Assistant (mobile team)', 'Mobile Team', 'stf_25', 'Gaza'),
+  V(32, 'Physiotherapist Assistant (mobile team)', 'Mobile Team', 'stf_25', 'Gaza'),
+  V(33, 'Physiotherapist Assistant (centre)', 'Mobile & Rehabilitation Centre Team', 'stf_25', 'Gaza'),
+  V(34, 'MHPSS Assistant (mobile team)', 'Mobile Team', 'stf_26', 'Gaza'),
+  V(35, 'MHPSS Assistant (mobile team)', 'Mobile Team', 'stf_26', 'Gaza'),
+  V(36, 'MHPSS Assistant (mobile team)', 'Mobile Team', 'stf_26', 'Gaza'),
+  V(37, 'MHPSS Assistant (centre)', 'Mobile & Rehabilitation Centre Team', 'stf_26', 'Gaza'),
+  V(38, 'Centre Security (x2)', 'Gaza Country Office', 'stf_21', 'Gaza'),
+  V(39, 'Cleaner (x2)', 'Gaza Country Office', 'stf_21', 'Gaza'),
+]
 /** Staff records (org chart): everyone reports to Bilal except Tala, who reports to Alaa. Salaries from the budget narrative (USD/month). */
 export const RHS_STAFF: StaffMember[] = [
   S(3, 'u_shomsi', 'Shatha Homsi', 'Finance Director', 'Finance', 4935, { budgetHolder: true, approvalLimitUSD: 25000 }),

@@ -13,7 +13,7 @@ import { blockingFailures, emptySourcing, isBidMethod, sourcingRequirements, tie
 import { applyDecision, buildChain, currentStep, resetChain, resolveApprover, chainFromSteps, lineManagerSteps } from '@/lib/workflow'
 import { linesSubtotal, nowIso, uid } from '@/lib/format'
 import { passwordProblem, tempPassword } from '@/lib/auth'
-import { RHS_ALL_USERS, RHS_STAFF, HUMANITY_DONOR, HUMANITY_PROJECT, HUMANITY_BUDGET, HUMANITY_CODE } from '@/data/rhs'
+import { RHS_ALL_USERS, RHS_STAFF, RHS_ED, RHS_POSITIONS, HUMANITY_DONOR, HUMANITY_PROJECT, HUMANITY_BUDGET, HUMANITY_CODE } from '@/data/rhs'
 import { emptyDueDiligence } from '@/lib/partners'
 import { unassignedSalaryLines, isSalaryLine, headcount, nextRhsNumber } from '@/lib/salary'
 import { buildVacancyChain, canDecideVacancy, scoreApplicant } from '@/lib/recruitment'
@@ -248,7 +248,7 @@ export type DataMode = 'clean' | 'demo'
 export const startupMode = (): DataMode => { try { return localStorage.getItem('rhs-platform-mode') === 'demo' ? 'demo' : 'clean' } catch { return 'clean' } }
 /** Staff records for the platform accounts only — positions and line managers kept, salaries and contracts cleared. */
 /** Clean start: Bilal at the top of the org chart (salary 4,935 USD/month from the budget narrative) and the RHS colleagues from src/data/rhs.ts. */
-const cleanStaff = (): StaffMember[] => [...SEED_STAFF.filter((s) => s.userId === CORE_USER.id).map((s) => ({ ...s, monthlySalary: 4935, currency: 'USD' as const, endDate: undefined, contractRef: undefined, notes: '', lineManagerId: undefined, budgetHolder: true, approvalLimitUSD: undefined, sourceProjectId: undefined, sourceProjectCode: undefined, sourceLineCode: undefined, status: 'active' as const })), ...RHS_STAFF]
+const cleanStaff = (): StaffMember[] => [RHS_ED, ...SEED_STAFF.filter((s) => s.userId === CORE_USER.id).map((s) => ({ ...s, monthlySalary: 4935, currency: 'USD' as const, endDate: undefined, contractRef: undefined, notes: '', lineManagerId: RHS_ED.id, budgetHolder: true, approvalLimitUSD: undefined, sourceProjectId: undefined, sourceProjectCode: undefined, sourceLineCode: undefined, status: 'active' as const })), ...RHS_STAFF, ...RHS_POSITIONS]
 const EMPTY_COUNTERS = { PR: 0, PO: 0, CT: 0, GRN: 0, INV: 0, ENV: 0, PT: 0, LR: 0, WFH: 0, PS: 0, REC: 0, APP: 0, SM: 0, SR: 0, WB: 0, TR: 0 }
 /** Clean start: user accounts, approval matrix, policy settings and minimal staff records; every register and document empty. */
 const cleanInitial = (): State => ({
@@ -1455,7 +1455,7 @@ export const useStore = create<State & Actions>()(
       }
     },
     {
-      name: 'rhs-platform-v8', version: 10,
+      name: 'rhs-platform-v8', version: 11,
       migrate: (persisted: unknown, version: number) => {
         const st = persisted as State
         if (version < 9 && st?.users) {
@@ -1476,6 +1476,13 @@ export const useStore = create<State & Actions>()(
           st.staff = [...(st.staff ?? []), ...RHS_STAFF.filter((x) => !staffIds.has(x.id) && !linked.has(x.userId))]
           if (!(st.donors ?? []).some((d) => d.id === HUMANITY_DONOR.id || d.name.toLowerCase() === 'humanity')) st.donors = [HUMANITY_DONOR, ...(st.donors ?? [])]
           if (!(st.projects ?? []).some((p) => p.code === HUMANITY_CODE)) { st.projects = [HUMANITY_PROJECT, ...(st.projects ?? [])]; st.budgets = [HUMANITY_BUDGET, ...(st.budgets ?? []).filter((b) => b.id !== HUMANITY_BUDGET.id)] }
+        }
+        if (version < 11 && st?.staff && st.dataMode !== 'demo') {
+          // Organogram: Executive Director (acting Bilal) at the top, Amman vacancies and the Gaza country office positions
+          const ids = new Set(st.staff.map((x) => x.id))
+          if (!ids.has(RHS_ED.id)) st.staff = [RHS_ED, ...st.staff]
+          st.staff = st.staff.map((x) => (x.id === 'stf_2' && !x.lineManagerId ? { ...x, lineManagerId: RHS_ED.id } : x))
+          st.staff = [...st.staff, ...RHS_POSITIONS.filter((x) => !ids.has(x.id))]
         }
         return st
       },

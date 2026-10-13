@@ -840,6 +840,7 @@ export interface StaffMember {
   userId?: string             // platform account, if any
   lineManagerId?: string      // StaffMember id of the line manager (approves leave / WFH, creates timesheets, first approver on requisitions)
   budgetHolder?: boolean      // holds a budget: appears as budget holder in the org chart and master budget
+  acting?: boolean            // acting assignment (shown light green on the organogram)
   approvalLimitUSD?: number   // requisitions above this amount escalate to the next line manager up (undefined = no limit)
   contractRef?: string        // contract number
   annualLeaveDays?: number    // entitlement per year (defaults to settings.hr)

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Pencil, Users, Landmark, ShieldCheck, ChevronRight } from 'lucide-react'
+import { Plus, Pencil, Users, Landmark, ShieldCheck, ChevronRight, Network, List } from 'lucide-react'
+import { OrgChartSvg } from '@/components/OrgChartSvg'
 import { useStore, useCurrentUser } from '@/store/useStore'
 import { Card, PageHeader, Modal, Field, Alert, Stat, Avatar } from '@/components/ui'
 import { can } from '@/lib/permissions'
@@ -19,6 +20,7 @@ export default function OrgChart() {
   const canEdit = can(user, 'hr.staff.manage')
   const [edit, setEdit] = useState<Partial<StaffMember> | null>(null)
   const [open, setOpen] = useState<Record<string, boolean>>({})
+  const [view, setView] = useState<'chart' | 'list'>('chart')
   const [simReq, setSimReq] = useState<string>('')
   const [simAmt, setSimAmt] = useState<string>('1000')
 
@@ -69,11 +71,12 @@ export default function OrgChart() {
         actions={<div className="flex gap-2"><Link to="/hr/staff" className="btn-secondary"><Users size={15} /> Staff register</Link>{canEdit && <button className="btn-primary" onClick={() => setEdit({ position: '', name: '', department: '', country: settings.countries[0], status: 'active' })}><Plus size={15} /> Add person</button>}</div>} />
       <div className="mb-5 grid gap-4 sm:grid-cols-4"><Stat label="People" value={active.length} /><Stat label="Budget holders" value={holders.length} /><Stat label="Without platform account" value={unlinked.length} tone={unlinked.length ? 'sun' : 'default'} /><Stat label="Without line manager" value={noManager.length} tone={noManager.length ? 'sun' : 'default'} /></div>
       {!canEdit && <div className="mb-4"><Alert tone="info">Read-only view. Editing the org chart needs the “Edit the staff register and the org chart” function (Users & access → Permissions).</Alert></div>}
-      <div className="grid gap-6 xl:grid-cols-3">
-        <Card className="xl:col-span-2" title="Reporting lines" description="Expand a person to see their reports. The first root is the head of the organisation.">
-          {active.length === 0 ? <div className="text-[13px] text-ink-500">No staff yet — add the first person (usually the Executive Director).</div> : <ul className="space-y-1">{roots.map((r) => <Node key={r.id} s={r} depth={0} />)}</ul>}
+      <div className={cx('grid gap-6', view === 'chart' ? 'xl:grid-cols-1' : 'xl:grid-cols-3')}>
+        <Card className={view === 'chart' ? '' : 'xl:col-span-2'} title={view === 'chart' ? 'Organogram' : 'Reporting lines'} description={view === 'chart' ? 'Boxed chart as in the RHS organogram deck — Amman in green, Gaza in pink and red, vacancies in amber, acting in light green. Click a box to edit it, the circle to fold a team.' : 'Expand a person to see their reports. The first root is the head of the organisation.'}
+          actions={<div className="flex rounded-control bg-surface-muted p-0.5" role="radiogroup"><button role="radio" aria-checked={view === 'chart'} data-testid="org-view-chart" className={cx('flex items-center gap-1 rounded-control px-2.5 py-1 text-[12.5px] font-medium', view === 'chart' ? 'bg-surface shadow-card text-ink-900' : 'text-ink-600')} onClick={() => setView('chart')}><Network size={13} /> Chart</button><button role="radio" aria-checked={view === 'list'} data-testid="org-view-list" className={cx('flex items-center gap-1 rounded-control px-2.5 py-1 text-[12.5px] font-medium', view === 'list' ? 'bg-surface shadow-card text-ink-900' : 'text-ink-600')} onClick={() => setView('list')}><List size={13} /> List</button></div>}>
+          {active.length === 0 ? <div className="text-[13px] text-ink-500">No staff yet — add the first person (usually the Executive Director).</div> : view === 'chart' ? <OrgChartSvg staff={active} roots={roots} users={users} title={`${settings.orgName} — Organogram ${new Date().getFullYear()}`} onSelect={canEdit ? (s) => setEdit(s) : undefined} canEdit={canEdit} /> : <ul className="space-y-1">{roots.map((r) => <Node key={r.id} s={r} depth={0} />)}</ul>}
         </Card>
-        <div className="space-y-6">
+        <div className={view === 'chart' ? 'grid gap-6 md:grid-cols-2' : 'space-y-6'}>
           <Card title="Escalation preview" description="Which managers a requisition would go to, before the approval matrix steps.">
             <div className="space-y-3">
               <Field label="Requester"><select className="input" data-testid="sim-req" value={simReq} onChange={(e) => setSimReq(e.target.value)}><option value="">— choose —</option>{active.filter((s) => s.userId).map((s) => <option key={s.id} value={s.id}>{s.name} · {s.position}</option>)}</select></Field>
@@ -99,6 +102,7 @@ export default function OrgChart() {
             <Field label="Platform account" hint="Needed for the person to approve on the system."><select className="input" data-testid="org-account" value={edit.userId ?? ''} onChange={(e) => setEdit({ ...edit, userId: e.target.value || undefined })}><option value="">— none —</option>{users.filter((u) => u.active && (!staff.some((s) => s.userId === u.id && s.id !== edit.id))).map((u) => <option key={u.id} value={u.id}>{u.name} · {u.email}</option>)}</select></Field>
             <Field label="Status"><select className="input" value={edit.status ?? 'active'} onChange={(e) => setEdit({ ...edit, status: e.target.value as StaffStatus })}>{(['active', 'planned', 'left'] as StaffStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}</select></Field>
             <div className="rounded-card border border-line bg-surface-muted p-3 sm:col-span-2">
+              <label className="mb-2 flex items-center gap-2 text-[13px] font-medium text-ink-900"><input type="checkbox" data-testid="org-acting" checked={!!edit.acting} onChange={(e) => setEdit({ ...edit, acting: e.target.checked })} /> Acting assignment <span className="text-[11.5px] font-normal text-ink-500">(shown light green; the person's own position is a separate record)</span></label>
               <label className="flex items-center gap-2 text-[13px] font-medium text-ink-900"><input type="checkbox" data-testid="org-holder" checked={!!edit.budgetHolder} onChange={(e) => setEdit({ ...edit, budgetHolder: e.target.checked, approvalLimitUSD: e.target.checked ? edit.approvalLimitUSD : undefined })} /> Budget holder</label>
               <div className="mt-1 text-[11.5px] text-ink-500">Budget holders own master-budget lines and approve what their reports request.</div>
               {edit.budgetHolder && <div className="mt-3"><Field label="Approval limit (USD)" hint="Requisitions above this amount also go to the next manager up the chart. Leave empty for no limit."><input type="number" className="input" data-testid="org-limit" value={edit.approvalLimitUSD ?? ''} placeholder="no limit" onChange={(e) => setEdit({ ...edit, approvalLimitUSD: e.target.value === '' ? undefined : Number(e.target.value) })} /></Field></div>}

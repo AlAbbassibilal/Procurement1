@@ -8,10 +8,11 @@ import { AttachmentList } from '@/components/workflow'
 import { computeBvA } from '@/lib/budget'
 import { STAGE_LABEL, STAGE_DESC, STAGE_INDEX, PROJECT_STAGES_LIST, ipttProgress, workplanProgress, reportLiveStatus, allIndicators, monthsOf, planTotal } from '@/lib/grants'
 import { accessOf } from '@/lib/departments'
-import { fmtMoney, fmtDate, fmtDateTime, timeAgo, cx, uid } from '@/lib/format'
+import { fmtMoney, fmtDate, fmtDateTime, timeAgo, cx } from '@/lib/format'
 import { StagePill } from './Overview'
 import { LogframeTab, WorkplanTab, BudgetTab, SpendingTab, IPTTTab } from './ProjectPlanning'
 import { ProposalImportButton } from './ProposalImport'
+import { ProposalSections, ExportProposalButton } from './ProposalEditor'
 import { TaskModal, TaskList } from '@/pages/Tasks'
 import { PartnerStagePill } from '@/pages/partnerships/shared'
 import type { ProjectStage, ProjectReport, Attachment } from '@/types'
@@ -112,9 +113,9 @@ export default function ProjectPage() {
       {tab === 'proposal' && (
         <div className="grid gap-6 xl:grid-cols-3">
           <div className="space-y-4 xl:col-span-2">
-            {canEdit && <div className="flex flex-wrap items-center justify-between gap-2 rounded-card border border-dashed border-line bg-surface-muted px-4 py-3"><div className="text-[12.5px] text-ink-600"><b className="text-ink-900">Have the proposal as a file?</b> Attach the Word, PDF or text document and the sections below are filled from its headings — you review the mapping first.</div><ProposalImportButton p={p} canEdit={canEdit} /></div>}
-            {p.proposal.sections.map((s) => <Card key={s.id} title={s.title}><textarea className="input min-h-[110px]" value={s.content} disabled={!canEdit} placeholder="Write this section…" onChange={(e) => updateProject(p.id, { proposal: { ...p.proposal, sections: p.proposal.sections.map((x) => (x.id === s.id ? { ...x, content: e.target.value } : x)) } })} /></Card>)}
-            {canEdit && <button className="btn-secondary btn-sm" onClick={() => { const t = prompt('Section title'); if (t) updateProject(p.id, { proposal: { ...p.proposal, sections: [...p.proposal.sections, { id: uid('ps_'), title: t, content: '' }] } }) }}><Plus size={13} /> Add section</button>}
+            {canEdit && <div className="flex flex-wrap items-center justify-between gap-2 rounded-card border border-dashed border-line bg-surface-muted px-4 py-3"><div className="text-[12.5px] text-ink-600"><b className="text-ink-900">Have the proposal as a file?</b> Attach the Word, PDF or text document and the sections below are filled from its headings — you review the mapping first.</div><div className="flex flex-wrap gap-2"><ProposalImportButton p={p} canEdit={canEdit} /><ExportProposalButton p={p} totalBudget={budget?.lines.reduce((t, l) => t + l.amount, 0)} /></div></div>}
+            {!canEdit && <div className="flex justify-end"><ExportProposalButton p={p} totalBudget={budget?.lines.reduce((t, l) => t + l.amount, 0)} /></div>}
+            <ProposalSections p={p} canEdit={canEdit} />
           </div>
           <div className="space-y-6">
             <Card title="Submission"><div className="space-y-3"><Field label="Submitted to"><input className="input" value={p.proposal.submittedTo ?? ''} disabled={!canEdit} onChange={(e) => updateProject(p.id, { proposal: { ...p.proposal, submittedTo: e.target.value } })} /></Field><Field label="Reference"><input className="input" value={p.proposal.reference ?? ''} disabled={!canEdit} onChange={(e) => updateProject(p.id, { proposal: { ...p.proposal, reference: e.target.value } })} /></Field><Field label="Version"><input className="input" value={p.proposal.version ?? ''} disabled={!canEdit} onChange={(e) => updateProject(p.id, { proposal: { ...p.proposal, version: e.target.value } })} /></Field><Field label="Submission deadline"><DateInput className="input" value={p.proposal.submissionDeadline ?? ''} disabled={!canEdit} onChange={(e) => updateProject(p.id, { proposal: { ...p.proposal, submissionDeadline: e.target.value } })} /></Field><Field label="Requested amount"><input type="number" className="input" value={p.requestedAmount ?? ''} disabled={!canEdit} onChange={(e) => updateProject(p.id, { requestedAmount: Number(e.target.value) || undefined })} /></Field></div></Card>

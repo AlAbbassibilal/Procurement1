@@ -39,8 +39,10 @@ async function wordParagraphs(file: File): Promise<{ text: string; heading: bool
     if (!text) continue
     const runs = [...p.matchAll(/<w:r[ >][\s\S]*?<\/w:r>/g)].map((r) => r[0])
     const allBold = runs.length > 0 && runs.every((r) => /<w:b\/>|<w:b w:val="(1|true)"/.test(r) || !/<w:t/.test(r))
-    const heading = /heading|title|subtitle/i.test(style) || (allBold && text.length <= 90 && !/[.]$/.test(text)) || looksLikeHeading(text) && text.length <= 60
-    out.push({ text, heading })
+    const level = /heading1|^title$/i.test(style) ? 1 : /heading2/i.test(style) ? 2 : /heading[3-9]/i.test(style) ? 3 : 0
+    const heading = level === 1 || (!level && ((allBold && text.length <= 90 && !/[.]$/.test(text)) || (looksLikeHeading(text) && text.length <= 60)))
+    // sub-headings stay inside the section text, marked for the RHS export ("## " = Heading 2, "### " = Heading 3)
+    out.push({ text: level === 2 ? `## ${text}` : level === 3 ? `### ${text}` : (/listbullet/i.test(style) || (/listparagraph/i.test(style) && /<w:numPr>/.test(p))) && !heading ? `• ${text}` : text, heading })
   }
   return out
 }

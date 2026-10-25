@@ -31,22 +31,22 @@ const S = (n: number, userId: string, name: string, position: string, department
   id: `stf_${n}`, rhsNumber: `RHS-${String(n).padStart(4, '0')}`, name, position, department, country: 'Amman (Regional Office)', contractType: 'full_time', monthlySalary, currency: 'USD', startDate: '2025-01-01', status: 'active', userId, lineManagerId: 'stf_2', createdAt: T0, updatedAt: T0, ...extra,
 })
 /** Executive Director position, held in an acting capacity by Bilal (no separate account — Bilal signs in as Director of Programs). */
-export const RHS_ED: StaffMember = { id: 'stf_1', rhsNumber: 'RHS-0001', name: 'Bilal Abbassi', position: 'Executive Director', department: 'Executive Office', country: 'Amman (Regional Office)', contractType: 'full_time', monthlySalary: 0, currency: 'USD', startDate: '2025-01-01', status: 'active', acting: true, budgetHolder: true, createdAt: T0, updatedAt: T0 }
-const V = (n: number, position: string, department: string, lineManagerId: string, country = 'Amman (Regional Office)', name = ''): StaffMember => ({ id: `stf_${n}`, rhsNumber: `RHS-${String(n).padStart(4, '0')}`, name, position, department, country, contractType: 'full_time', monthlySalary: 0, currency: 'USD', startDate: '2026-10-01', status: name ? 'active' : 'planned', lineManagerId, createdAt: T0, updatedAt: T0 })
-/** Positions from the RHS organogram deck: hired colleagues without platform accounts, plus the Gaza field teams —
- *  the Rehabilitation Officer leads 6 rehabilitation assistants and the MHPSS Officer leads 6 MHPSS assistants (vacant until recruited). */
+export const RHS_ED: StaffMember = { id: 'stf_1', rhsNumber: 'RHS-0001', name: '', position: 'Executive Director', department: 'Executive Office', country: 'Amman (Regional Office)', contractType: 'full_time', monthlySalary: 0, currency: 'USD', startDate: '2025-01-01', status: 'active', acting: true, actingStaffId: 'stf_2', budgetHolder: true, createdAt: T0, updatedAt: T0 }
+const V = (n: number, position: string, department: string, lineManagerId: string, country = 'Amman (Regional Office)', name = '', extra: Partial<StaffMember> = {}): StaffMember => ({ id: `stf_${n}`, rhsNumber: `RHS-${String(n).padStart(4, '0')}`, name, position, department, country, contractType: 'full_time', monthlySalary: 0, currency: 'USD', startDate: '2026-10-01', status: name ? 'active' : 'planned', lineManagerId, createdAt: T0, updatedAt: T0, ...extra })
+/** Positions from the RHS organogram deck: colleagues without platform accounts and the Gaza country office.
+ *  Teams still to be recruited (6 rehabilitation assistants, 6 MHPSS assistants) are planned under their officers, not staff records. */
 export const RHS_POSITIONS: StaffMember[] = [
   V(11, 'MEAL Officer', 'Programs', 'stf_2', 'Amman (Regional Office)', 'Ahmad Gharaibeh'),
-  V(20, 'Program Manager (Overall Operations Manager)', 'Gaza Country Office', 'stf_2', 'Gaza', 'Rami Basheer'),
-  V(21, 'Logistic Officer', 'Gaza Country Office', 'stf_3', 'Gaza', 'Yehya Abo Qara'),
-  V(23, 'Videographer', 'Gaza Country Office', 'stf_20', 'Gaza', 'AbdAlrahman Albaba'),
-  V(25, 'Rehabilitation Officer', 'Mobile & Rehabilitation Centre Team', 'stf_20', 'Gaza'),
-  V(26, 'MHPSS Officer', 'Mobile & Rehabilitation Centre Team', 'stf_20', 'Gaza', 'Rafat Alsalem'),
-  ...[30, 31, 32, 33, 34, 35].map((n) => V(n, 'Rehabilitation Assistant', 'Mobile Team', 'stf_25', 'Gaza')),
-  ...[40, 41, 42, 43, 44, 45].map((n) => V(n, 'MHPSS Assistant', 'Mobile Team', 'stf_26', 'Gaza')),
+  V(12, 'Program Manager (Overall Operations Manager)', 'Gaza Country Office', 'stf_2', 'Gaza', 'Rami Basheer'),
+  V(13, 'Logistic Officer', 'Gaza Country Office', 'stf_3', 'Gaza', 'Yehya Abo Qara'),
+  V(14, 'Videographer', 'Gaza Country Office', 'stf_12', 'Gaza', 'AbdAlrahman Albaba'),
+  V(15, 'Rehabilitation Officer', 'Mobile & Rehabilitation Centre Team', 'stf_12', 'Gaza', '', { plannedTeam: [{ position: 'Rehabilitation Assistant', count: 6 }] }),
+  V(16, 'MHPSS Officer', 'Mobile & Rehabilitation Centre Team', 'stf_12', 'Gaza', 'Rafat Alsalem', { plannedTeam: [{ position: 'MHPSS Assistant', count: 6 }] }),
 ]
-/** Seeded vacancies from an earlier version that are not part of the organogram — removed on upgrade if still unfilled. */
-export const RHS_DROPPED_POSITIONS = ['stf_12', 'stf_13', 'stf_14', 'stf_15', 'stf_16', 'stf_22', 'stf_24', 'stf_27', 'stf_28', 'stf_29', 'stf_36', 'stf_37', 'stf_38', 'stf_39']
+/** Ids of earlier seeded records superseded by the list above (old ids / vacancies) — cleaned up on upgrade when still unnamed. */
+export const RHS_DROPPED_POSITIONS = ['stf_12', 'stf_13', 'stf_14', 'stf_15', 'stf_16', 'stf_22', 'stf_24', 'stf_27', 'stf_28', 'stf_29', 'stf_30', 'stf_31', 'stf_32', 'stf_33', 'stf_34', 'stf_35', 'stf_36', 'stf_37', 'stf_38', 'stf_39', 'stf_40', 'stf_41', 'stf_42', 'stf_43', 'stf_44', 'stf_45']
+/** Old id → new record, for upgrading the earlier seed (Gaza office used ids 20/21/23/25/26). */
+export const RHS_RENUMBER: Record<string, string> = { stf_20: 'stf_12', stf_21: 'stf_13', stf_23: 'stf_14', stf_25: 'stf_15', stf_26: 'stf_16' }
 /** Staff records (org chart): everyone reports to Bilal except Tala, who reports to Alaa. Salaries from the budget narrative (USD/month). */
 export const RHS_STAFF: StaffMember[] = [
   S(3, 'u_shomsi', 'Shatha Homsi', 'Finance Director', 'Finance', 4935, { budgetHolder: true, approvalLimitUSD: 25000 }),

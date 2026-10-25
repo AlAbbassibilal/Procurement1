@@ -20,14 +20,14 @@ const COLORS = {
 }
 export type NodeTone = keyof typeof COLORS
 export const toneOf = (s: StaffMember): NodeTone => {
+  if (s.actingStaffId || s.acting) return 'ammanLight'
   if (!s.name.trim() || s.status === 'planned') return 'vacant'
-  if (s.acting) return 'ammanLight'
   if (/gaza/i.test(s.country)) return /assistant|security|cleaner|mobile/i.test(s.position) ? 'gazaTeam' : 'gaza'
   if (/amman|jordan|regional/i.test(s.country)) return 'amman'
   return 'other'
 }
 
-interface Laid { s: StaffMember; x: number; y: number; depth: number; children: Laid[]; width: number; collapsed: boolean; hidden: number }
+interface Laid { s: StaffMember; x: number; y: number; depth: number; children: Laid[]; width: number; collapsed: boolean; hidden: number; planned: { position: string; count: number }[] }
 
 function layout(staff: StaffMember[], roots: StaffMember[], collapsed: Set<string>): { nodes: Laid[]; width: number; height: number } {
   const kids = (id: string) => staff.filter((x) => x.lineManagerId === id).sort((a, b) => (toneOf(a) === 'vacant' ? 1 : 0) - (toneOf(b) === 'vacant' ? 1 : 0) || (a.name || a.position).localeCompare(b.name || b.position))
@@ -35,18 +35,20 @@ function layout(staff: StaffMember[], roots: StaffMember[], collapsed: Set<strin
   const build = (s: StaffMember, depth: number): Laid => {
     const isCol = collapsed.has(s.id)
     const children = isCol ? [] : kids(s.id).map((k) => build(k, depth + 1))
-    const width = Math.max(BOX_W, children.reduce((w, c) => w + c.width, 0) + Math.max(0, children.length - 1) * H_GAP)
-    return { s, x: 0, y: depth * (BOX_H + V_GAP), depth, children, width, collapsed: isCol, hidden: isCol ? count(s.id) : 0 }
+    const planned = isCol ? [] : (s.plannedTeam ?? []).filter((t) => t.count > 0)
+    const width = Math.max(BOX_W, children.reduce((w, c) => w + c.width, 0) + Math.max(0, children.length - 1) * H_GAP + planned.length * (BOX_W + H_GAP))
+    return { s, x: 0, y: depth * (BOX_H + V_GAP), depth, children, width, collapsed: isCol, hidden: isCol ? count(s.id) : 0, planned }
   }
   const trees = roots.map((r) => build(r, 0))
   const place = (n: Laid, left: number) => {
     n.x = left + n.width / 2 - BOX_W / 2
-    let cur = left + (n.width - (n.children.reduce((w, c) => w + c.width, 0) + Math.max(0, n.children.length - 1) * H_GAP)) / 2
+    const row = n.children.reduce((w, c) => w + c.width, 0) + Math.max(0, n.children.length - 1) * H_GAP + n.planned.length * (BOX_W + H_GAP)
+    let cur = left + (n.width - row) / 2 + n.planned.length * (BOX_W + H_GAP)
     for (const c of n.children) { place(c, cur); cur += c.width + H_GAP }
   }
   let left = 0; for (const t of trees) { place(t, left); left += t.width + H_GAP * 3 }
   const flat: Laid[] = []; const walk = (n: Laid) => { flat.push(n); n.children.forEach(walk) }; trees.forEach(walk)
-  const depth = flat.reduce((d, n) => Math.max(d, n.depth), 0)
+  const depth = flat.reduce((d, n) => Math.max(d, n.depth + (n.planned.length ? 1 : 0)), 0)
   return { nodes: flat, width: Math.max(left - H_GAP * 3, BOX_W), height: (depth + 1) * BOX_H + depth * V_GAP }
 }
 
@@ -72,11 +74,11 @@ export function OrgChartSvg({ staff, roots, users, title, onSelect, canEdit }: {
     const c = document.createElement('canvas'); c.width = W * 2; c.height = H * 2; const g = c.getContext('2d')!; g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url)
     const blob = await new Promise<Blob | null>((r) => c.toBlob(r, 'image/png')); if (blob) await saveFile(`${title.replace(/\W+/g, '_')}.png`, blob, 'image/png')
   }
-  const legend: { tone: NodeTone; label: string }[] = [{ tone: 'amman', label: 'Regional office staff (Amman)' }, { tone: 'ammanLight', label: 'Acting' }, { tone: 'gaza', label: 'Gaza country office staff' }, { tone: 'gazaTeam', label: 'Mobile team / centre staff' }, { tone: 'other', label: 'Other country offices' }, { tone: 'vacant', label: 'Vacant' }]
+  const legend: { tone: NodeTone; label: string }[] = [{ tone: 'amman', label: 'Regional office staff (Amman)' }, { tone: 'ammanLight', label: 'Acting' }, { tone: 'gaza', label: 'Gaza country office staff' }, { tone: 'gazaTeam', label: 'Mobile team / centre staff' }, { tone: 'other', label: 'Other country offices' }, { tone: 'vacant', label: 'Vacant position' }]
   return (
     <div>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap gap-3 text-[11.5px] text-ink-700">{legend.map((l) => <span key={l.tone} className="flex items-center gap-1.5"><span className="inline-block h-3 w-4 rounded-sm" style={{ background: COLORS[l.tone].fill }} />{l.label}</span>)}</div>
+        <div className="flex flex-wrap gap-3 text-[11.5px] text-ink-700">{legend.map((l) => <span key={l.tone} className="flex items-center gap-1.5"><span className="inline-block h-3 w-4 rounded-sm" style={{ background: COLORS[l.tone].fill }} />{l.label}</span>)}<span className="flex items-center gap-1.5"><span className="inline-block h-3 w-4 rounded-sm border border-dashed border-amber-700 bg-white" />Planned team (to recruit)</span></div>
         <div className="flex gap-1"><button className="btn-ghost btn-sm" onClick={() => setScale((s) => Math.max(0.25, s - 0.1))} title="Zoom out"><ZoomOut size={14} /></button><span className="self-center font-mono text-[11px] text-ink-500">{Math.round(scale * 100)}%</span><button className="btn-ghost btn-sm" onClick={() => setScale((s) => Math.min(2, s + 0.1))} title="Zoom in"><ZoomIn size={14} /></button><button className="btn-ghost btn-sm" onClick={fit} title="Fit to width"><Maximize2 size={14} /></button><button className="btn-secondary btn-sm" data-testid="org-png" onClick={png}><Download size={13} /> PNG</button><button className="btn-ghost btn-sm" onClick={() => window.print()} title="Print"><Printer size={14} /></button></div>
       </div>
       <div ref={wrapRef} className="overflow-auto rounded-card border border-line bg-white scrollbar-thin" style={{ maxHeight: '70vh' }}>
@@ -88,7 +90,14 @@ export function OrgChartSvg({ staff, roots, users, title, onSelect, canEdit }: {
             <line x1={0} y1={H - 6} x2={W} y2={H - 6} stroke="#3A7C22" strokeWidth={4} />
             <g transform={`translate(${PAD}, ${PAD + 50})`}>
               {nodes.map((n) => n.children.map((c) => { const x1 = n.x + BOX_W / 2, y1 = n.y + BOX_H, x2 = c.x + BOX_W / 2, y2 = c.y, ym = y1 + V_GAP / 2; return <path key={n.s.id + c.s.id} d={`M${x1},${y1} L${x1},${ym} L${x2},${ym} L${x2},${y2 - 1}`} fill="none" stroke="#1C2833" strokeWidth={1.4} markerEnd="url(#org-arrow)" /> }))}
-              {nodes.map((n) => { const t = COLORS[toneOf(n.s)]; const u = users.find((x) => x.id === n.s.userId); const pos = wrap(n.s.position, 24); const name = n.s.name.trim() ? (n.s.acting ? `Acting · ${n.s.name}` : n.s.name) : 'Vacant'; const hasKids = staff.some((x) => x.lineManagerId === n.s.id); return (
+              {nodes.map((n) => n.planned.map((t, i) => { const childrenRow = n.children.reduce((w, c) => w + c.width, 0) + Math.max(0, n.children.length - 1) * H_GAP + n.planned.length * (BOX_W + H_GAP); const x = n.x + BOX_W / 2 - childrenRow / 2 + i * (BOX_W + H_GAP); const y = n.y + BOX_H + V_GAP; const x1 = n.x + BOX_W / 2, ym = n.y + BOX_H + V_GAP / 2; return (
+                <g key={n.s.id + 'plan' + i} data-testid={`org-planned-${n.s.rhsNumber}-${i}`}>
+                  <path d={`M${x1},${n.y + BOX_H} L${x1},${ym} L${x + BOX_W / 2},${ym} L${x + BOX_W / 2},${y - 1}`} fill="none" stroke="#1C2833" strokeWidth={1.2} strokeDasharray="4 3" markerEnd="url(#org-arrow)" />
+                  <rect x={x} y={y} width={BOX_W} height={BOX_H} rx={3} fill="#FFFFFF" stroke="#B45309" strokeWidth={1.2} strokeDasharray="5 3" />
+                  <text x={x + BOX_W / 2} y={y + 22} textAnchor="middle" fontSize={11.5} fill="#1C2833">{`${t.count} × ${t.position}`.slice(0, 30)}</text>
+                  <text x={x + BOX_W / 2} y={y + 42} textAnchor="middle" fontSize={11} fontWeight={700} fill="#B45309">To recruit — planned team</text>
+                </g>) }))}
+              {nodes.map((n) => { const t = COLORS[toneOf(n.s)]; const u = users.find((x) => x.id === n.s.userId); const pos = wrap(n.s.position, 24); const holder = n.s.actingStaffId ? staff.find((x) => x.id === n.s.actingStaffId) : undefined; const name = holder ? `Acting · ${holder.name}` : n.s.name.trim() ? (n.s.acting ? `Acting · ${n.s.name}` : n.s.name) : 'Vacant'; const hasKids = staff.some((x) => x.lineManagerId === n.s.id); return (
                 <g key={n.s.id} transform={`translate(${n.x}, ${n.y})`} className={onSelect ? 'cursor-pointer' : undefined} onClick={() => onSelect?.(n.s)} data-testid={`org-box-${n.s.rhsNumber}`}>
                   <rect width={BOX_W} height={BOX_H} rx={3} fill={t.fill} stroke="#1C2833" strokeWidth={0.8} />
                   {pos.map((l, i) => <text key={i} x={BOX_W / 2} y={pos.length === 1 ? 20 : 15 + i * 13} textAnchor="middle" fontSize={11.5} fill={t.text}>{l}</text>)}

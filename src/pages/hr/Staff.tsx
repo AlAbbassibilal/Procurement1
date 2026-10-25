@@ -28,7 +28,7 @@ export default function HrStaff() {
         <tbody>{list.map((s) => { const b = balances(s, leaveRequests, settings); const left = contractDaysLeft(s); const mgr = staff.find((x) => x.id === s.lineManagerId); return (
           <tr key={s.id} className="hover:bg-surface-muted">
             <td className="table-td font-mono text-[12px] text-brand-700">{s.rhsNumber}</td>
-            <td className="table-td"><div className="font-medium text-ink-900">{s.name || <i className="text-ink-500">to recruit</i>}</div><div className="text-[12px] text-ink-500">{s.position} · {s.department}</div></td>
+            <td className="table-td"><div className="font-medium text-ink-900">{s.actingStaffId ? <>{staff.find((x) => x.id === s.actingStaffId)?.name} <span className="rounded-pill bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold text-brand-800">acting</span></> : s.name || <i className="text-ink-500">to recruit</i>}</div><div className="text-[12px] text-ink-500">{s.position} · {s.department}</div></td>
             <td className="table-td text-ink-700">{mgr?.name ?? '—'}</td>
             <td className="table-td text-[12px]">{(() => { const u = users.find((x) => x.id === s.userId); return u ? <span className="text-ink-700">{u.email}</span> : user.role === 'admin' && s.status !== 'left' ? <Link to={`/admin/users?staff=${s.id}`} className="text-brand-700 hover:underline" data-testid={`create-account-${s.rhsNumber}`}>Create account</Link> : <span className="text-ink-400">none</span> })()}</td>
             <td className="table-td text-ink-700">{CONTRACT_LABEL[s.contractType]}{s.contractRef && <div className="font-mono text-[11px] text-ink-500">{s.contractRef}</div>}</td>

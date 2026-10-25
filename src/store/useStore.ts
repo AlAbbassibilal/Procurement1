@@ -13,7 +13,7 @@ import { blockingFailures, emptySourcing, isBidMethod, sourcingRequirements, tie
 import { applyDecision, buildChain, currentStep, resetChain, resolveApprover, chainFromSteps, lineManagerSteps } from '@/lib/workflow'
 import { linesSubtotal, nowIso, uid } from '@/lib/format'
 import { passwordProblem, tempPassword } from '@/lib/auth'
-import { RHS_ALL_USERS, RHS_STAFF, RHS_ED, RHS_POSITIONS, RHS_DROPPED_POSITIONS, HUMANITY_DONOR, HUMANITY_PROJECT, HUMANITY_BUDGET, HUMANITY_CODE } from '@/data/rhs'
+import { RHS_ALL_USERS, RHS_STAFF, RHS_ED, RHS_POSITIONS, RHS_DROPPED_POSITIONS, RHS_RENUMBER, HUMANITY_DONOR, HUMANITY_PROJECT, HUMANITY_BUDGET, HUMANITY_CODE } from '@/data/rhs'
 import { emptyDueDiligence } from '@/lib/partners'
 import { unassignedSalaryLines, isSalaryLine, headcount, nextRhsNumber } from '@/lib/salary'
 import { buildVacancyChain, canDecideVacancy, scoreApplicant } from '@/lib/recruitment'
@@ -838,7 +838,7 @@ export const useStore = create<State & Actions>()(
           let mb = mbId ? s0.masterBudgets.find((m) => m.id === mbId) : [...s0.masterBudgets].sort((x, y) => y.year - x.year).find((m) => m.status === 'draft')
           if (!mb) { if (s0.masterBudgets.some((m) => m.status === 'approved') && !mbId) return { ok: false, added: 0, updated: 0, removed: 0, error: 'The latest master budget is approved — re-open it or create the next year first.' }; mb = get().createMasterBudget(new Date().getFullYear()) }
           if (mb.status !== 'draft') return { ok: false, added: 0, updated: 0, removed: 0, error: `Master budget ${mb.year} is approved — re-open it to sync positions.` }
-          const staff = get().staff.filter((x) => x.status !== 'left'); const users = get().users
+          const staff = get().staff.filter((x) => x.status !== 'left' && !x.actingStaffId); const users = get().users
           let added = 0, updated = 0
           let lines = mb.lines.filter((l) => !l.staffId || staff.some((x) => x.id === l.staffId)); const removed = mb.lines.length - lines.length
           let n = lines.length
@@ -1482,7 +1482,7 @@ export const useStore = create<State & Actions>()(
       }
     },
     {
-      name: 'rhs-platform-v8', version: 12,
+      name: 'rhs-platform-v8', version: 13,
       migrate: (persisted: unknown, version: number) => {
         const st = persisted as State
         if (version < 9 && st?.users) {
@@ -1517,6 +1517,20 @@ export const useStore = create<State & Actions>()(
           st.staff = st.staff.map((x) => (x.id === 'stf_25' && /physiotherapy officer/i.test(x.position) ? { ...x, position: 'Rehabilitation Officer' } : x))
           const ids = new Set(st.staff.map((x) => x.id))
           st.staff = [...st.staff.map((x) => { const seed = RHS_POSITIONS.find((p) => p.id === x.id); return seed && !x.name.trim() && /assistant/i.test(x.position) ? { ...x, position: seed.position, department: seed.department, lineManagerId: seed.lineManagerId } : x }), ...RHS_POSITIONS.filter((x) => !ids.has(x.id))]
+        }
+        if (version < 13 && st?.staff && st.dataMode !== 'demo') {
+          // Staff register clean-up: no vacancy records (teams to recruit are planned under their officers), ED held in acting capacity, sequential RHS numbers
+          // 1. drop earlier seeded vacancies (unnamed) — including old ids that clash with the new numbering but hold a different position
+          st.staff = st.staff.filter((x) => { if (x.name.trim()) return true; const seed = RHS_POSITIONS.find((p) => p.id === x.id); if (seed) return seed.position === x.position; return !RHS_DROPPED_POSITIONS.includes(x.id) })
+          const byId = (id: string) => st.staff.find((x) => x.id === id)
+          // 2. old Gaza ids → new ids (keeping any edits the user made)
+          for (const [oldId, newId] of Object.entries(RHS_RENUMBER)) { const old = byId(oldId); const seed = RHS_POSITIONS.find((p) => p.id === newId)!; if (old && !byId(newId)) { st.staff = st.staff.map((x) => (x.id === oldId ? { ...old, id: newId, rhsNumber: seed.rhsNumber, position: old.position === 'Physiotherapy Officer' ? seed.position : old.position, plannedTeam: seed.plannedTeam } : x)) } }
+          st.staff = st.staff.map((x) => ({ ...x, lineManagerId: x.lineManagerId && RHS_RENUMBER[x.lineManagerId] ? RHS_RENUMBER[x.lineManagerId] : x.lineManagerId }))
+          const ids = new Set(st.staff.map((x) => x.id))
+          st.staff = [...st.staff, ...RHS_POSITIONS.filter((x) => !ids.has(x.id))]
+          st.staff = st.staff.map((x) => (x.id === RHS_ED.id && x.acting ? { ...x, name: '', actingStaffId: x.actingStaffId ?? 'stf_2' } : x))
+          st.staff = st.staff.map((x) => { const seed = RHS_POSITIONS.find((p) => p.id === x.id); return seed && !x.plannedTeam && seed.plannedTeam ? { ...x, plannedTeam: seed.plannedTeam } : x })
+          st.users = st.users.map((u) => (u.id === 'u_bilal' ? { ...u, title: 'Director of Programs · Acting Executive Director' } : u))
         }
         return st
       },

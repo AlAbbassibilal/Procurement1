@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { Plus, Trash2, ShieldCheck, CheckCircle2, Clock } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { Logo } from '@/components/Logo'
-import { Field, Alert, DateInput } from '@/components/ui'
+import { Field, Alert, DateInput, DOB_MIN } from '@/components/ui'
 import { DD_VETTING_QUESTIONS, DD_PLATFORMS } from '@/data/dueDiligence'
 import { emptyKeyPerson } from '@/lib/partners'
 import { fmtDateTime, cx } from '@/lib/format'
@@ -88,7 +88,7 @@ export default function VettingPublic() {
             <td className="table-td py-1.5"><input className="input" value={k.name} onChange={(e) => setKp(k.id, { name: e.target.value })} /></td>
             <td className="table-td py-1.5"><input className="input" value={k.title} onChange={(e) => setKp(k.id, { title: e.target.value })} /></td>
             <td className="table-td py-1.5"><input className="input" value={k.countryOfBirth} onChange={(e) => setKp(k.id, { countryOfBirth: e.target.value })} /></td>
-            <td className="table-td py-1.5"><DateInput className="input" value={k.dob} onChange={(e) => setKp(k.id, { dob: e.target.value })} /></td>
+            <td className="table-td py-1.5"><DateInput className="input" min={DOB_MIN} value={k.dob} onChange={(e) => setKp(k.id, { dob: e.target.value })} /></td>
             <td className="table-td py-1.5"><select className="input" value={k.gender} onChange={(e) => setKp(k.id, { gender: e.target.value })}><option value="">—</option><option>Female</option><option>Male</option><option>Other</option></select></td>
             <td className="table-td py-1.5"><input className="input" value={k.idNumber ?? ''} onChange={(e) => setKp(k.id, { idNumber: e.target.value })} /></td>
             <td className="table-td py-1.5"><button className="btn-ghost btn-sm text-accent-700" onClick={() => setF({ ...f, keyPersonnel: f.keyPersonnel.filter((x) => x.id !== k.id) })}><Trash2 size={13} /></button></td>

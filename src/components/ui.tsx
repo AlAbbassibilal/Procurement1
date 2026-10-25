@@ -209,23 +209,25 @@ export function KV({ k, v, mono }: { k: string; v: ReactNode; mono?: boolean }) 
 export const DATE_MIN = '1990-01-01'
 export const DATE_MAX = '2050-12-31'
 /** Why a date string is unacceptable, or null when it is fine (empty is fine). */
-export function dateProblem(v: string | undefined | null): string | null {
+export function dateProblem(v: string | undefined | null, min: string = DATE_MIN, max: string = DATE_MAX): string | null {
   if (!v) return null
   if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return 'Enter a date as YYYY-MM-DD.'
   const [y, m, d] = v.split('-').map(Number) as [number, number, number]
   const dt = new Date(Date.UTC(y, m - 1, d))
   if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return 'This date does not exist.'
-  if (v < DATE_MIN) return 'Dates before 1990 are not accepted.'
-  if (v > DATE_MAX) return 'Dates after 2050 are not accepted.'
+  if (v < min) return `Dates before ${min.slice(0, 4)} are not accepted.`
+  if (v > max) return `Dates after ${max.slice(0, 4)} are not accepted.`
   return null
 }
+/** Lower bound for dates of birth (staff, partner key personnel). */
+export const DOB_MIN = '1920-01-01'
 export function DateInput({ value, onChange, className, ...rest }: Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'value' | 'onChange'> & { value?: string; onChange?: (e: { target: { value: string } }) => void }) {
   const [problem, setProblem] = useState<string | null>(null)
   return (
     <span className="block">
       <input type="date" min={rest.min ?? DATE_MIN} max={rest.max ?? DATE_MAX} {...rest} value={value ?? ''} className={cx(className, problem && 'border-danger-500 ring-1 ring-danger-500')} aria-invalid={!!problem}
-        onChange={(e) => { const v = e.target.value; const pr = dateProblem(v); setProblem(pr); if (!pr) onChange?.({ target: { value: v } }) }}
-        onBlur={(e) => { const pr = dateProblem(e.target.value); setProblem(pr); if (pr) { e.target.value = value ?? '' } }} />
+        onChange={(e) => { const v = e.target.value; const pr = dateProblem(v, String(rest.min ?? DATE_MIN), String(rest.max ?? DATE_MAX)); setProblem(pr); if (!pr) onChange?.({ target: { value: v } }) }}
+        onBlur={(e) => { const pr = dateProblem(e.target.value, String(rest.min ?? DATE_MIN), String(rest.max ?? DATE_MAX)); setProblem(pr); if (pr) { e.target.value = value ?? '' } }} />
       {problem && <span className="mt-1 block text-[11.5px] text-danger-700" role="alert">{problem}</span>}
     </span>
   )

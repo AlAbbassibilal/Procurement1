@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Download, Trash2, Save, ArrowRight, Share2, Copy, ExternalLink, XCircle, RotateCcw, Plus, ShieldCheck, CheckCircle2, PenLine, Clock, Info } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
 import { can } from '@/lib/permissions'
-import { Card, PageHeader, KV, Alert, Field, Modal, Stat, DateInput } from '@/components/ui'
+import { Card, PageHeader, KV, Alert, Field, Modal, Stat, DateInput, DOB_MIN } from '@/components/ui'
 import { accessOf } from '@/lib/departments'
 import { DD_CHECKLIST, DD_VETTING_QUESTIONS, DD_SEARCH_INSTRUCTIONS, PCA_SECTIONS, PCA_CATEGORY_LABELS, DD_RISK_GROUPS, DD_PURPOSE } from '@/data/dueDiligence'
 import type { PcaKey } from '@/data/dueDiligence'
@@ -225,7 +225,7 @@ function VettingTab({ p, setDD, canEdit, canManage }: { p: Partner; setDD: (fn: 
             <td className="table-td py-1.5"><input className="input" disabled={!canEdit || locked} value={k.name} onChange={(e) => setKp(k.id, { name: e.target.value })} /></td>
             <td className="table-td py-1.5"><input className="input" disabled={!canEdit || locked} value={k.title} onChange={(e) => setKp(k.id, { title: e.target.value })} /></td>
             <td className="table-td py-1.5"><input className="input" disabled={!canEdit || locked} value={k.countryOfBirth} onChange={(e) => setKp(k.id, { countryOfBirth: e.target.value })} /></td>
-            <td className="table-td py-1.5"><DateInput className="input" disabled={!canEdit || locked} value={k.dob} onChange={(e) => setKp(k.id, { dob: e.target.value })} /></td>
+            <td className="table-td py-1.5"><DateInput className="input" min={DOB_MIN} disabled={!canEdit || locked} value={k.dob} onChange={(e) => setKp(k.id, { dob: e.target.value })} /></td>
             <td className="table-td py-1.5"><select className="input" disabled={!canEdit || locked} value={k.gender} onChange={(e) => setKp(k.id, { gender: e.target.value })}><option value="">—</option><option>Female</option><option>Male</option><option>Other</option></select></td>
             <td className="table-td py-1.5"><input className="input" disabled={!canEdit || locked} value={k.verification ?? ''} onChange={(e) => setKp(k.id, { verification: e.target.value })} placeholder="ATC" /></td>
             <td className="table-td py-1.5"><select className={cx('input', k.atcClear === 'clear' && 'text-brand-800', k.atcClear === 'flagged' && 'text-accent-700')} disabled={!canEdit || locked} value={k.atcClear ?? ''} onChange={(e) => setKp(k.id, { atcClear: e.target.value as KeyPerson['atcClear'] })}><option value="">—</option><option value="pending">Pending</option><option value="clear">Clear</option><option value="flagged">Flagged</option></select></td>

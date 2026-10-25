@@ -16,7 +16,8 @@ import type { StaffMember, StaffStatus } from '@/types'
  */
 export default function OrgChart() {
   const user = useCurrentUser()!
-  const { staff, users, settings, upsertStaff, deleteStaff, updateSettings, masterBudgets } = useStore()
+  const { staff, users, settings, upsertStaff, deleteStaff, updateSettings, masterBudgets, mergeProjectPosition, removeProjectPosition } = useStore()
+  const [placing, setPlacing] = useState<Record<string, { manager?: string; same?: string }>>({})
   const [msg, setMsg] = useState<string | null>(null)
   const canEdit = can(user, 'hr.staff.manage')
   const [edit, setEdit] = useState<Partial<StaffMember> | null>(null)
@@ -25,7 +26,10 @@ export default function OrgChart() {
   const [simReq, setSimReq] = useState<string>('')
   const [simAmt, setSimAmt] = useState<string>('1000')
 
-  const active = staff.filter((s) => s.status !== 'left')
+  /** Positions created automatically from a granted project budget that nobody has placed yet: kept in the salary plan, not drawn until placed, merged or removed. */
+  const isUnplaced = (s: StaffMember) => !!s.sourceProjectId && !s.lineManagerId && !s.name.trim() && s.status === 'planned'
+  const unplaced = staff.filter((s) => s.status !== 'left' && isUnplaced(s))
+  const active = staff.filter((s) => s.status !== 'left' && !isUnplaced(s))
   const byId = useMemo(() => new Map(staff.map((s) => [s.id, s])), [staff])
   const children = (id: string) => active.filter((s) => s.lineManagerId === id).sort((a, b) => (a.name || a.position).localeCompare(b.name || b.position))
   const roots = active.filter((s) => !s.lineManagerId || !byId.has(s.lineManagerId) || byId.get(s.lineManagerId)!.status === 'left')
@@ -73,6 +77,22 @@ export default function OrgChart() {
       <div className="mb-5 grid gap-4 sm:grid-cols-4"><Stat label="People" value={active.filter((s) => s.name.trim() && !s.actingStaffId).length} hint={`${active.filter((s) => !s.name.trim() && !s.actingStaffId).length} vacant position(s) · ${active.reduce((n, s) => n + (s.plannedTeam ?? []).reduce((m, t) => m + t.count, 0), 0)} planned to recruit`} /><Stat label="Budget holders" value={holders.length} /><Stat label="Hired without platform account" value={unlinked.length} tone={unlinked.length ? 'sun' : 'default'} /><Stat label="Without line manager" value={noManager.length} tone={noManager.length ? 'sun' : 'default'} /></div>
       {msg && <div className="mb-4"><Alert tone="success">{msg}</Alert></div>}
       {!canEdit && <div className="mb-4"><Alert tone="info">Read-only view. Editing the org chart needs the “Edit the staff register and the org chart” function (Users & access → Permissions).</Alert></div>}
+      {unplaced.length > 0 && (
+        <Card className="mb-6" title={`${unplaced.length} position${unplaced.length === 1 ? '' : 's'} from project budgets — not on the organogram yet`} description="Created when a project was granted (one per “new position” salary line). They stay on the master salary plan but are not drawn until you place each one under a manager, mark it as the same as an existing position, or remove it.">
+          <div className="overflow-x-auto"><table className="w-full text-[12.5px]" data-testid="unplaced-table">
+            <thead><tr><th className="table-th">Position</th><th className="table-th">Project</th><th className="table-th">Country</th><th className="table-th w-64">Place under</th><th className="table-th w-64">Same as existing position</th><th className="table-th w-28" /></tr></thead>
+            <tbody>{unplaced.map((s) => { const pl = placing[s.id] ?? {}; return (
+              <tr key={s.id} className="border-t border-line" data-testid={`unplaced-${s.rhsNumber}`}>
+                <td className="table-td"><div className="font-medium text-ink-900">{s.position}</div><div className="font-mono text-[11px] text-ink-400">{s.rhsNumber}{s.monthlySalary ? ` · ${s.currency} ${s.monthlySalary.toLocaleString()}/mo` : ''}</div></td>
+                <td className="table-td text-ink-600">{s.sourceProjectCode ?? ''}{s.sourceLineCode ? ` · ${s.sourceLineCode}` : ''}</td>
+                <td className="table-td text-ink-600">{s.country}</td>
+                <td className="table-td"><div className="flex gap-1"><select className="input text-[12px]" data-testid={`place-${s.rhsNumber}`} value={pl.manager ?? ''} onChange={(e) => setPlacing({ ...placing, [s.id]: { ...pl, manager: e.target.value } })}><option value="">— choose manager —</option>{active.filter((m) => m.name.trim() || m.actingStaffId).map((m) => <option key={m.id} value={m.id}>{m.actingStaffId ? active.find((x) => x.id === m.actingStaffId)?.name : m.name} · {m.position}</option>)}</select>{canEdit && <button className="btn-primary btn-sm" data-testid={`place-ok-${s.rhsNumber}`} disabled={!pl.manager} onClick={() => { upsertStaff({ id: s.id, position: s.position, lineManagerId: pl.manager }); setMsg(`${s.position} placed on the organogram.`) }}>Place</button>}</div></td>
+                <td className="table-td"><div className="flex gap-1"><select className="input text-[12px]" data-testid={`same-${s.rhsNumber}`} value={pl.same ?? ''} onChange={(e) => setPlacing({ ...placing, [s.id]: { ...pl, same: e.target.value } })}><option value="">— choose position —</option>{active.map((m) => <option key={m.id} value={m.id}>{m.position}{m.name ? ` · ${m.name}` : m.actingStaffId ? ` · acting ${active.find((x) => x.id === m.actingStaffId)?.name}` : ' · vacant'}</option>)}</select>{canEdit && <button className="btn-secondary btn-sm" data-testid={`same-ok-${s.rhsNumber}`} disabled={!pl.same} onClick={() => { mergeProjectPosition(s.id, pl.same!); setMsg(`${s.position} merged — the budget line now pays the existing position.`) }}>Merge</button>}</div></td>
+                <td className="table-td text-right">{canEdit && <button className="btn-ghost btn-sm text-accent-700" data-testid={`drop-${s.rhsNumber}`} onClick={() => { if (confirm(`Remove “${s.position}”? The budget line is flagged as a new position again.`)) { removeProjectPosition(s.id); setMsg(`${s.position} removed.`) } }}><Trash2 size={13} /> Remove</button>}</td>
+              </tr>) })}</tbody>
+          </table></div>
+        </Card>
+      )}
       <div className={cx('grid gap-6', view === 'chart' ? 'xl:grid-cols-1' : 'xl:grid-cols-3')}>
         <Card className={view === 'chart' ? '' : 'xl:col-span-2'} title={view === 'chart' ? 'Organogram' : 'Reporting lines'} description={view === 'chart' ? 'Boxed chart as in the RHS organogram deck — Amman in green, Gaza in pink and red, vacancies in amber, acting in light green. Click a box to edit it, the circle to fold a team.' : 'Expand a person to see their reports. The first root is the head of the organisation.'}
           actions={<div className="flex rounded-control bg-surface-muted p-0.5" role="radiogroup"><button role="radio" aria-checked={view === 'chart'} data-testid="org-view-chart" className={cx('flex items-center gap-1 rounded-control px-2.5 py-1 text-[12.5px] font-medium', view === 'chart' ? 'bg-surface shadow-card text-ink-900' : 'text-ink-600')} onClick={() => setView('chart')}><Network size={13} /> Chart</button><button role="radio" aria-checked={view === 'list'} data-testid="org-view-list" className={cx('flex items-center gap-1 rounded-control px-2.5 py-1 text-[12.5px] font-medium', view === 'list' ? 'bg-surface shadow-card text-ink-900' : 'text-ink-600')} onClick={() => setView('list')}><List size={13} /> List</button></div>}>

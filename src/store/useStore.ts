@@ -157,6 +157,10 @@ interface Actions {
   // Master salary plan
   upsertStaff: (st: Partial<StaffMember> & { position: string }) => StaffMember
   deleteStaff: (id: string) => void
+  /** A position created from a project budget is the same as an existing position: the budget line points to the existing person and the duplicate record goes. */
+  mergeProjectPosition: (fromId: string, intoId: string) => void
+  /** Remove a position created from a project budget; its budget line is flagged "new position" again. */
+  removeProjectPosition: (id: string) => void
   confirmRecruitment: (id: string, name: string, startDate: string) => void
   // HR & Admin
   submitLeave: (data: { type: LeaveType; startDate: string; endDate: string; reason: string; staffId?: string }) => { ok: boolean; error?: string; request?: LeaveRequest }
@@ -952,6 +956,18 @@ export const useStore = create<State & Actions>()(
           const st = get().staff.find((x) => x.id === id); if (!st) return
           set((s) => ({ staff: s.staff.filter((x) => x.id !== id), budgets: s.budgets.map((b) => ({ ...b, lines: b.lines.map((l) => (l.staffIds?.includes(id) ? { ...l, staffIds: l.staffIds.filter((x) => x !== id) } : l)) })) }))
           log('STAFF', 'Staff removed from the master salary plan', { id: st.id, number: st.rhsNumber }, st.name || st.position)
+          if (get().masterBudgets.some((m) => m.status === 'draft')) get().syncStaffToMasterBudget()
+        },
+        mergeProjectPosition: (fromId, intoId) => {
+          const from = get().staff.find((x) => x.id === fromId); const into = get().staff.find((x) => x.id === intoId); if (!from || !into) return
+          set((s) => ({ staff: s.staff.filter((x) => x.id !== fromId), budgets: s.budgets.map((b) => ({ ...b, lines: b.lines.map((l) => (l.staffIds?.includes(fromId) ? { ...l, staffIds: [...new Set(l.staffIds.map((x) => (x === fromId ? intoId : x)))], newStaff: false } : l)) })) }))
+          log('STAFF', 'Project position merged into an existing position', { id: into.id, number: into.rhsNumber }, `${from.position} (${from.sourceProjectCode ?? 'project'}) → ${into.name || into.position}`)
+          if (get().masterBudgets.some((m) => m.status === 'draft')) get().syncStaffToMasterBudget()
+        },
+        removeProjectPosition: (id) => {
+          const st = get().staff.find((x) => x.id === id); if (!st) return
+          set((s) => ({ staff: s.staff.filter((x) => x.id !== id), budgets: s.budgets.map((b) => ({ ...b, lines: b.lines.map((l) => { if (!l.staffIds?.includes(id)) return l; const rest = l.staffIds.filter((x) => x !== id); return { ...l, staffIds: rest, newStaff: rest.length === 0 ? true : l.newStaff } }) })) }))
+          log('STAFF', 'Project position removed', { id: st.id, number: st.rhsNumber }, `${st.position} (${st.sourceProjectCode ?? 'project'})`)
           if (get().masterBudgets.some((m) => m.status === 'draft')) get().syncStaffToMasterBudget()
         },
         confirmRecruitment: (id, name, startDate) => {

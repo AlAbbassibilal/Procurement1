@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Pencil, Users, Landmark, ShieldCheck, ChevronRight, Network, List } from 'lucide-react'
+import { Plus, Pencil, Users, Landmark, ShieldCheck, ChevronRight, Network, List, Trash2 } from 'lucide-react'
 import { OrgChartSvg } from '@/components/OrgChartSvg'
 import { useStore, useCurrentUser } from '@/store/useStore'
 import { Card, PageHeader, Modal, Field, Alert, Stat, Avatar } from '@/components/ui'
@@ -16,7 +16,8 @@ import type { StaffMember, StaffStatus } from '@/types'
  */
 export default function OrgChart() {
   const user = useCurrentUser()!
-  const { staff, users, settings, upsertStaff } = useStore()
+  const { staff, users, settings, upsertStaff, deleteStaff, updateSettings, masterBudgets } = useStore()
+  const [msg, setMsg] = useState<string | null>(null)
   const canEdit = can(user, 'hr.staff.manage')
   const [edit, setEdit] = useState<Partial<StaffMember> | null>(null)
   const [open, setOpen] = useState<Record<string, boolean>>({})
@@ -68,8 +69,9 @@ export default function OrgChart() {
   return (
     <>
       <PageHeader title="Org chart" subtitle="Who reports to whom, who holds a budget and up to what amount they may approve. Requisitions go to the requester's line manager first and escalate up the chart while the amount exceeds each manager's limit; the approval matrix then adds the policy steps."
-        actions={<div className="flex gap-2"><Link to="/hr/staff" className="btn-secondary"><Users size={15} /> Staff register</Link>{canEdit && <button className="btn-primary" onClick={() => setEdit({ position: '', name: '', department: '', country: settings.countries[0], status: 'active' })}><Plus size={15} /> Add person</button>}</div>} />
+        actions={<div className="flex gap-2"><Link to="/hr/staff" className="btn-secondary"><Users size={15} /> Staff register</Link>{canEdit && <button className="btn-primary" onClick={() => setEdit({ position: '', name: '', department: '', country: settings.countries[0], status: 'planned' })}><Plus size={15} /> Add position</button>}</div>} />
       <div className="mb-5 grid gap-4 sm:grid-cols-4"><Stat label="People" value={active.length} /><Stat label="Budget holders" value={holders.length} /><Stat label="Without platform account" value={unlinked.length} tone={unlinked.length ? 'sun' : 'default'} /><Stat label="Without line manager" value={noManager.length} tone={noManager.length ? 'sun' : 'default'} /></div>
+      {msg && <div className="mb-4"><Alert tone="success">{msg}</Alert></div>}
       {!canEdit && <div className="mb-4"><Alert tone="info">Read-only view. Editing the org chart needs the “Edit the staff register and the org chart” function (Users & access → Permissions).</Alert></div>}
       <div className={cx('grid gap-6', view === 'chart' ? 'xl:grid-cols-1' : 'xl:grid-cols-3')}>
         <Card className={view === 'chart' ? '' : 'xl:col-span-2'} title={view === 'chart' ? 'Organogram' : 'Reporting lines'} description={view === 'chart' ? 'Boxed chart as in the RHS organogram deck — Amman in green, Gaza in pink and red, vacancies in amber, acting in light green. Click a box to edit it, the circle to fold a team.' : 'Expand a person to see their reports. The first root is the head of the organisation.'}
@@ -91,16 +93,19 @@ export default function OrgChart() {
       </div>
 
       <Modal open={!!edit} onClose={() => setEdit(null)} width="max-w-2xl" title={edit?.id ? `Org chart — ${edit.name || edit.position}` : 'Add person to the org chart'}
-        footer={<><button className="btn-secondary" onClick={() => setEdit(null)}>Cancel</button><button className="btn-primary" data-testid="org-save" onClick={() => { if (!edit?.position) return alert('Position is required.'); upsertStaff({ ...edit, position: edit.position! } as Partial<StaffMember> & { position: string }); setEdit(null) }}>Save</button></>}>
+        footer={<>
+          {edit?.id && <button className="btn-danger-soft mr-auto" data-testid="org-remove" onClick={() => { const reports = staff.filter((x) => x.lineManagerId === edit.id && x.status !== 'left'); if (!confirm(`Remove the position “${edit.position}”${edit.name ? ` (${edit.name})` : ''} from the organogram?${reports.length ? `\n\n${reports.length} position(s) report to it — they will be moved under ${staff.find((x) => x.id === edit.lineManagerId)?.name || staff.find((x) => x.id === edit.lineManagerId)?.position || 'the top of the chart'}.` : ''}\n\nThe linked platform account (if any) is kept; the master budget line is removed.`)) return; reports.forEach((r) => upsertStaff({ id: r.id, position: r.position, lineManagerId: edit.lineManagerId })); deleteStaff(edit.id!); setEdit(null); setMsg('Position removed — organogram, salary plan and master budget updated.') }}><Trash2 size={15} /> Remove position</button>}
+          {edit?.id && <button className="btn-secondary" data-testid="org-add-under" onClick={() => setEdit({ position: '', name: '', department: edit.department, country: edit.country, status: 'planned', lineManagerId: edit.id })}><Plus size={15} /> Add position under this</button>}
+          <button className="btn-secondary" onClick={() => setEdit(null)}>Cancel</button><button className="btn-primary" data-testid="org-save" onClick={() => { if (!edit?.position) return alert('Position is required.'); if (edit.status !== 'planned' && !edit.name?.trim()) return alert('Enter the person’s name, or set the position to Vacant.'); upsertStaff({ ...edit, position: edit.position! } as Partial<StaffMember> & { position: string }); setEdit(null); setMsg(masterBudgets.some((m) => m.status === 'draft') ? 'Saved — organogram, staff register, salary plan and the draft master budget updated.' : 'Saved — organogram, staff register and salary plan updated. Create or re-open a master budget to carry positions into it.') }}>Save</button></>}>
         {edit && (
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Full name"><input className="input" value={edit.name ?? ''} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></Field>
             <Field label="Position" required><input className="input" value={edit.position ?? ''} onChange={(e) => setEdit({ ...edit, position: e.target.value })} /></Field>
             <Field label="Department"><input className="input" value={edit.department ?? ''} onChange={(e) => setEdit({ ...edit, department: e.target.value })} /></Field>
-            <Field label="Country"><select className="input" value={edit.country ?? ''} onChange={(e) => setEdit({ ...edit, country: e.target.value })}>{settings.countries.map((c) => <option key={c}>{c}</option>)}</select></Field>
+            <Field label="Country / office" hint="New countries are added to the platform's country list (header selector, master budget, projects)."><select className="input" data-testid="org-country" value={edit.country ?? ''} onChange={(e) => { if (e.target.value === '__new') { const c = prompt('New country / office name (e.g. Syria – Country office)'); if (c && c.trim()) { const name = c.trim(); if (!settings.countries.includes(name)) updateSettings({ countries: [...settings.countries, name] }); setEdit({ ...edit, country: name }) } return } setEdit({ ...edit, country: e.target.value }) }}>{settings.countries.map((c) => <option key={c}>{c}</option>)}{edit.country && !settings.countries.includes(edit.country) && <option>{edit.country}</option>}<option value="__new">+ Add a new country…</option></select></Field>
             <Field label="Line manager" hint="First approver on this person's requisitions, leave and WFH requests."><select className="input" data-testid="org-manager" value={edit.lineManagerId ?? ''} onChange={(e) => setEdit({ ...edit, lineManagerId: e.target.value || undefined })}><option value="">— none (top of the chart) —</option>{active.filter((s) => s.id !== edit.id && !(edit.id && isDesc(s.id, edit.id))).map((s) => <option key={s.id} value={s.id}>{s.name || '(to recruit)'} · {s.position}</option>)}</select></Field>
             <Field label="Platform account" hint="Needed for the person to approve on the system."><select className="input" data-testid="org-account" value={edit.userId ?? ''} onChange={(e) => setEdit({ ...edit, userId: e.target.value || undefined })}><option value="">— none —</option>{users.filter((u) => u.active && (!staff.some((s) => s.userId === u.id && s.id !== edit.id))).map((u) => <option key={u.id} value={u.id}>{u.name} · {u.email}</option>)}</select></Field>
-            <Field label="Status"><select className="input" value={edit.status ?? 'active'} onChange={(e) => setEdit({ ...edit, status: e.target.value as StaffStatus })}>{(['active', 'planned', 'left'] as StaffStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}</select></Field>
+            <Field label="Position status" hint={edit.status === 'planned' ? 'Vacant — shown amber; no name needed.' : edit.status === 'left' ? 'Left — hidden from the organogram and the master budget.' : 'Hired — enter the person’s name.'}><select className="input" data-testid="org-status" value={edit.status ?? 'active'} onChange={(e) => setEdit({ ...edit, status: e.target.value as StaffStatus })}><option value="active">Hired</option><option value="planned">Vacant — to recruit</option><option value="left">Left the organisation</option></select></Field>
             <div className="rounded-card border border-line bg-surface-muted p-3 sm:col-span-2">
               <label className="mb-2 flex items-center gap-2 text-[13px] font-medium text-ink-900"><input type="checkbox" data-testid="org-acting" checked={!!edit.acting} onChange={(e) => setEdit({ ...edit, acting: e.target.checked })} /> Acting assignment <span className="text-[11.5px] font-normal text-ink-500">(shown light green; the person's own position is a separate record)</span></label>
               <label className="flex items-center gap-2 text-[13px] font-medium text-ink-900"><input type="checkbox" data-testid="org-holder" checked={!!edit.budgetHolder} onChange={(e) => setEdit({ ...edit, budgetHolder: e.target.checked, approvalLimitUSD: e.target.checked ? edit.approvalLimitUSD : undefined })} /> Budget holder</label>

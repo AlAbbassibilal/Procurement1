@@ -13,7 +13,7 @@ import { blockingFailures, emptySourcing, isBidMethod, sourcingRequirements, tie
 import { applyDecision, buildChain, currentStep, resetChain, resolveApprover, chainFromSteps, lineManagerSteps } from '@/lib/workflow'
 import { linesSubtotal, nowIso, uid } from '@/lib/format'
 import { passwordProblem, tempPassword } from '@/lib/auth'
-import { RHS_ALL_USERS, RHS_STAFF, RHS_ED, RHS_POSITIONS, HUMANITY_DONOR, HUMANITY_PROJECT, HUMANITY_BUDGET, HUMANITY_CODE } from '@/data/rhs'
+import { RHS_ALL_USERS, RHS_STAFF, RHS_ED, RHS_POSITIONS, RHS_DROPPED_POSITIONS, HUMANITY_DONOR, HUMANITY_PROJECT, HUMANITY_BUDGET, HUMANITY_CODE } from '@/data/rhs'
 import { emptyDueDiligence } from '@/lib/partners'
 import { unassignedSalaryLines, isSalaryLine, headcount, nextRhsNumber } from '@/lib/salary'
 import { buildVacancyChain, canDecideVacancy, scoreApplicant } from '@/lib/recruitment'
@@ -134,6 +134,8 @@ interface Actions {
   // Master budget
   createMasterBudget: (year: number, copyFromId?: string) => MasterBudget
   upsertMasterLine: (mbId: string, line: MasterLine) => void
+  /** One personnel line per org-chart position on the draft master budget (created for the current year if none); removes lines of positions that no longer exist. */
+  syncStaffToMasterBudget: (mbId?: string) => { ok: boolean; added: number; updated: number; removed: number; mbId?: string; error?: string }
   deleteMasterLine: (mbId: string, lineId: string) => void
   approveMasterBudget: (mbId: string) => { ok: boolean; error?: string }
   reopenMasterBudget: (mbId: string) => void
@@ -831,6 +833,29 @@ export const useStore = create<State & Actions>()(
           log('MASTER', `Master budget ${year} created`, { id: mb.id, number: `MB-${year}` }, src ? `copied from ${src.year}` : undefined)
           return mb
         },
+        syncStaffToMasterBudget: (mbId) => {
+          const a = actor(); const s0 = get(); const fx = s0.settings.fxToUSD
+          let mb = mbId ? s0.masterBudgets.find((m) => m.id === mbId) : [...s0.masterBudgets].sort((x, y) => y.year - x.year).find((m) => m.status === 'draft')
+          if (!mb) { if (s0.masterBudgets.some((m) => m.status === 'approved') && !mbId) return { ok: false, added: 0, updated: 0, removed: 0, error: 'The latest master budget is approved — re-open it or create the next year first.' }; mb = get().createMasterBudget(new Date().getFullYear()) }
+          if (mb.status !== 'draft') return { ok: false, added: 0, updated: 0, removed: 0, error: `Master budget ${mb.year} is approved — re-open it to sync positions.` }
+          const staff = get().staff.filter((x) => x.status !== 'left'); const users = get().users
+          let added = 0, updated = 0
+          let lines = mb.lines.filter((l) => !l.staffId || staff.some((x) => x.id === l.staffId)); const removed = mb.lines.length - lines.length
+          let n = lines.length
+          for (const st of staff) {
+            const mgr = staff.find((x) => x.id === st.lineManagerId); const holder = users.find((u) => u.id === (mgr?.userId ?? st.userId))
+            const annual = Math.round(st.monthlySalary * 12 * ((fx[st.currency] ?? 1) / (fx[mb.currency] ?? 1)) * 100) / 100
+            const amman = /amman/i.test(st.country)
+            const base = { staffId: st.id, accountNo: amman ? '2603' : '2601', accountName: `${st.position}${st.name.trim() ? ` — ${st.name}` : ' — vacant'}`, category: amman ? 'Personnel — Amman support' : 'Personnel — field', country: st.country, budgetHolderId: holder?.id, budgetHolderName: holder?.name, amount: annual, notes: `${st.rhsNumber} · org chart${st.status === 'planned' ? ' · to recruit' : ''}` }
+            const cur = lines.find((l) => l.staffId === st.id)
+            if (cur) { if (cur.accountName !== base.accountName || cur.amount !== base.amount || cur.country !== base.country || cur.budgetHolderId !== base.budgetHolderId) { lines = lines.map((l) => (l.id === cur.id ? { ...l, ...base, filledAt: nowIso() } : l)); updated++ } }
+            else { lines = [...lines, { id: uid('ml_'), code: `MB-${mb.year}-${String(++n).padStart(3, '0')}`, ...base, filledAt: nowIso() }]; added++ }
+          }
+          const id = mb.id
+          set((s) => ({ masterBudgets: s.masterBudgets.map((m) => (m.id === id ? { ...m, lines } : m)) }))
+          if (added || updated || removed) log('MASTER', 'Personnel lines synced from the org chart', { id, number: `MB-${mb.year}` }, `${added} added · ${updated} updated · ${removed} removed · by ${a.name}`)
+          return { ok: true, added, updated, removed, mbId: id }
+        },
         upsertMasterLine: (mbId, line) => {
           const a = actor()
           set((s) => ({ masterBudgets: s.masterBudgets.map((m) => (m.id === mbId ? { ...m, lines: m.lines.some((l) => l.id === line.id) ? m.lines.map((l) => (l.id === line.id ? { ...line, filledAt: nowIso() } : l)) : [...m.lines, { ...line, filledAt: nowIso() }] } : m)) }))
@@ -920,12 +945,14 @@ export const useStore = create<State & Actions>()(
             users: st.userId ? s.users.map((u) => (u.id === st.userId ? { ...u, title: st.position, department: st.department || u.department, name: st.name || u.name } : u)) : s.users,
           }))
           log('STAFF', exists ? 'Staff record updated' : 'Staff added to the master salary plan', { id: st.id, number: st.rhsNumber }, `${st.name || '(to recruit)'} · ${st.position}`)
+          if (get().masterBudgets.some((m) => m.status === 'draft')) get().syncStaffToMasterBudget()
           return st
         },
         deleteStaff: (id) => {
           const st = get().staff.find((x) => x.id === id); if (!st) return
           set((s) => ({ staff: s.staff.filter((x) => x.id !== id), budgets: s.budgets.map((b) => ({ ...b, lines: b.lines.map((l) => (l.staffIds?.includes(id) ? { ...l, staffIds: l.staffIds.filter((x) => x !== id) } : l)) })) }))
           log('STAFF', 'Staff removed from the master salary plan', { id: st.id, number: st.rhsNumber }, st.name || st.position)
+          if (get().masterBudgets.some((m) => m.status === 'draft')) get().syncStaffToMasterBudget()
         },
         confirmRecruitment: (id, name, startDate) => {
           set((s) => ({ staff: s.staff.map((x) => (x.id === id ? { ...x, name, startDate, status: 'active', updatedAt: nowIso() } : x)) }))
@@ -1455,7 +1482,7 @@ export const useStore = create<State & Actions>()(
       }
     },
     {
-      name: 'rhs-platform-v8', version: 11,
+      name: 'rhs-platform-v8', version: 12,
       migrate: (persisted: unknown, version: number) => {
         const st = persisted as State
         if (version < 9 && st?.users) {
@@ -1483,6 +1510,13 @@ export const useStore = create<State & Actions>()(
           if (!ids.has(RHS_ED.id)) st.staff = [RHS_ED, ...st.staff]
           st.staff = st.staff.map((x) => (x.id === 'stf_2' && !x.lineManagerId ? { ...x, lineManagerId: RHS_ED.id } : x))
           st.staff = [...st.staff, ...RHS_POSITIONS.filter((x) => !ids.has(x.id))]
+        }
+        if (version < 12 && st?.staff && st.dataMode !== 'demo') {
+          // Organogram correction: drop unfilled vacancies that are not on the chart; rehab / MHPSS teams of 6 under their officers
+          st.staff = st.staff.filter((x) => !(RHS_DROPPED_POSITIONS.includes(x.id) && !x.name.trim()))
+          st.staff = st.staff.map((x) => (x.id === 'stf_25' && /physiotherapy officer/i.test(x.position) ? { ...x, position: 'Rehabilitation Officer' } : x))
+          const ids = new Set(st.staff.map((x) => x.id))
+          st.staff = [...st.staff.map((x) => { const seed = RHS_POSITIONS.find((p) => p.id === x.id); return seed && !x.name.trim() && /assistant/i.test(x.position) ? { ...x, position: seed.position, department: seed.department, lineManagerId: seed.lineManagerId } : x }), ...RHS_POSITIONS.filter((x) => !ids.has(x.id))]
         }
         return st
       },

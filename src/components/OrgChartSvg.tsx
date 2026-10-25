@@ -16,13 +16,15 @@ const COLORS = {
   gaza: { fill: '#FD95A9', text: '#1C2833', sub: '#7A0C20' },
   gazaTeam: { fill: '#ED0531', text: '#FFFFFF', sub: '#FFE3E8' },
   vacant: { fill: '#FFC000', text: '#1C2833', sub: '#1C2833' },
+  other: { fill: '#2E86AB', text: '#FFFFFF', sub: '#E3F2F8' },
 }
 export type NodeTone = keyof typeof COLORS
 export const toneOf = (s: StaffMember): NodeTone => {
   if (!s.name.trim() || s.status === 'planned') return 'vacant'
   if (s.acting) return 'ammanLight'
   if (/gaza/i.test(s.country)) return /assistant|security|cleaner|mobile/i.test(s.position) ? 'gazaTeam' : 'gaza'
-  return 'amman'
+  if (/amman|jordan|regional/i.test(s.country)) return 'amman'
+  return 'other'
 }
 
 interface Laid { s: StaffMember; x: number; y: number; depth: number; children: Laid[]; width: number; collapsed: boolean; hidden: number }
@@ -70,7 +72,7 @@ export function OrgChartSvg({ staff, roots, users, title, onSelect, canEdit }: {
     const c = document.createElement('canvas'); c.width = W * 2; c.height = H * 2; const g = c.getContext('2d')!; g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url)
     const blob = await new Promise<Blob | null>((r) => c.toBlob(r, 'image/png')); if (blob) await saveFile(`${title.replace(/\W+/g, '_')}.png`, blob, 'image/png')
   }
-  const legend: { tone: NodeTone; label: string }[] = [{ tone: 'amman', label: 'Regional office staff (Amman)' }, { tone: 'ammanLight', label: 'Acting' }, { tone: 'gaza', label: 'Gaza country office staff' }, { tone: 'gazaTeam', label: 'Mobile team / centre staff' }, { tone: 'vacant', label: 'Vacant' }]
+  const legend: { tone: NodeTone; label: string }[] = [{ tone: 'amman', label: 'Regional office staff (Amman)' }, { tone: 'ammanLight', label: 'Acting' }, { tone: 'gaza', label: 'Gaza country office staff' }, { tone: 'gazaTeam', label: 'Mobile team / centre staff' }, { tone: 'other', label: 'Other country offices' }, { tone: 'vacant', label: 'Vacant' }]
   return (
     <div>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">

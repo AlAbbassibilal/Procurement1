@@ -699,6 +699,7 @@ export interface MasterLine {
   country: string           // Amman (regional office) · Gaza · …
   budgetHolderId?: string
   budgetHolderName?: string
+  staffId?: string          // personnel line synchronised from the org chart (StaffMember id)
   amount: number            // annual, master budget currency
   notes?: string
   filledAt?: string

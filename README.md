@@ -51,7 +51,9 @@ npm run build      # production bundle in dist/
 
 **Spending plan = forecast.** On a project's Spending plan tab the forecast is typed per budget line and month (months from the project dates); the totals show on the BvA in a "Planned (spending plan)" column beside the automatic "Forecast (PRs)" pipeline figure.
 
-**Dates.** Every date field (`DateInput` in `src/components/ui.tsx`) accepts only real calendar dates between 1990-01-01 and 2050-12-31 in YYYY-MM-DD form; anything else is refused with a message and never saved.
+**Dates.** Every date field (`DateInput` in `src/components/ui.tsx`) accepts only real calendar dates between 1990-01-01 and 2050-12-31 in YYYY-MM-DD form; anything else is refused with a message and never saved. Dates of birth (partner key personnel) go back to 1920.
+
+**Verification.** Before a release the whole platform is driven end to end in a headless browser: every route and detail page in both data modes with every non-destructive button clicked; the procure-to-pay chain (quotation → award → PO → approvals → GRN → three-way-matched invoice → payment → BvA → audit); HR (leave, timesheets, payroll and payslip, recruitment with public application and screening); fleet; assets; partnerships (vetting link, public form, submission back in the partner file); e-signature (send, sequential signing, completed PDF); grants (proposal extraction and export, logframe, workplan, submission, grant, project positions); budgets (import on the RHS template, basis, approved view); accounts, permissions, org chart and master-budget sync.
 
 **Data modes.** A fresh browser starts **clean**: Bilal's administrator account, the approval matrix and policy settings only, every register empty. "Reset — clean start" wipes documents and registers but keeps the accounts you created, their permissions and the org chart; "Load sample data" replaces everything with the demo dataset (account menu or Settings → Data). **Downloads** go through the host save dialog inside the claude.ai viewer and through a normal browser download elsewhere (`src/lib/download.ts`).
 

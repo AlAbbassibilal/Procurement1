@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Receipt } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
@@ -24,9 +24,12 @@ export default function InvoiceNew() {
   const [lines, setLines] = useState<Record<string, InvoiceLine>>({})
   const [err, setErr] = useState<string | null>(null)
 
+  /** Lines default to what has been received but not yet invoiced on the chosen PO. */
+  const linesFromReceipts = (p: typeof po) => Object.fromEntries((p?.lines ?? []).map((l) => [l.id, { lineItemId: l.id, description: l.description, quantity: Math.max(0, receivedQty(grns, p!.id, l.id) - invoicedQty(invoices, p!.id, l.id)), unitPrice: l.unitPrice }]))
   const pickPO = (id: string) => {
-    setPoId(id); setLines({}); const p = pos.find((x) => x.id === id); if (p) setTaxRate(p.taxRate)
+    setPoId(id); const p = pos.find((x) => x.id === id); setLines(p ? linesFromReceipts(p) : {}); if (p) setTaxRate(p.taxRate)
   }
+  useEffect(() => { if (po && !Object.keys(lines).length) setLines(linesFromReceipts(po)) }, [po?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const setLine = (l: { id: string; description: string; unitPrice: number }, patch: Partial<InvoiceLine>) =>
     setLines((ls) => { const prev = ls[l.id] as InvoiceLine | undefined; return { ...ls, [l.id]: { lineItemId: l.id, description: l.description, quantity: prev?.quantity ?? 0, unitPrice: prev?.unitPrice ?? l.unitPrice, ...patch } } })
   const fillReceived = () => po?.lines.forEach((l) => setLine(l, { quantity: Math.max(0, receivedQty(grns, po.id, l.id) - invoicedQty(invoices, po.id, l.id)) }))

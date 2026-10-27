@@ -68,7 +68,7 @@ export default function Users() {
   useEffect(() => { const id = sp.get('staff'); if (id) { const st = staff.find((x) => x.id === id); if (st && !st.userId) openNew(st); setSp({}, { replace: true }) } }, [sp]) // eslint-disable-line react-hooks/exhaustive-deps
   /** Positions available for linking: unlinked staff (plus the one already linked to the account being edited). */
   const linkable = staff.filter((x) => x.status !== 'left' && (!x.userId || x.userId === edit?.id))
-  const pickStaff = (id: string) => { setLinkStaff(id); const st = staff.find((x) => x.id === id); if (st) setEdit({ ...edit, name: st.name || edit?.name || '', title: st.position, department: st.department || edit?.department || '' }) }
+  const pickStaff = (id: string) => { setLinkStaff(id); const st = staff.find((x) => x.id === id); if (st) setEdit({ ...edit, name: st.name || edit?.name || '', email: st.email || edit?.email || '', title: st.position, department: st.department || edit?.department || '' }) }
   const [invite, setInvite] = useState<{ user: User; password: string } | null>(null)
   const [copied, setCopied] = useState(false)
   const [perm, setPerm] = useState<User | null>(null)

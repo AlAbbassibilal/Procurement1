@@ -839,6 +839,7 @@ export interface StaffMember {
   endDate?: string
   status: StaffStatus
   userId?: string             // platform account, if any
+  email?: string              // contact e-mail for people without a platform account (board members, colleagues not yet invited)
   lineManagerId?: string      // StaffMember id of the line manager (approves leave / WFH, creates timesheets, first approver on requisitions)
   budgetHolder?: boolean      // holds a budget: appears as budget holder in the org chart and master budget
   acting?: boolean            // acting assignment (shown light green on the organogram)

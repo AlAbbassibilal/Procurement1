@@ -13,7 +13,7 @@ import { blockingFailures, emptySourcing, isBidMethod, sourcingRequirements, tie
 import { applyDecision, buildChain, currentStep, resetChain, resolveApprover, chainFromSteps, lineManagerSteps } from '@/lib/workflow'
 import { linesSubtotal, nowIso, uid } from '@/lib/format'
 import { passwordProblem, tempPassword } from '@/lib/auth'
-import { RHS_ALL_USERS, RHS_STAFF, RHS_ED, RHS_POSITIONS, RHS_DROPPED_POSITIONS, RHS_RENUMBER, HUMANITY_DONOR, HUMANITY_PROJECT, HUMANITY_BUDGET, HUMANITY_CODE } from '@/data/rhs'
+import { RHS_ALL_USERS, RHS_STAFF, RHS_ED, RHS_CHAIR, RHS_POSITIONS, RHS_DROPPED_POSITIONS, RHS_RENUMBER, HUMANITY_DONOR, HUMANITY_PROJECT, HUMANITY_BUDGET, HUMANITY_CODE } from '@/data/rhs'
 import { emptyDueDiligence } from '@/lib/partners'
 import { unassignedSalaryLines, isSalaryLine, headcount, nextRhsNumber } from '@/lib/salary'
 import { buildVacancyChain, canDecideVacancy, scoreApplicant } from '@/lib/recruitment'
@@ -253,8 +253,8 @@ export type DataMode = 'clean' | 'demo'
 /** Which dataset a fresh browser starts with: clean (accounts + policy only) unless a demo flag is set. */
 export const startupMode = (): DataMode => { try { return localStorage.getItem('rhs-platform-mode') === 'demo' ? 'demo' : 'clean' } catch { return 'clean' } }
 /** Staff records for the platform accounts only — positions and line managers kept, salaries and contracts cleared. */
-/** Clean start: Bilal at the top of the org chart (salary 4,935 USD/month from the budget narrative) and the RHS colleagues from src/data/rhs.ts. */
-const cleanStaff = (): StaffMember[] => [RHS_ED, ...SEED_STAFF.filter((s) => s.userId === CORE_USER.id).map((s) => ({ ...s, monthlySalary: 4935, currency: 'USD' as const, endDate: undefined, contractRef: undefined, notes: '', lineManagerId: RHS_ED.id, budgetHolder: true, approvalLimitUSD: undefined, sourceProjectId: undefined, sourceProjectCode: undefined, sourceLineCode: undefined, status: 'active' as const })), ...RHS_STAFF, ...RHS_POSITIONS]
+/** Clean start: the Chairman, Bilal as Executive Director under him (salary 4,935 USD/month from the budget narrative) and the RHS colleagues from src/data/rhs.ts. */
+const cleanStaff = (): StaffMember[] => [RHS_CHAIR, ...SEED_STAFF.filter((s) => s.userId === CORE_USER.id).map((s) => ({ ...s, position: 'Executive Director', department: 'Executive Office', monthlySalary: 4935, currency: 'USD' as const, endDate: undefined, contractRef: undefined, notes: '', lineManagerId: RHS_CHAIR.id, budgetHolder: true, approvalLimitUSD: undefined, sourceProjectId: undefined, sourceProjectCode: undefined, sourceLineCode: undefined, status: 'active' as const })), ...RHS_STAFF, ...RHS_POSITIONS]
 const EMPTY_COUNTERS = { PR: 0, PO: 0, CT: 0, GRN: 0, INV: 0, ENV: 0, PT: 0, LR: 0, WFH: 0, PS: 0, REC: 0, APP: 0, SM: 0, SR: 0, WB: 0, TR: 0 }
 /** Clean start: user accounts, approval matrix, policy settings and minimal staff records; every register and document empty. */
 const cleanInitial = (): State => ({
@@ -842,7 +842,7 @@ export const useStore = create<State & Actions>()(
           let mb = mbId ? s0.masterBudgets.find((m) => m.id === mbId) : [...s0.masterBudgets].sort((x, y) => y.year - x.year).find((m) => m.status === 'draft')
           if (!mb) { if (s0.masterBudgets.some((m) => m.status === 'approved') && !mbId) return { ok: false, added: 0, updated: 0, removed: 0, error: 'The latest master budget is approved — re-open it or create the next year first.' }; mb = get().createMasterBudget(new Date().getFullYear()) }
           if (mb.status !== 'draft') return { ok: false, added: 0, updated: 0, removed: 0, error: `Master budget ${mb.year} is approved — re-open it to sync positions.` }
-          const staff = get().staff.filter((x) => x.status !== 'left' && !x.actingStaffId); const users = get().users
+          const staff = get().staff.filter((x) => x.status !== 'left' && !x.actingStaffId && x.contractType !== 'volunteer'); const users = get().users
           let added = 0, updated = 0
           let lines = mb.lines.filter((l) => !l.staffId || staff.some((x) => x.id === l.staffId)); const removed = mb.lines.length - lines.length
           let n = lines.length
@@ -1498,7 +1498,7 @@ export const useStore = create<State & Actions>()(
       }
     },
     {
-      name: 'rhs-platform-v8', version: 13,
+      name: 'rhs-platform-v8', version: 14,
       migrate: (persisted: unknown, version: number) => {
         const st = persisted as State
         if (version < 9 && st?.users) {
@@ -1547,6 +1547,19 @@ export const useStore = create<State & Actions>()(
           st.staff = st.staff.map((x) => (x.id === RHS_ED.id && x.acting ? { ...x, name: '', actingStaffId: x.actingStaffId ?? 'stf_2' } : x))
           st.staff = st.staff.map((x) => { const seed = RHS_POSITIONS.find((p) => p.id === x.id); return seed && !x.plannedTeam && seed.plannedTeam ? { ...x, plannedTeam: seed.plannedTeam } : x })
           st.users = st.users.map((u) => (u.id === 'u_bilal' ? { ...u, title: 'Director of Programs · Acting Executive Director' } : u))
+        }
+        if (version < 14 && st?.staff && st.dataMode !== 'demo') {
+          // One record for Bilal (Executive Director) instead of an acting placeholder plus his own record; the Chairman above him
+          const bilal = st.staff.find((x) => x.userId === CORE_USER.id)
+          const placeholder = st.staff.find((x) => x.id === RHS_ED.id && (x.actingStaffId || x.acting || !x.name.trim() || (bilal && x.id !== bilal.id && x.name.trim().toLowerCase() === bilal.name.trim().toLowerCase())))
+          if (placeholder) st.staff = st.staff.map((x) => (x.id === placeholder.id ? { ...RHS_CHAIR, createdAt: x.createdAt, updatedAt: nowIso() } : x))
+          else if (!st.staff.some((x) => /chairman/i.test(x.position))) st.staff = [{ ...RHS_CHAIR, id: 'stf_chair', rhsNumber: `RHS-${String(st.staff.length + 1).padStart(4, '0')}` }, ...st.staff]
+          const chair = st.staff.find((x) => /chairman/i.test(x.position))!
+          if (bilal) {
+            st.staff = st.staff.map((x) => (x.id === bilal.id ? { ...x, position: 'Executive Director', department: 'Executive Office', lineManagerId: chair.id, budgetHolder: true, updatedAt: nowIso() } : x.id !== chair.id && x.lineManagerId === placeholder?.id ? { ...x, lineManagerId: bilal.id } : x))
+            st.users = st.users.map((u) => (u.id === CORE_USER.id ? { ...u, title: 'Executive Director' } : u))
+          }
+          st.staff = st.staff.map((x) => (x.actingStaffId === bilal?.id ? { ...x, actingStaffId: undefined, acting: false } : x))
         }
         return st
       },

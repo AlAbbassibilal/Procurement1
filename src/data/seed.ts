@@ -56,10 +56,10 @@ export const COST_CENTERS = ['CC-100 Executive', 'CC-200 Medical', 'CC-210 Prost
 export const BUDGET_LINES = ['BL-01 Program Delivery', 'BL-02 Medical Supplies', 'BL-03 Capital Equipment', 'BL-04 Admin & Overheads', 'BL-05 Logistics', 'BL-06 Technology']
 
 /** The one real account every start begins with: Bilal Abbassi — system administrator, acting as Executive Director and Director of Programs in approval chains. */
-export const CORE_USER: User = { id: 'u_bilal', name: 'Bilal Abbassi', email: 'babbassi@RHS.jo', password: 'rhs2025', mustChangePassword: true, role: 'admin', approverRoles: ['executive_director', 'programs_director'], department: 'Programs', title: 'Director of Programs · Acting Executive Director', avatarColor: 'bg-brand-600', active: true }
+export const CORE_USER: User = { id: 'u_bilal', name: 'Bilal Abbassi', email: 'babbassi@RHS.jo', password: 'rhs2025', mustChangePassword: true, role: 'admin', approverRoles: ['executive_director', 'programs_director'], department: 'Programs', title: 'Executive Director', avatarColor: 'bg-brand-600', active: true }
 /** Sample-dataset accounts (demo mode only). A clean start has CORE_USER alone; real colleagues are added with their RHS.jo accounts. */
 export const SEED_USERS: User[] = [
-  { ...CORE_USER, mustChangePassword: false },   // sample dataset: no forced password change
+  { ...CORE_USER, mustChangePassword: false, title: 'Director of Programs' },   // sample dataset: no forced password change; Fawaz Al Shakaa is the sample Executive Director
   { id: 'u_shatha', name: 'Shatha Homsi',    email: 'shatha.homsi@rhs.jo',       password: 'rhs2025', role: 'finance_director',    department: 'Finance',           title: 'Director of Finance & Support', avatarColor: 'bg-sun-700',    active: true },
   { id: 'u_khalid', name: 'Khalid Mansour',  email: 'khalid.mansour@rhs.jo',     password: 'rhs2025', role: 'logistics',           department: 'Operations',        title: 'Logistics & Warehouse Officer', avatarColor: 'bg-ink-600',    active: true },
   { id: 'u_lina',   name: 'Lina Haddad',     email: 'lina.haddad@rhs.jo',        password: 'rhs2025', role: 'requester',           department: 'Medical Programs',  title: 'Program Coordinator',           avatarColor: 'bg-accent-600', active: true },

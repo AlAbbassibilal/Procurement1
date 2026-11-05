@@ -1498,7 +1498,7 @@ export const useStore = create<State & Actions>()(
       }
     },
     {
-      name: 'rhs-platform-v8', version: 14,
+      name: 'rhs-platform-v8', version: 15,
       migrate: (persisted: unknown, version: number) => {
         const st = persisted as State
         if (version < 9 && st?.users) {
@@ -1560,6 +1560,10 @@ export const useStore = create<State & Actions>()(
             st.users = st.users.map((u) => (u.id === CORE_USER.id ? { ...u, title: 'Executive Director' } : u))
           }
           st.staff = st.staff.map((x) => (x.actingStaffId === bilal?.id ? { ...x, actingStaffId: undefined, acting: false } : x))
+        }
+        if (version < 15 && st?.users) {
+          // Media & Communication workspace removed: drop its access entries from the accounts
+          st.users = st.users.map((u) => { if (!u.access || !('media' in u.access)) return u; const { media: _m, ...access } = u.access as Record<string, unknown>; return { ...u, access: access as User['access'] } })
         }
         return st
       },

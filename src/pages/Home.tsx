@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { CheckSquare, ListChecks, FileText, Lock, ArrowRight, PenLine, HandCoins, Handshake, ShoppingCart, Landmark, Users, Megaphone, LayoutGrid } from 'lucide-react'
+import { CheckSquare, ListChecks, FileText, Lock, ArrowRight, PenLine, HandCoins, Handshake, ShoppingCart, Landmark, Users, LayoutGrid } from 'lucide-react'
 import { useStore, useCurrentUser } from '@/store/useStore'
 import { PageHeader } from '@/components/ui'
 import { DEPARTMENTS, ACCESS_LABEL, effectiveAccess } from '@/lib/departments'
@@ -10,7 +10,7 @@ import { fmtMoney, cx } from '@/lib/format'
 import type { Department } from '@/types'
 
 export const DEPT_ICON: Record<Department, React.ReactNode> = {
-  grants: <HandCoins size={22} />, partnerships: <Handshake size={22} />, procurement: <ShoppingCart size={22} />, finance: <Landmark size={22} />, hr: <Users size={22} />, media: <Megaphone size={22} />,
+  grants: <HandCoins size={22} />, partnerships: <Handshake size={22} />, procurement: <ShoppingCart size={22} />, finance: <Landmark size={22} />, hr: <Users size={22} />,
 }
 
 export default function Home() {
@@ -38,7 +38,6 @@ export default function Home() {
     procurement: [{ label: 'Open requisitions', value: String(prs.filter((p) => ['pending_approval', 'approved', 'sourcing', 'awarded'].includes(p.status)).length) }, { label: 'POs in progress', value: String(pos.filter((p) => ['draft', 'pending_approval', 'approved', 'issued', 'contracted', 'partially_received'].includes(p.status)).length) }, { label: 'Contracts', value: String(contracts.filter((c) => c.status === 'active' || c.status === 'pending_signature').length) }],
     finance: [{ label: 'Invoices awaiting approval', value: String(invoices.filter((i) => i.status === 'pending_approval').length) }, { label: 'Match exceptions', value: String(invoices.filter((i) => i.status === 'exception').length) }, { label: 'Ready to pay', value: fmtMoney(invoices.filter((i) => i.status === 'approved').reduce((s, i) => s + i.lines.reduce((t, l) => t + l.quantity * l.unitPrice, 0) * (1 + i.taxRate / 100), 0), ccy) }],
     hr: [{ label: 'Staff', value: '—' }, { label: 'Open requests', value: '—' }],
-    media: [{ label: 'Scheduled content', value: '—' }, { label: 'Visibility items', value: '—' }],
   }
 
   return (

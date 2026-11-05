@@ -20,7 +20,7 @@ export type Role =
 // ---------------------------------------------------------------------------
 // Platform workspaces (departments) and per-user access
 // ---------------------------------------------------------------------------
-export type Department = 'grants' | 'partnerships' | 'procurement' | 'finance' | 'hr' | 'media'
+export type Department = 'grants' | 'partnerships' | 'procurement' | 'finance' | 'hr'
 export type AccessLevel = 'none' | 'view' | 'edit' | 'manage'
 
 export interface User {

@@ -6,7 +6,7 @@ import NoAccess from '@/pages/NoAccess'
 import EnvelopeList from '@/pages/esign/List'
 import EnvelopeNew from '@/pages/esign/New'
 import EnvelopeDetail from '@/pages/esign/Detail'
-import { FinanceHome, PartnershipsHome, HrHome, MediaHome } from '@/pages/departments'
+import { FinanceHome, PartnershipsHome, HrHome } from '@/pages/departments'
 import GrantsOverview from '@/pages/grants/Overview'
 import GrantsTracker from '@/pages/grants/Tracker'
 import Donors from '@/pages/grants/Donors'
@@ -145,7 +145,6 @@ export default function App() {
           <Route path="hr/recruitment/new" element={<VacancyForm />} />
           <Route path="hr/recruitment/:id/edit" element={<VacancyForm />} />
           <Route path="hr/recruitment/:id" element={<VacancyPage />} />
-          <Route path="media" element={<MediaHome />} />
           <Route path="approvals" element={<Approvals />} />
           <Route path="esign" element={<EnvelopeList />} />
           <Route path="esign/new" element={<EnvelopeNew />} />

@@ -20,9 +20,9 @@ export const RHS_USERS: User[] = [
   U('u_malissa', 'Mohammad Alissa', 'malissa@rhs.jo', 'procurement_officer', 'Supply Chain', 'Supply Chain Senior Officer', 'bg-brand-800'),
   U('u_dmohammad', "Dua'a Mohammad", 'dmohammad@rhs.jo', 'requester', 'Programs', 'Grants and Partnership Senior Officer', 'bg-accent-600',
     { access: { grants: 'manage', partnerships: 'manage', procurement: 'edit', finance: 'view' }, permissions: { 'grants.project.create': true, 'grants.project.edit': true, 'grants.project.stage': true, 'grants.donors.edit': true, 'grants.budget.edit': true, 'partners.edit': true, 'partners.manage': true } }),
-  U('u_aduwakiat', 'Alaa Duwakiat', 'aduwakiat@rhs.jo', 'dept_manager', 'Communication & Advocacy', 'Communication and Advocacy Team Leader', 'bg-info-700', { access: { grants: 'view', procurement: 'edit', hr: 'view', media: 'manage' } }),
+  U('u_aduwakiat', 'Alaa Duwakiat', 'aduwakiat@rhs.jo', 'dept_manager', 'Communication & Advocacy', 'Communication and Advocacy Team Leader', 'bg-info-700', { access: { grants: 'view', procurement: 'edit', hr: 'view' } }),
   U('u_mrawahneh', 'Majd Rawahneh', 'mrawahneh@rhs.jo', 'hr', 'HR & Admin', 'HR and Admin Officer', 'bg-info-500'),
-  U('u_tsharaan', 'Tala Sharaan', 'tsharaan@rhs.jo', 'requester', 'Communication & Advocacy', 'Content Creator', 'bg-brand-500', { access: { grants: 'view', procurement: 'edit', media: 'edit' } }),
+  U('u_tsharaan', 'Tala Sharaan', 'tsharaan@rhs.jo', 'requester', 'Communication & Advocacy', 'Content Creator', 'bg-brand-500', { access: { grants: 'view', procurement: 'edit' } }),
   U('u_mrimawi', 'Mohammad Rimawi', 'mrimawi@rhs.jo', 'dept_manager', 'Digital Innovation Hub', 'Lead Programmer', 'bg-ink-700'),
   U('u_rmohammad', 'Refaa Mohammad', 'rmohammad@rhs.jo', 'dept_manager', 'Technical Unit', 'Technical Unit Manager', 'bg-ink-900'),
 ]

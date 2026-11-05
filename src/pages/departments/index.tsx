@@ -112,4 +112,3 @@ export function HrHome() {
     } />
   )
 }
-export const MediaHome = () => <WorkspaceFrame id="media" />

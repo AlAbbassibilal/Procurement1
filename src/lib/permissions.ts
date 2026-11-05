@@ -49,7 +49,6 @@ export const PERMISSIONS: Record<Department, PermissionDef[]> = {
     { key: 'hr.recruitment.raise', label: 'Raise recruitment requests' },
     { key: 'hr.recruitment.advertise', label: 'Create advertisements and manage applicants' },
   ],
-  media: [],
 }
 export const ALL_PERMISSION_KEYS = Object.values(PERMISSIONS).flatMap((l) => l.map((p) => p.key))
 

@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Platform workspaces — the six department cards on the home hub.
+// Platform workspaces — the five department cards on the home hub.
 // Each workspace owns a set of routes; a user enters it according to their
 // access level (none / view / edit / manage), defaulting from their role.
 // ---------------------------------------------------------------------------
@@ -48,12 +48,6 @@ export const DEPARTMENTS: DepartmentDef[] = [
     tone: { tile: 'bg-ink-700 text-white', text: 'text-ink-700', ring: 'ring-ink-300' },
     modules: [{ to: '/hr', label: 'Overview' }, { to: '/hr/me', label: 'My HR' }, { to: '/hr/staff', label: 'Staff register' }, { to: '/hr/requests', label: 'Leave & WFH requests' }, { to: '/hr/timesheets', label: 'Timesheets' }, { to: '/hr/attendance', label: 'Attendance' }, { to: '/hr/payroll', label: 'Payroll & payslips' }, { to: '/hr/recruitment', label: 'Recruitment' }, { to: '/finance/salary-plan', label: 'Master salary plan' }],
   },
-  {
-    id: 'media', name: 'Media & Communication', short: 'Visibility & content', home: '/media', paths: ['/media'],
-    description: 'Content calendar, visibility commitments per grant, media assets and coverage log, and communication approvals.',
-    tone: { tile: 'bg-accent-600 text-white', text: 'text-accent-700', ring: 'ring-accent-200' },
-    modules: [{ to: '/media', label: 'Overview' }, { to: '/media/calendar', label: 'Content calendar', soon: true }, { to: '/media/visibility', label: 'Visibility log', soon: true }, { to: '/media/assets', label: 'Media assets', soon: true }],
-  },
 ]
 
 export const DEPT = Object.fromEntries(DEPARTMENTS.map((d) => [d.id, d])) as Record<Department, DepartmentDef>
@@ -61,9 +55,9 @@ export const ACCESS_LABEL: Record<AccessLevel, string> = { none: 'No access', vi
 
 /** Default workspace access by role — the admin can override per user. */
 const ROLE_DEFAULTS: Record<Role, Partial<Record<Department, AccessLevel>>> = {
-  admin:               { grants: 'manage', partnerships: 'manage', procurement: 'manage', finance: 'manage', hr: 'manage', media: 'manage' },
-  executive_director:  { grants: 'manage', partnerships: 'manage', procurement: 'manage', finance: 'manage', hr: 'manage', media: 'manage' },
-  programs_director:   { grants: 'manage', partnerships: 'manage', procurement: 'edit', finance: 'view', hr: 'view', media: 'edit' },
+  admin:               { grants: 'manage', partnerships: 'manage', procurement: 'manage', finance: 'manage', hr: 'manage' },
+  executive_director:  { grants: 'manage', partnerships: 'manage', procurement: 'manage', finance: 'manage', hr: 'manage' },
+  programs_director:   { grants: 'manage', partnerships: 'manage', procurement: 'edit', finance: 'view', hr: 'view' },
   finance_director:    { grants: 'edit', partnerships: 'view', procurement: 'edit', finance: 'manage', hr: 'view' },
   finance:             { grants: 'view', procurement: 'edit', finance: 'manage' },
   procurement_manager: { grants: 'view', procurement: 'manage', finance: 'view' },
